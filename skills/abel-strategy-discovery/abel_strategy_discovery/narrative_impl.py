@@ -92,6 +92,14 @@ MEMORY_VIEWS_DIRNAME = "views"
 MEMORY_OVERVIEW_FILENAME = "overview.md"
 MEMORY_COMPARE_FILENAME = "compare.md"
 
+EXPERIMENT_METADATA_ENV = {
+    "protocol_id": "ABEL_EXPERIMENT_PROTOCOL_ID",
+    "experiment_mode": "ABEL_EXPERIMENT_MODE",
+    "round_budget": "ABEL_EXPERIMENT_ROUND_BUDGET",
+    "abel_skills_commit": "ABEL_SKILLS_COMMIT",
+    "abel_edge_commit": "ABEL_EDGE_COMMIT",
+}
+
 RESULTS_HEADER = [
     "exp_id",
     "ticker",
@@ -2143,6 +2151,9 @@ def prepare_branch_inputs(args: argparse.Namespace) -> int:
     requested_start = str(
         branch_spec.get("requested_start") or _get_backtest_start(discovery)
     ).strip()
+    data_requirements = branch_spec.get("data_requirements") or {}
+    cache_adapter = str(data_requirements.get("adapter") or "abel")
+    cache_path = str(data_requirements.get("path") or "").strip()
     advisory_lines = branch_runtime_advisory_lines(
         branch_requested_start=requested_start,
         discovery=discovery,
@@ -2171,16 +2182,18 @@ def prepare_branch_inputs(args: argparse.Namespace) -> int:
         "causal_edge.cli",
         "warm-cache",
         "--adapter",
-        "abel",
+        cache_adapter,
         "--start",
         requested_start,
         "--timeframe",
-        str((branch_spec.get("data_requirements") or {}).get("timeframe") or "1d"),
+        str(data_requirements.get("timeframe") or "1d"),
         "--limit",
         str(args.cache_limit),
         "--output-json",
         str(output_path),
     ]
+    if cache_path:
+        command.extend(["--path", cache_path])
     for symbol in symbols:
         command.extend(["--symbol", symbol])
     completed = subprocess.run(
@@ -3621,6 +3634,7 @@ def build_memory_manifest(
         "created_at": discovery.get("created_at", _now()),
         "updated_at": _now(),
         "branch_count": len(branches),
+        "experiment": session_experiment_metadata(branches, round_rows),
         "memory_counts": {
             "branches": len(branch_rows),
             "rounds": len(round_rows),
@@ -4708,8 +4722,11 @@ def build_branch_context(
         ),
     }
     cache_root = (cache or {}).get("cache_root")
+    cache_path = (cache or {}).get("path")
     if cache_root:
         primary_feed["cache_root"] = cache_root
+    if cache_path:
+        primary_feed["path"] = cache_path
     feeds = {"primary": primary_feed}
     for item in (data_manifest.get("feeds") or []):
         if not isinstance(item, dict):
@@ -4728,10 +4745,12 @@ def build_branch_context(
             "node_id": str(item.get("node_id") or ""),
             "default_field": str(item.get("runtime_field") or "close"),
             **({"cache_root": item.get("cache_root")} if item.get("cache_root") else {}),
+            **({"path": item.get("path")} if item.get("path") else {}),
         }
     return {
         "schema_version": 1,
         "workspace_root": str(workspace_root) if workspace_root is not None else None,
+        "experiment": current_experiment_metadata(),
         "exp_id": session.name,
         "branch_id": branch.name,
         "round_id": round_id,
@@ -4761,6 +4780,57 @@ def build_branch_context(
         "_runtime_profile": runtime_profile,
         "_execution_constraints": execution_constraints,
         "_feeds": feeds,
+    }
+
+
+def current_experiment_metadata() -> dict[str, str]:
+    return {
+        key: str(os.environ.get(env_name) or "").strip()
+        for key, env_name in EXPERIMENT_METADATA_ENV.items()
+    }
+
+
+def session_experiment_metadata(
+    branches: list[dict],
+    round_rows: list[dict[str, str]],
+) -> dict[str, str]:
+    metadata = {key: "" for key in EXPERIMENT_METADATA_ENV}
+    branch_dirs = {branch["branch_id"]: branch["branch_dir"] for branch in branches}
+    latest_round = max(
+        round_rows,
+        key=lambda row: (row.get("ended_at", ""), row.get("round_id", "")),
+        default=None,
+    )
+    if latest_round is None:
+        return metadata
+    branch_dir = branch_dirs.get(latest_round.get("branch_id", ""))
+    if branch_dir is None:
+        return metadata
+    return round_experiment_metadata(branch_dir, latest_round.get("round_id", ""))
+
+
+def round_experiment_metadata(branch_dir: Path, round_id: str) -> dict[str, str]:
+    empty = {key: "" for key in EXPERIMENT_METADATA_ENV}
+    if not round_id:
+        return empty
+    note = read_round_note(branch_dir, round_id)
+    context_path_raw = note.get("context_path", "")
+    if not context_path_raw:
+        return empty
+    session = branch_dir.parent.parent
+    context_path = session / Path(context_path_raw)
+    if not context_path.exists():
+        return empty
+    try:
+        payload = json.loads(context_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return empty
+    experiment = payload.get("experiment")
+    if not isinstance(experiment, dict):
+        return empty
+    return {
+        key: str(experiment.get(key) or "").strip()
+        for key in EXPERIMENT_METADATA_ENV
     }
 
 
@@ -5398,6 +5468,7 @@ def build_data_manifest_payload(
     }
     feeds: list[dict[str, object]] = []
     adapter = str(cache_payload.get("adapter") or "abel")
+    path = cache_payload.get("path")
     timeframe = str(cache_payload.get("timeframe") or "1d")
     profile = str(cache_payload.get("profile") or "daily")
     cache_root = cache_payload.get("cache_root")
@@ -5433,6 +5504,8 @@ def build_data_manifest_payload(
         }
         if cache_root:
             feed_entry["cache_root"] = cache_root
+        if path:
+            feed_entry["path"] = path
         return feed_entry
 
     feeds.append(build_feed_entry(name="primary", ref=target_ref, role="target"))
