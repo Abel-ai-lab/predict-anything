@@ -3638,10 +3638,10 @@ def render_resume_state_facts(
     )
     return "\n".join(
         [
-            f"- agent_memory_records: `{len(records)}`",
-            f"- unresolved_memory_references: `{unresolved}`",
-            f"- closed_directions: `{closed_directions}`",
-            f"- open_questions: `{open_questions}`",
+            f"- legacy_agent_memory_records: `{len(records)}`",
+            f"- unresolved_legacy_memory_references: `{unresolved}`",
+            f"- legacy_closed_directions: `{closed_directions}`",
+            f"- legacy_open_questions: `{open_questions}`",
         ]
     )
 
