@@ -27,8 +27,10 @@ Only move into session or branch work when doctor reports `Status: ready`.
 ## Auth
 
 Reuse existing Abel auth first. If doctor reports `auth_missing`, do not start
-live discovery yet. Use `abel-auth` or the handoff command shown by doctor, then
-rerun doctor.
+live discovery yet. Use `abel-auth`, then rerun doctor.
+
+Do not invent a separate auth flow from this skill. `abel-auth` owns explicit
+auth handoff and credential setup.
 
 If the user explicitly asks for offline inspection, you may inspect existing
 artifacts without auth, but mark live discovery/evaluation as blocked until

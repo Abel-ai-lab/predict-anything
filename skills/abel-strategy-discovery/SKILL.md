@@ -29,8 +29,7 @@ Always start by resolving workspace state before strategy work.
      under the current directory, use that child workspace
    - else bootstrap a workspace before deep research work
 3. Run `abel-strategy-discovery doctor --path <workspace-root>`.
-4. If doctor reports `auth_missing`, use `abel-auth` or the user's provided
-   auth handoff, then rerun doctor.
+4. If doctor reports `auth_missing`, use `abel-auth`, then rerun doctor.
 5. Only start or continue session/branch work after doctor is ready, unless the
    user explicitly asks you to inspect or repair setup.
 
@@ -60,19 +59,21 @@ Always start by resolving workspace state before strategy work.
 2. Reuse the default workspace when it already exists.
 3. Bootstrap the workspace before deep strategy work when it does not exist yet.
 4. Use `abel-strategy-discovery` commands, not old command aliases.
-5. Treat `branch.yaml` as a research declaration, not evidence truth.
-6. Treat `evidence_ledger.json` and `frontier.md` as factual evidence surfaces,
+5. Reuse existing Abel auth first. If live access is still missing, use
+   `abel-auth`.
+6. Treat `branch.yaml` as a research declaration, not evidence truth.
+7. Treat `evidence_ledger.json` and `frontier.md` as factual evidence surfaces,
    not generated strategy advice.
-7. Treat `agent_context.md` as the compact factual resume surface and
+8. Treat `agent_context.md` as the compact factual resume surface and
    `research_journal.md` as agent-owned research state.
-8. New sessions are graph-first: live causal graph discovery is the opening
+9. New sessions are graph-first: live causal graph discovery is the opening
    search prior, then strategy variants, then parameters.
-9. Do not treat branch count as proof of breadth. Graph/input concentration,
+10. Do not treat branch count as proof of breadth. Graph/input concentration,
    strategy-variant coverage, and local refinement pressure are separate facts.
-10. Do not call parameter, sizing, threshold, filter, or window tweaks broad
+11. Do not call parameter, sizing, threshold, filter, or window tweaks broad
    exploration.
-11. When evidence accumulates or a pivot checkpoint is due, update
+12. When evidence accumulates or a pivot checkpoint is due, update
    `research_journal.md` with agent-owned reflection and evidence references
    before continuing deep local refinement.
-12. The framework defines evidence validity. The agent owns the strategy
+13. The framework defines evidence validity. The agent owns the strategy
     thinking.
