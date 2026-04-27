@@ -141,6 +141,7 @@ INITIAL_BREADTH_ROUND_THRESHOLD = 3
 INITIAL_BRANCH_FAMILY_MINIMUM = 2
 INPUT_BREADTH_ROUND_THRESHOLD = 8
 MEMORY_CHECKPOINT_ROUND_THRESHOLD = 6
+GRAPH_PRIORITY_ROUND_MINIMUM = 3
 SAME_NEIGHBORHOOD_FAIL_THRESHOLD = 5
 SAME_BRANCH_ROUND_THRESHOLD = 8
 
@@ -350,10 +351,19 @@ def main() -> int:
         default=DEFAULT_BACKTEST_START,
         help="Session-level backtest start date passed to causal-edge evaluate",
     )
-    init_session.add_argument(
+    discovery_group = init_session.add_mutually_exclusive_group()
+    discovery_group.add_argument(
         "--discover",
+        dest="discover",
         action="store_true",
-        help="Run live Abel discovery and persist it into discovery.json",
+        default=True,
+        help="Run live Abel discovery and persist it into discovery.json (default)",
+    )
+    discovery_group.add_argument(
+        "--no-discover",
+        dest="discover",
+        action="store_false",
+        help="Create an explicit pending/offline session without live graph discovery",
     )
     init_session.add_argument(
         "--discover-limit",
@@ -832,7 +842,7 @@ def handle_workspace_command(args: argparse.Namespace) -> int:
         if doctor_exit_code(doctor_result) == 0:
             print(f"  cd {root}")
             print(f"  {default_activate_command()}")
-            print("  abel-strategy-discovery init-session --ticker <TICKER> --exp-id <session-id>")
+            print("  abel-strategy-discovery init-session --ticker <TICKER> --exp-id <session-id>  # runs live graph discovery by default")
         else:
             print(f"  cd {root}")
             next_step = str(doctor_result.get("next_step") or "").strip()
@@ -925,10 +935,10 @@ def resolve_session_root(root_arg: str | None) -> Path:
 
 def render_breadth_first_start_lines(session: Path) -> list[str]:
     return [
-        "breadth-first start protocol:",
+        "graph-first breadth protocol:",
         f"abel-strategy-discovery init-branch --session {session} --branch-id <family-a-branch>",
         f"abel-strategy-discovery init-branch --session {session} --branch-id <family-b-branch>",
-        "edit each branch.yaml with agent-chosen hypothesis-family declarations before deep local refinement",
+        "edit each branch.yaml with graph/input hypotheses and agent-chosen mechanism-family declarations before deep local refinement",
         "or continue intentionally narrow by recording --single-branch-rationale on the recorded round",
     ]
 
@@ -1078,12 +1088,12 @@ def fetch_live_discovery(ticker: str, *, limit: int) -> dict:
     except MissingAbelApiKeyError as exc:
         python_bin = resolve_default_python_bin(workspace_root or Path.cwd())
         raise RuntimeError(
-            "init-session --discover is blocked on Abel auth. "
+            "init-session live graph discovery is blocked on Abel auth. "
             "No reusable auth was found, so start explicit auth handoff now with:\n"
             f"{build_auth_handoff_command(python_bin)}\n\n"
             "Surface the URL immediately when it appears, complete authorization, "
             "then retry `abel-strategy-discovery init-session --ticker "
-            f"{ticker.upper()} --exp-id <exp-id> --discover`."
+            f"{ticker.upper()} --exp-id <exp-id>`."
         ) from exc
 
     payload = discover_graph_payload(ticker.upper(), mode="all", limit=limit)
@@ -1869,6 +1879,8 @@ def run_branch_round(args: argparse.Namespace) -> int:
         render_session(session)
     for line in exploration_protocol_warning_lines(session, branch.name, round_id):
         print(f"Exploration protocol: {line}")
+    for line in graph_priority_warning_lines(session):
+        print(f"Exploration protocol: {line}")
     for line in input_breadth_warning_lines(session):
         print(f"Exploration protocol: {line}")
     for line in memory_checkpoint_warning_lines(session):
@@ -2426,6 +2438,28 @@ def input_breadth_warning_lines(session: Path) -> list[str]:
     ]
 
 
+def graph_priority_warning_lines(session: Path) -> list[str]:
+    frontier = load_json_object(session / FRONTIER_JSON_FILENAME)
+    graph_priority = frontier.get("graph_priority") if isinstance(frontier.get("graph_priority"), dict) else {}
+    if not graph_priority:
+        return []
+    lines: list[str] = []
+    if graph_priority.get("graph_discovery_missing"):
+        lines.append(
+            "graph_discovery_missing=true "
+            f"graph_discovery_source={graph_priority.get('graph_discovery_source', 'unknown')} "
+            f"graph_discovery_k={graph_priority.get('graph_discovery_k', 0)} "
+            f"target_only_saturation={str(graph_priority.get('target_only_saturation', False)).lower()}"
+        )
+    if graph_priority.get("graph_first_uncovered"):
+        lines.append(
+            "graph_first_uncovered=true "
+            f"graph_discovery_k={graph_priority.get('graph_discovery_k', 0)} "
+            f"target_only_saturation={str(graph_priority.get('target_only_saturation', False)).lower()}"
+        )
+    return lines
+
+
 def memory_checkpoint_warning_lines(session: Path) -> list[str]:
     frontier = load_json_object(session / FRONTIER_JSON_FILENAME)
     checkpoint = frontier.get("memory_checkpoint") if isinstance(frontier.get("memory_checkpoint"), dict) else {}
@@ -2925,12 +2959,15 @@ def build_evidence_ledger(session: Path, discovery: dict, branches: list[dict]) 
     for branch in branches:
         rows.extend(build_evidence_rows_for_branch(session, branch))
     annotate_exploration_protocol(rows)
+    discovered_drivers = discovered_driver_tickers(discovery)
     return {
         "schema_version": 1,
         "exp_id": session.name,
         "asset_scope": discovery.get("ticker", session.parent.name.upper()),
         "generated_at": _now(),
-        "discovered_drivers": discovered_driver_tickers(discovery),
+        "graph_discovery_source": discovery.get("source", "unknown"),
+        "graph_discovery_k": int(discovery.get("K_discovery") or len(discovered_drivers)),
+        "discovered_drivers": discovered_drivers,
         "rows": rows,
     }
 
@@ -2958,6 +2995,8 @@ def build_frontier(
 ) -> dict:
     rows = [row for row in (ledger.get("rows") or []) if isinstance(row, dict)]
     discovered_drivers = ordered_unique_upper(ledger.get("discovered_drivers") or [])
+    graph_discovery_source = str(ledger.get("graph_discovery_source") or "unknown")
+    graph_discovery_k = int(ledger.get("graph_discovery_k") or len(discovered_drivers))
     label_counts: dict[str, int] = {}
     label_verdict_counts: dict[str, dict[str, int]] = {}
     label_decision_counts: dict[str, dict[str, int]] = {}
@@ -3071,7 +3110,18 @@ def build_frontier(
         len(discovered_drivers) >= 2
         and recorded_round_count >= INPUT_BREADTH_ROUND_THRESHOLD
         and len(candidate_driver_sets) < 2
-        and agent_memory_count == 0
+    )
+    graph_candidates_available = bool(discovered_drivers) or graph_discovery_k > 0
+    target_only_saturation = (
+        recorded_round_count >= GRAPH_PRIORITY_ROUND_MINIMUM
+        and target_only_recorded_round_count == recorded_round_count
+        and recorded_round_count > 0
+    )
+    graph_discovery_missing = target_only_saturation and not graph_candidates_available
+    graph_first_uncovered = (
+        graph_candidates_available
+        and recorded_round_count >= GRAPH_PRIORITY_ROUND_MINIMUM
+        and graph_supported_candidate_round_count == 0
     )
     memory_checkpoint_reason = "none"
     if agent_memory_count == 0 and recorded_round_count >= MEMORY_CHECKPOINT_ROUND_THRESHOLD:
@@ -3129,6 +3179,15 @@ def build_frontier(
             ),
             "target_only_recorded_round_count": target_only_recorded_round_count,
             "graph_supported_candidate_round_count": graph_supported_candidate_round_count,
+        },
+        "graph_priority": {
+            "graph_discovery_source": graph_discovery_source,
+            "graph_discovery_k": graph_discovery_k,
+            "graph_candidates_available": graph_candidates_available,
+            "graph_first_uncovered": graph_first_uncovered,
+            "graph_discovery_missing": graph_discovery_missing,
+            "target_only_saturation": target_only_saturation,
+            "graph_priority_round_minimum": GRAPH_PRIORITY_ROUND_MINIMUM,
         },
         "memory_checkpoint": {
             "agent_memory_records": int(agent_memory_count),
@@ -3261,6 +3320,7 @@ def render_frontier_markdown(frontier: dict) -> str:
     concentration = frontier.get("coverage_concentration") or {}
     exploration = frontier.get("exploration_breadth") or {}
     input_breadth = frontier.get("input_breadth") or {}
+    graph_priority = frontier.get("graph_priority") or {}
     memory_checkpoint = frontier.get("memory_checkpoint") or {}
     return f"""# Evidence Frontier
 
@@ -3353,6 +3413,16 @@ generated by Abel strategy discovery narrative layer
 - target_only_recorded_round_count: `{input_breadth.get("target_only_recorded_round_count", 0)}`
 - graph_supported_candidate_round_count: `{input_breadth.get("graph_supported_candidate_round_count", 0)}`
 
+## Graph Priority
+
+- graph_discovery_source: `{graph_priority.get("graph_discovery_source", "unknown")}`
+- graph_discovery_k: `{graph_priority.get("graph_discovery_k", 0)}`
+- graph_candidates_available: `{str(graph_priority.get("graph_candidates_available", False)).lower()}`
+- graph_first_uncovered: `{str(graph_priority.get("graph_first_uncovered", False)).lower()}`
+- graph_discovery_missing: `{str(graph_priority.get("graph_discovery_missing", False)).lower()}`
+- target_only_saturation: `{str(graph_priority.get("target_only_saturation", False)).lower()}`
+- graph_priority_round_minimum: `{graph_priority.get("graph_priority_round_minimum", 0)}`
+
 ## Memory Checkpoint
 
 - memory_checkpoint_due: `{str(memory_checkpoint.get("memory_checkpoint_due", False)).lower()}`
@@ -3412,6 +3482,7 @@ def render_session_frontier_summary(frontier: dict) -> str:
     concentration = frontier.get("coverage_concentration") or {}
     exploration = frontier.get("exploration_breadth") or {}
     input_breadth = frontier.get("input_breadth") or {}
+    graph_priority = frontier.get("graph_priority") or {}
     memory_checkpoint = frontier.get("memory_checkpoint") or {}
     return "\n".join(
         [
@@ -3430,6 +3501,8 @@ def render_session_frontier_summary(frontier: dict) -> str:
             f"- agent_memory_records: `{concentration.get('agent_memory_records', 0)}`",
             f"- branch_family_count: `{exploration.get('branch_family_count', 0)}`",
             f"- candidate_driver_set_count: `{input_breadth.get('candidate_driver_set_count', 0)}`",
+            f"- graph_first_uncovered: `{str(graph_priority.get('graph_first_uncovered', False)).lower()}`",
+            f"- graph_discovery_missing: `{str(graph_priority.get('graph_discovery_missing', False)).lower()}`",
             f"- memory_checkpoint_due: `{str(memory_checkpoint.get('memory_checkpoint_due', False)).lower()}`",
             f"- initial_breadth_incomplete: `{str(exploration.get('initial_breadth_incomplete', False)).lower()}`",
             f"- local_refinement_count: `{exploration.get('local_refinement_count', 0)}`",
@@ -3484,6 +3557,10 @@ generated by Abel strategy discovery narrative layer
 ## Input Breadth
 
 {render_agent_context_input_breadth(frontier)}
+
+## Graph Priority
+
+{render_agent_context_graph_priority(frontier)}
 
 ## Breadth Protocol State
 
@@ -3549,6 +3626,23 @@ def render_agent_context_input_breadth(frontier: dict) -> str:
             f"- discovered_driver_coverage: `{input_breadth.get('discovered_driver_coverage', '0/0')}`",
             f"- target_only_recorded_round_count: `{input_breadth.get('target_only_recorded_round_count', 0)}`",
             f"- graph_supported_candidate_round_count: `{input_breadth.get('graph_supported_candidate_round_count', 0)}`",
+        ]
+    )
+
+
+def render_agent_context_graph_priority(frontier: dict) -> str:
+    graph_priority = frontier.get("graph_priority") or {}
+    if not graph_priority:
+        return "- not generated"
+    return "\n".join(
+        [
+            f"- graph_discovery_source: `{graph_priority.get('graph_discovery_source', 'unknown')}`",
+            f"- graph_discovery_k: `{graph_priority.get('graph_discovery_k', 0)}`",
+            f"- graph_candidates_available: `{str(graph_priority.get('graph_candidates_available', False)).lower()}`",
+            f"- graph_first_uncovered: `{str(graph_priority.get('graph_first_uncovered', False)).lower()}`",
+            f"- graph_discovery_missing: `{str(graph_priority.get('graph_discovery_missing', False)).lower()}`",
+            f"- target_only_saturation: `{str(graph_priority.get('target_only_saturation', False)).lower()}`",
+            f"- graph_priority_round_minimum: `{graph_priority.get('graph_priority_round_minimum', 0)}`",
         ]
     )
 
@@ -5011,17 +5105,19 @@ def suggest_branch_drivers(discovery: dict, readiness: dict, *, limit: int = 5) 
 
 def build_default_branch_spec(*, branch: Path, discovery: dict, readiness: dict) -> dict:
     suggested = suggest_branch_drivers(discovery, readiness, limit=5)
+    selected = suggested[: min(3, len(suggested))]
+    graph_first = bool(selected)
     return {
         "version": 2,
         "branch_id": branch.name,
         "target": discovery.get("ticker", branch.parent.parent.parent.name.upper()),
         "hypothesis": "",
         "evidence_intent": "draft",
-        "input_claim": "target_only",
+        "input_claim": "graph_supported" if graph_first else "target_only",
         "mechanism_family": "unspecified",
         "invalidation_condition": "",
-        "source_type": "draft",
-        "method_family": "unspecified",
+        "source_type": "causal" if graph_first else "draft",
+        "method_family": "graph" if graph_first else "unspecified",
         "model_family": "unspecified",
         "complexity_class": "unspecified",
         "exploration_role": "candidate",
@@ -5029,8 +5125,8 @@ def build_default_branch_spec(*, branch: Path, discovery: dict, readiness: dict)
         "requested_start": _get_backtest_start(discovery),
         "resolved_start_policy": "requested",
         "overlap_mode": "target_only",
-        "selected_inputs": [],
-        "selected_drivers": [],
+        "selected_inputs": selected,
+        "selected_drivers": selected,
         "suggested_drivers": suggested,
         "data_requirements": {
             "timeframe": "1d",

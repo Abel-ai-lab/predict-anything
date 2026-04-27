@@ -19,6 +19,9 @@ Direct parents are the default opening, not a guarantee that the final branch
 should stay direct-only.
 Discovery should widen the search space without pretending to pre-solve the
 strategy.
+Live discovery is the normal session opening. Use an explicit no-discovery
+fallback only when auth, service access, or continuity constraints make live
+graph discovery unavailable.
 
 ## Session Model
 

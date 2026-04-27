@@ -24,13 +24,14 @@ Operating rules:
    not generated strategy advice.
 8. Treat `agent_context.md` and `agent_memory.jsonl` as agent-owned resume
    state; do not expect the system to generate next strategy directions.
-9. New sessions default to a breadth-first start: make at least two
-   agent-chosen hypothesis families explicit before deep local refinement, or
-   record an agent-authored single-branch rationale.
-10. Do not call parameter, sizing, threshold, filter, or window tweaks broad
+9. New sessions are graph-first: use live causal graph discovery as the opening
+   search prior, then explore strategy variants, then tune parameters.
+10. Make at least two agent-chosen hypothesis families explicit before deep
+    local refinement, or record an agent-authored single-branch rationale.
+11. Do not call parameter, sizing, threshold, filter, or window tweaks broad
     exploration. Use changed-dimension and continuation-rationale fields to keep
     local refinement accountable.
-11. When evidence accumulates, write agent-owned memory with ledger or frontier
+12. When evidence accumulates, write agent-owned memory with ledger or frontier
     references before continuing deep refinement.
 
 Read `references/workspace-bootstrap.md` before bootstrapping a new workspace.

@@ -15,7 +15,7 @@ Do not decide that "the workspace does not exist" by checking only whether
 ## Standard Path
 
 ```bash
-abel-alpha init-session --ticker <TICKER> --exp-id <exp-id> --discover
+abel-alpha init-session --ticker <TICKER> --exp-id <exp-id>
 abel-alpha init-branch --session research/<ticker>/<exp_id> --branch-id <family-a-branch>
 abel-alpha init-branch --session research/<ticker>/<exp_id> --branch-id <family-b-branch>
 
@@ -40,10 +40,10 @@ Each round should answer a question about mechanism, not just consume compute.
 Each branch should stay a hypothesis family. If a new round changes drivers,
 mechanism, model family, or complexity class, record that dimension explicitly
 or use a new branch when the thesis has materially changed.
-New sessions default to breadth-first start: make at least two agent-chosen
-hypothesis families explicit before deep local refinement. If intentionally
-starting narrow, record the reason with `--single-branch-rationale` on the
-recorded round.
+New sessions run live graph discovery by default. Treat graph/input coverage as
+the opening priority, then make at least two agent-chosen hypothesis families
+explicit before deep local refinement. If intentionally starting narrow, record
+the reason with `--single-branch-rationale` on the recorded round.
 
 After each render, treat `evidence_ledger.json` as the evidence record and
 `frontier.md` / `frontier.json` as factual coverage reports. They should show

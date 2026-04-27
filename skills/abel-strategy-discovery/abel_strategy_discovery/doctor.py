@@ -178,7 +178,7 @@ def run_doctor(start: Path | None = None) -> dict[str, object]:
             ),
             "next_step": (
                 "abel-strategy-discovery init-session --ticker <TICKER> --exp-id <session-id>  "
-                "# then init-branch -> edit branch.yaml -> prepare-branch"
+                "# runs live graph discovery by default, then init-branch -> edit branch.yaml -> prepare-branch"
             ),
         }
     )

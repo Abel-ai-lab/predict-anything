@@ -12,9 +12,11 @@ from abel_strategy_discovery import narrative_impl as ni
 def _sample_discovery() -> dict:
     return {
         "ticker": "TSLA",
+        "source": "abel_live",
         "parents": [{"ticker": "AAPL"}, {"ticker": "MSFT"}],
         "blanket_new": [],
         "children": [],
+        "K_discovery": 2,
         "backtest": {"start": "2020-01-01"},
     }
 
@@ -329,6 +331,7 @@ def _complete_candidate_spec(
             "exploration_role": exploration_role,
             "invalidation_condition": "Driver reads disappear or validation fails repeatedly.",
             "requested_start": "2020-01-01",
+            "selected_inputs": selected,
             "selected_drivers": selected,
         }
     )
@@ -450,7 +453,7 @@ def test_prepare_branch_inputs_writes_runtime_contract_artifacts(tmp_path, monke
     assert "DecisionContext" in context_guide
 
 
-def test_default_branch_spec_starts_as_draft_declaration(tmp_path) -> None:
+def test_default_branch_spec_starts_as_graph_first_draft_declaration(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-decl", tmp_path / "research")
     ni.write_discovery(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
@@ -460,15 +463,112 @@ def test_default_branch_spec_starts_as_draft_declaration(tmp_path) -> None:
     status = ni.branch_declaration_status(spec)
 
     assert spec["evidence_intent"] == "draft"
-    assert spec["source_type"] == "draft"
-    assert spec["method_family"] == "unspecified"
+    assert spec["input_claim"] == "graph_supported"
+    assert spec["source_type"] == "causal"
+    assert spec["method_family"] == "graph"
     assert spec["model_family"] == "unspecified"
     assert spec["complexity_class"] == "unspecified"
     assert spec["exploration_role"] == "candidate"
-    assert spec["selected_drivers"] == []
+    assert spec["overlap_mode"] == "target_only"
+    assert spec["selected_inputs"] == ["AAPL", "MSFT"]
+    assert spec["selected_drivers"] == ["AAPL", "MSFT"]
     assert status["protocol_complete"] is False
     assert "hypothesis" in status["protocol_gaps"]
     assert "evidence_intent:draft" in status["protocol_gaps"]
+
+
+def test_default_branch_spec_stays_target_only_when_discovery_is_pending(tmp_path) -> None:
+    session = ni.init_session_dir("TSLA", "tsla-decl-pending", tmp_path / "research")
+    branch = ni.init_branch_dir(session, "fallback-v1")
+
+    spec = ni.load_branch_spec(branch)
+
+    assert spec["evidence_intent"] == "draft"
+    assert spec["input_claim"] == "target_only"
+    assert spec["source_type"] == "draft"
+    assert spec["method_family"] == "unspecified"
+    assert spec["selected_inputs"] == []
+    assert spec["selected_drivers"] == []
+
+
+def test_init_session_cli_runs_live_discovery_by_default(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    calls: list[tuple[str, int]] = []
+
+    def fake_fetch_live_discovery(ticker: str, *, limit: int) -> dict:
+        calls.append((ticker, limit))
+        return _sample_discovery()
+
+    monkeypatch.setattr(ni, "fetch_live_discovery", fake_fetch_live_discovery)
+    monkeypatch.setattr(ni, "refresh_data_readiness", lambda **_kwargs: _sample_readiness())
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "abel-strategy-discovery",
+            "init-session",
+            "--ticker",
+            "TSLA",
+            "--exp-id",
+            "tsla-cli-default",
+            "--root",
+            str(tmp_path / "research"),
+        ],
+    )
+
+    assert ni.main() == 0
+    out = capsys.readouterr().out
+    discovery = json.loads(
+        (tmp_path / "research" / "tsla" / "tsla-cli-default" / "discovery.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert calls == [("TSLA", 10)]
+    assert discovery["source"] == "abel_live"
+    assert discovery["K_discovery"] == 2
+    assert "discovery_source: abel_live (K=2)" in out
+
+
+def test_init_session_cli_no_discover_is_explicit_pending_fallback(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    def fail_fetch_live_discovery(*_args, **_kwargs) -> dict:
+        raise AssertionError("live discovery should not run with --no-discover")
+
+    monkeypatch.setattr(ni, "fetch_live_discovery", fail_fetch_live_discovery)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "abel-strategy-discovery",
+            "init-session",
+            "--ticker",
+            "TSLA",
+            "--exp-id",
+            "tsla-cli-pending",
+            "--root",
+            str(tmp_path / "research"),
+            "--no-discover",
+        ],
+    )
+
+    assert ni.main() == 0
+    out = capsys.readouterr().out
+    discovery = json.loads(
+        (tmp_path / "research" / "tsla" / "tsla-cli-pending" / "discovery.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert discovery["source"] == "pending"
+    assert discovery["K_discovery"] == 0
+    assert "discovery_source: pending (live discovery not run)" in out
 
 
 def test_complete_branch_declaration_accepts_legacy_selected_drivers(tmp_path) -> None:
@@ -1037,7 +1137,29 @@ def test_input_breadth_warning_marks_thin_candidate_driver_coverage(tmp_path) ->
     context_text = (session / ni.AGENT_CONTEXT_FILENAME).read_text(encoding="utf-8")
 
     assert frontier["input_breadth"]["input_breadth_thin"] is True
+    assert frontier["graph_priority"]["graph_candidates_available"] is True
     assert "input_breadth_thin: `true`" in context_text
+    assert ni.input_breadth_warning_lines(session) == [
+        "input_breadth_thin=true "
+        "candidate_driver_set_count=1 "
+        "discovered_driver_coverage=1/2 "
+        "target_only_recorded_round_count=4 "
+        "graph_supported_candidate_round_count=4"
+    ]
+
+    ni.record_agent_memory(
+        Namespace(
+            session=str(session),
+            branch="",
+            scope="session",
+            type="insight",
+            text="AAPL-only graph candidate coverage remains thin.",
+            confidence="medium",
+            status="active",
+            round_id="",
+            evidence_ref=["frontier:input_breadth"],
+        )
+    )
     assert ni.input_breadth_warning_lines(session) == [
         "input_breadth_thin=true "
         "candidate_driver_set_count=1 "
@@ -1063,6 +1185,71 @@ def test_input_breadth_warning_marks_thin_candidate_driver_coverage(tmp_path) ->
     assert frontier["input_breadth"]["candidate_driver_set_count"] == 2
     assert frontier["input_breadth"]["input_breadth_thin"] is False
     assert ni.input_breadth_warning_lines(session) == []
+
+
+def test_graph_priority_warns_when_graph_candidates_are_uncovered(tmp_path) -> None:
+    session = ni.init_session_dir("TSLA", "tsla-graph-uncovered", tmp_path / "research")
+    ni.write_discovery(session, _sample_discovery())
+    ni.write_readiness(session, _sample_readiness())
+    target_branch = ni.init_branch_dir(session, "target-control")
+    target_spec = _complete_candidate_spec(target_branch, selected_drivers=[])
+    target_spec["input_claim"] = "target_only"
+    target_spec["selected_drivers"] = []
+    target_spec["selected_inputs"] = []
+
+    for index in range(3):
+        _record_synthetic_round(
+            session,
+            target_branch,
+            spec=target_spec,
+            result=_edge_result(traced_inputs=[], verdict="FAIL"),
+            round_id=f"round-{index + 1:03d}",
+            decision="discard",
+        )
+
+    ni.render_session(session)
+    frontier = json.loads((session / ni.FRONTIER_JSON_FILENAME).read_text(encoding="utf-8"))
+    context_text = (session / ni.AGENT_CONTEXT_FILENAME).read_text(encoding="utf-8")
+
+    assert frontier["graph_priority"]["graph_candidates_available"] is True
+    assert frontier["graph_priority"]["graph_first_uncovered"] is True
+    assert frontier["graph_priority"]["graph_discovery_missing"] is False
+    assert "graph_first_uncovered: `true`" in context_text
+    assert ni.graph_priority_warning_lines(session) == [
+        "graph_first_uncovered=true graph_discovery_k=2 target_only_saturation=true"
+    ]
+
+
+def test_graph_priority_warns_when_discovery_is_missing_and_target_only_saturates(tmp_path) -> None:
+    session = ni.init_session_dir("TSLA", "tsla-graph-missing", tmp_path / "research")
+    target_branch = ni.init_branch_dir(session, "target-control")
+    target_spec = _complete_candidate_spec(target_branch, selected_drivers=[])
+    target_spec["input_claim"] = "target_only"
+    target_spec["selected_drivers"] = []
+    target_spec["selected_inputs"] = []
+
+    for index in range(3):
+        _record_synthetic_round(
+            session,
+            target_branch,
+            spec=target_spec,
+            result=_edge_result(traced_inputs=[], verdict="FAIL"),
+            round_id=f"round-{index + 1:03d}",
+            decision="discard",
+        )
+
+    ni.render_session(session)
+    frontier = json.loads((session / ni.FRONTIER_JSON_FILENAME).read_text(encoding="utf-8"))
+
+    assert frontier["graph_priority"]["graph_candidates_available"] is False
+    assert frontier["graph_priority"]["graph_discovery_missing"] is True
+    assert frontier["graph_priority"]["graph_first_uncovered"] is False
+    assert ni.graph_priority_warning_lines(session) == [
+        "graph_discovery_missing=true "
+        "graph_discovery_source=pending "
+        "graph_discovery_k=0 "
+        "target_only_saturation=true"
+    ]
 
 
 def test_memory_checkpoint_requires_agent_authored_memory_after_evidence(tmp_path) -> None:
@@ -1237,7 +1424,7 @@ def test_init_session_output_uses_breadth_first_start_protocol() -> None:
     assert "<family-a-branch>" in rendered
     assert "<family-b-branch>" in rendered
     assert "graph-v1" not in rendered
-    assert "breadth-first start protocol" in rendered
+    assert "graph-first breadth protocol" in rendered
 
 
 def test_tsla_replay_fixture_keeps_broad_failed_search_as_frontier_facts(tmp_path) -> None:

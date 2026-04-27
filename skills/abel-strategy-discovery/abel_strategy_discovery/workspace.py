@@ -260,7 +260,7 @@ into branch evidence.
 ```bash
 abel-strategy-discovery doctor
 {default_activate_command()}
-abel-strategy-discovery init-session --ticker TSLA --exp-id tsla-v1 --discover
+abel-strategy-discovery init-session --ticker TSLA --exp-id tsla-v1
 abel-strategy-discovery init-branch --session research/tsla/tsla-v1 --branch-id <family-a-branch>
 abel-strategy-discovery init-branch --session research/tsla/tsla-v1 --branch-id <family-b-branch>
 edit research/tsla/tsla-v1/branches/<family-a-branch>/branch.yaml
@@ -342,7 +342,7 @@ is the workspace root. Do not create `./abel-strategy-discovery-workspace` insid
 ### Start a new exploration session
 ```bash
 abel-strategy-discovery doctor
-abel-strategy-discovery init-session --ticker TSLA --exp-id tsla-v1 --discover
+abel-strategy-discovery init-session --ticker TSLA --exp-id tsla-v1
 abel-strategy-discovery init-branch --session research/tsla/tsla-v1 --branch-id <family-a-branch>
 abel-strategy-discovery init-branch --session research/tsla/tsla-v1 --branch-id <family-b-branch>
 edit research/tsla/tsla-v1/branches/<family-a-branch>/branch.yaml

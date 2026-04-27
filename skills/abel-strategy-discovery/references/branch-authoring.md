@@ -67,6 +67,10 @@ model family, complexity class, or expansion probe. Local refinement means
 parameter, sizing, threshold, filter, window, or implementation work inside the
 same family.
 
+The default priority is graph/input first, strategy variants second, and
+parameters last. Multiple target-only branch families can be useful controls,
+but they do not cover graph/input breadth when live graph candidates exist.
+
 At session start, make at least two agent-chosen hypothesis families explicit
 before deep local refinement. The protocol exits for a narrow start are factual:
 multiple recorded branch families or an agent-authored
