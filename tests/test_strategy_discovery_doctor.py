@@ -50,7 +50,7 @@ def test_run_doctor_ready_reports_alpha_managed_branch_research(
     assert "Workspace mode: alpha-managed branch research" in report
 
 
-def test_run_doctor_auth_missing_points_to_abel_auth(
+def test_run_doctor_auth_missing_routes_to_abel_auth(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -76,21 +76,15 @@ def test_run_doctor_auth_missing_points_to_abel_auth(
     monkeypatch.setattr(
         doctor,
         "probe_abel_auth",
-        lambda *_args, **_kwargs: {
-            "ok": False,
-            "source": "missing",
-            "path": None,
-        },
+        lambda *_args, **_kwargs: {"ok": False, "source": "missing"},
     )
 
     result = doctor.run_doctor(root)
+    report = doctor.render_doctor_report(result)
 
     assert result["status"] == "auth_missing"
-    assert "abel-auth" in str(result["summary"])
     assert "abel-auth" in str(result["next_step"])
-    assert "causal_edge.cli login" not in str(result["next_step"])
-
-    report = doctor.render_doctor_report(result)
-    assert "Auth handoff:" in report
-    assert "abel-auth" in report
+    assert "causal_edge.cli login" not in str(result)
+    assert "edge_login_fallback" not in str(result)
+    assert "Auth action: Use abel-auth" in report
 

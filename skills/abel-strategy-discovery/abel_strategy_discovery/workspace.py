@@ -188,7 +188,7 @@ def build_default_manifest(name: str) -> dict:
             "python": default_python_path(),
             "edge_package": "causal-edge",
             "edge_spec": DEFAULT_EDGE_SPEC,
-            "auth_strategy": "reuse_skill_collection_auth_first",
+            "auth_strategy": "reuse_abel_auth_first",
         },
         "defaults": {
             "backtest_start": "2020-01-01",
@@ -260,22 +260,29 @@ into branch evidence.
 ```bash
 abel-strategy-discovery doctor
 {default_activate_command()}
-abel-strategy-discovery init-session --ticker TSLA --exp-id tsla-v1 --discover
-abel-strategy-discovery frontier-status --session research/tsla/tsla-v1
-abel-strategy-discovery init-branch --session research/tsla/tsla-v1 --branch-id graph-v1
-abel-strategy-discovery select-inputs --branch research/tsla/tsla-v1/branches/graph-v1 --node TSLA.volume --replace
-edit research/tsla/tsla-v1/branches/graph-v1/branch.yaml
-abel-strategy-discovery prepare-branch --branch research/tsla/tsla-v1/branches/graph-v1
-abel-strategy-discovery debug-branch --branch research/tsla/tsla-v1/branches/graph-v1
-abel-strategy-discovery run-branch --branch research/tsla/tsla-v1/branches/graph-v1 -d "baseline"
+abel-strategy-discovery init-session --ticker TSLA --exp-id tsla-v1
+abel-strategy-discovery init-branch --session research/tsla/tsla-v1 --branch-id <family-a-branch>
+abel-strategy-discovery init-branch --session research/tsla/tsla-v1 --branch-id <family-b-branch>
+edit research/tsla/tsla-v1/branches/<family-a-branch>/branch.yaml
+edit research/tsla/tsla-v1/branches/<family-b-branch>/branch.yaml
+edit research/tsla/tsla-v1/research_journal.md
+edit research/tsla/tsla-v1/branches/<chosen-branch>/engine.py
+abel-strategy-discovery prepare-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
+abel-strategy-discovery debug-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
+abel-strategy-discovery run-branch --branch research/tsla/tsla-v1/branches/<chosen-branch> -d "baseline"
+edit research/tsla/tsla-v1/research_journal.md
+abel-strategy-discovery upload-dashboard-bundle --branch research/tsla/tsla-v1/branches/<chosen-branch> --base-url <router-base-url>
 ```
 
 Use that path as orientation, not as a rigid script. The important boundary is:
 - `doctor` tells you whether the workspace is actually ready
-- `frontier-status` and `select-inputs` keep branch candidates graph-grounded
-- `branch.yaml` makes the final branch inputs explicit
+- `branch.yaml` makes the branch inputs explicit
 - `prepare-branch` resolves inputs before you treat any round as evidence
 - the starter `engine.py` is only there to verify branch wiring before a branch-specific mechanism exists
+- new sessions default to graph-first research: use causal graph inputs first,
+  then strategy variants, then parameters
+- every recorded round requires an agent-written `research_journal.md` entry
+  with the round ledger ref before the next recorded round
 
 ## Re-entry
 
@@ -286,10 +293,16 @@ Use that path as orientation, not as a rigid script. The important boundary is:
 
 ## What This Workspace Makes Explicit
 
-- session owns `discovery.json`, `session_state.json`, `frontier.json`, and `readiness.json`
-- branch owns `branch.yaml` and its explicit `selected_inputs`
+- session owns `discovery.json` and `readiness.json`
+- session owns `evidence_ledger.json`, `frontier.md`, `agent_context.md`, and
+  `research_journal.md` after rendering
+- branch owns `branch.yaml`
 - edge owns the market-data cache
-- `prepare-branch` writes the prepared branch contract, including `window_availability.json`
+- `prepare-branch` should run before a recorded round
+- `frontier.md` reports input realization: declared graph-supported inputs only
+  count as realized when the engine reads prepared auxiliary inputs
+- `upload-dashboard-bundle` uploads branch evidence from the current workspace
+  surfaces, not promotion or replay artifacts
 - session `backtest_start` is a default target; branch `requested_start` can override it explicitly
 - the generated `engine.py` is a starter baseline for the first end-to-end run, not a finished branch thesis
 
@@ -311,7 +324,7 @@ Run `abel-strategy-discovery doctor` before opening a session.
 
 - `ready`: you can start research
 - `ready` means continue with `init-session -> init-branch -> branch.yaml -> prepare-branch`
-- `auth_missing`: no reusable auth was found; use `abel-auth` to initialize or repair shared collection auth before continuing
+- `auth_missing`: no reusable auth was found; use `abel-auth`, then rerun `doctor`
 - `env_missing`, `edge_missing`, or `edge_contract_missing`: rerun `abel-strategy-discovery env init`
 """
 
@@ -339,42 +352,49 @@ is the workspace root. Do not create `./abel-strategy-discovery-workspace` insid
 ### Start a new exploration session
 ```bash
 abel-strategy-discovery doctor
-abel-strategy-discovery init-session --ticker TSLA --exp-id tsla-v1 --discover
-abel-strategy-discovery frontier-status --session research/tsla/tsla-v1
-abel-strategy-discovery init-branch --session research/tsla/tsla-v1 --branch-id graph-v1
-abel-strategy-discovery select-inputs --branch research/tsla/tsla-v1/branches/graph-v1 --node TSLA.volume --replace
-edit research/tsla/tsla-v1/branches/graph-v1/branch.yaml
-abel-strategy-discovery prepare-branch --branch research/tsla/tsla-v1/branches/graph-v1
-abel-strategy-discovery debug-branch --branch research/tsla/tsla-v1/branches/graph-v1
-abel-strategy-discovery run-branch --branch research/tsla/tsla-v1/branches/graph-v1 -d "baseline"
+abel-strategy-discovery init-session --ticker TSLA --exp-id tsla-v1
+abel-strategy-discovery init-branch --session research/tsla/tsla-v1 --branch-id <family-a-branch>
+abel-strategy-discovery init-branch --session research/tsla/tsla-v1 --branch-id <family-b-branch>
+edit research/tsla/tsla-v1/branches/<family-a-branch>/branch.yaml
+edit research/tsla/tsla-v1/branches/<family-b-branch>/branch.yaml
+edit research/tsla/tsla-v1/research_journal.md
+edit research/tsla/tsla-v1/branches/<chosen-branch>/engine.py
+abel-strategy-discovery prepare-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
+abel-strategy-discovery debug-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
+abel-strategy-discovery run-branch --branch research/tsla/tsla-v1/branches/<chosen-branch> -d "baseline"
+edit research/tsla/tsla-v1/research_journal.md
+abel-strategy-discovery upload-dashboard-bundle --branch research/tsla/tsla-v1/branches/<chosen-branch> --base-url <router-base-url>
 ```
 
 Run `doctor` before `init-session`. If it reports `auth_missing`, use
-`abel-auth` immediately so the shared collection auth is repaired before the
-session continues.
-Treat the session frontier as the default search surface. Use
-`frontier-status`, `probe-nodes`, and `select-inputs` before widening the
-branch universe free-form. Treat `branch.yaml` as the place where target,
-selected inputs, start, and overlap become explicit. Treat `prepare-branch` as
-the moment that makes those inputs real. Treat the generated `engine.py` as a
-starter path check; once the branch path is proven, encode the branch-specific
-mechanism there. Treat session readiness as advisory context; the branch's
-explicit `requested_start` is the runtime start when it is set. Treat this
-workspace `.venv` as the canonical runtime for daily work.
+`abel-auth`, then rerun `doctor`.
+Treat `branch.yaml` as the place where target, start, drivers, and overlap
+become explicit. Treat `prepare-branch` as the moment that makes those inputs
+real. Treat the generated `engine.py` as a starter path check; once the branch
+path is proven, encode the branch-specific mechanism there. Treat session
+readiness as advisory context; the branch's explicit `requested_start` is the
+runtime start when it is set. Treat this workspace `.venv` as the canonical
+runtime for daily work. Treat branch count as a file-organization fact, not as
+proof of graph/input breadth. Use `research_journal.md` to record your own
+evidence-linked insight and continue/pivot reasoning after each recorded round.
+Check journal coverage before starting another round. Check input realization before treating a
+declared graph-supported branch as graph-supported evidence. When a branch has
+candidate evidence worth external inspection, `upload-dashboard-bundle` sends
+branch evidence from the current workspace surfaces.
 This workspace is for alpha-managed branch research, so do not create a
 standalone `causal-edge init` project inside it. Put standalone edge work in a
 separate directory.
 
 ### Run one research round
 ```bash
-abel-strategy-discovery debug-branch --branch research/tsla/tsla-v1/branches/graph-v1
-abel-strategy-discovery run-branch --branch research/tsla/tsla-v1/branches/graph-v1 -d "baseline"
-abel-strategy-discovery promote-branch --branch research/tsla/tsla-v1/branches/graph-v1
+abel-strategy-discovery debug-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
+abel-strategy-discovery run-branch --branch research/tsla/tsla-v1/branches/<chosen-branch> -d "baseline"
+abel-strategy-discovery promote-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
 ```
 
 ### Understand the workspace layout
 - `alpha.workspace.yaml` is the source of truth for workspace defaults
-- `research/` stores sessions, frontier state, branches, and evaluation outputs
+- `research/` stores sessions, branches, and evaluation outputs
 - `docs/` stores plans, summaries, and iteration records
 - `cache/market_data/` is the edge-owned shared cache root
 

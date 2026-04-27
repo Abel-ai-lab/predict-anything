@@ -1,108 +1,146 @@
 # Branch Authoring
 
-Use this reference after the workspace is ready and you are moving from
-workspace setup into session and branch work.
+Use this reference after the workspace is ready and you are creating or revising
+a research branch.
 
 ## Branch Model
 
-- `discovery.json` is only the session candidate snapshot
-- `frontier.json` is the durable session exploration surface
-- `readiness.json` is only the session coverage/advisory report
-- `branch.yaml` defines the branch runtime intent
+- `discovery.json` is the session candidate snapshot.
+- `readiness.json` is the session coverage/advisory report.
+- `branch.yaml` defines the branch research declaration and runtime intent.
 - `prepare-branch` resolves inputs, writes the branch contract, and warms edge
-  cache before a recorded round
-- `debug-branch` is the semantic preflight step
-- `run-branch` should consume prepared branch inputs, not invent them at runtime
-- session `backtest_start` is the default research target; `branch.yaml.requested_start` may override it explicitly
+  cache.
+- `debug-branch` is the semantic preflight step.
+- `run-branch` consumes prepared inputs and records evidence.
 
 Discovery gives leads, not answers. Readiness gives coverage clues, not
-permission. A branch is where the research becomes a falsifiable bet.
+permission. A branch is a hypothesis family: a coherent thesis, input set,
+mechanism, model family, and complexity class.
 
-## What `prepare-branch` Produces
+## Evidence Boundary
 
-The branch contract is materialized under `inputs/`:
+`branch.yaml` is a claim, not proof. Fill these fields before expecting a run
+to count as protocol-complete candidate evidence:
+
+- `hypothesis`
+- `evidence_intent`: `candidate`, `control`, `diagnostic`, or `draft`
+- `input_claim`: `graph_supported`, `target_only`, `supplement`, or `mixed`
+- `mechanism_family`
+- `invalidation_condition`
+- `requested_start`
+- `selected_inputs`
+- `model_family`
+- `complexity_class`
+- `exploration_role`
+
+The evidence ledger derives labels from explicit declaration fields plus actual
+edge runtime facts. `frontier.md` and `frontier.json` report coverage facts; they
+are not a strategy advisor.
+
+Input realization is recorded separately from declaration:
+
+- declared input claim: what `branch.yaml` says the branch intends
+- prepared auxiliary inputs: what `prepare-branch` made available
+- actual auxiliary reads: what the engine read at runtime
+- realized input claim: what kind of evidence the round actually supports
+
+If `input_claim=graph_supported` but runtime does not read the prepared graph
+inputs, the round is a graph input read gap. It can still be useful control or
+diagnostic evidence, but the declaration alone does not make it candidate
+causal evidence.
+
+## Exploration Shape
+
+Use branch fields to describe the hypothesis family:
+
+- `model_family`: `rule_signal`, `linear_model`, `tree_model`, `learned_model`,
+  `ensemble`, `hybrid`, or `unspecified`
+- `complexity_class`: `simple_signal`, `interaction`, `regime`, `portfolio`,
+  `learned_model`, `hybrid`, or `unspecified`
+- `exploration_role`: `candidate`, `control`, `ablation`, `expansion_probe`,
+  `refinement`, `diagnostic`, or `unspecified`
+
+Use `run-branch --changed-dimension` to describe factual round changes:
+
+```bash
+abel-strategy-discovery run-branch --branch ... -d "..." \
+  --changed-dimension drivers
+```
+
+Broad exploration means a new input hypothesis, mechanism family, model family,
+complexity class, or expansion probe. Local refinement means parameter, sizing,
+threshold, filter, window, or implementation work inside the same family.
+
+The default priority is graph/input first, strategy variants second, and
+parameters last. Target-only controls are useful contrast evidence, but they do
+not cover graph-supported candidate input breadth when live graph candidates
+exist.
+
+## Journal And Research Reflection
+
+`agent_context.md` is the compact factual resume surface. `research_journal.md`
+is the agent-owned research state.
+
+Use the journal for:
+
+- hypotheses and observations
+- failed neighborhoods
+- open questions
+- reasons to continue, pivot, add contrast evidence, or stop
+- cross-branch comparisons
+- final research summaries
+
+When an insight should survive as a research conclusion, cite evidence such as
+`ledger:<branch_id>:<round_id>`, `frontier.md`, or a raw artifact path.
+
+Every recorded round needs its own agent-written journal entry before the next
+recorded round. The entry does not need a fixed template, but it must cite the
+round ledger ref and preserve the observation or insight that should guide later
+exploration.
+
+When `journal_coverage_complete=false`, use frontier facts and the journal to
+close the missing entries. State whether you are continuing the neighborhood,
+pivoting graph/input, changing strategy family, adding contrast evidence, or
+stopping. The framework exposes the shape of the search; it should not choose
+the route.
+
+## Prepared Inputs
+
+`prepare-branch` materializes the branch contract under `inputs/`:
 
 - `runtime_profile.json`
 - `execution_constraints.json`
 - `data_manifest.json`
-- `window_availability.json`
 - `context_guide.md`
 - `probe_samples.json`
 - `dependencies.json`
 
-Those files are the system-owned description of the runtime world. The agent
-should inspect them before changing strategy logic.
+Inspect these files before changing strategy logic. Prefer prepared branch
+inputs over discovery-side inference.
 
 ## What To Do
 
-- state a branch thesis clearly
-- prepare the branch inputs
-- inspect the prepared inputs
-- write `engine.py`
-- read semantic preflight before recording a round
-- interpret the result honestly
-- decide the next branch move
-
-Strategy discovery owns the bookkeeping so the branch can focus on mechanism,
-not file management theater.
-
-## Writing `engine.py`
-
-Write against the branch-default contract:
-
-- implement `compute_decisions(self, ctx)`
-- inspect `ctx.target.series("close")` for the tradeable target
-- inspect `ctx.input(name)...` or `ctx.inputs_frame(...)` for prepared auxiliary inputs
-- inspect `ctx.feed(name).native_series(...)` for native feed cadence
-- inspect `ctx.feed(name).asof_series(...)` when you need target-calendar as-of values
-- inspect `ctx.points()` when you need point-level reasoning or debugging
-- return `ctx.decisions(next_position)`
-
-Prefer prepared branch inputs over discovery-side inference:
-
-- inspect `frontier.json` first when deciding whether the branch still needs wider search
-- inspect `inputs/context_guide.md`
-- inspect `inputs/data_manifest.json`
-- inspect `inputs/window_availability.json`
-- inspect `inputs/probe_samples.json`
-- treat `runtime_profile.json` and `execution_constraints.json` as system-owned
-  runtime facts, not something the strategy should guess or re-declare
-
-Do not parse relative workspace files manually when the injected context already
-contains the prepared branch payload.
-
-Do not reach for raw loaders or ad hoc alignment helpers from inside
-`compute_decisions()`. If you cannot express a read through `DecisionContext`,
-surface that mismatch and fix the framework or branch inputs instead of writing
-around the contract.
-
-## Recommended Loop
-
 1. State the branch thesis in `branch.yaml`.
-2. Probe or expand frontier nodes until the input set is worth testing.
-3. Run `select-inputs` or update `selected_inputs`.
-4. Run `prepare-branch`.
-5. Inspect `inputs/context_guide.md`, `window_availability.json`, `probe_samples.json`, and `data_manifest.json`.
-6. Implement or revise `compute_decisions(self, ctx)`.
-7. Run `abel-strategy-discovery debug-branch --branch ...`.
-8. Read the semantic verdict and traces.
-9. Only then decide whether `run-branch` is justified.
-
-## Readiness
-
-Keep readiness advisory:
-
-- use it to understand coverage
-- do not treat it as a hard permission system
-- do not force all selected inputs to share the latest common start unless the branch thesis truly requires strict overlap
-- do not confuse session start guidance with the branch's explicit requested start
+2. Run `abel-strategy-discovery prepare-branch --branch ...`.
+3. Inspect `inputs/context_guide.md`, `probe_samples.json`, and
+   `inputs/data_manifest.json`.
+4. Implement or revise `compute_decisions(self, ctx)`.
+5. Run `abel-strategy-discovery debug-branch --branch ...`.
+6. Read the semantic verdict and traces.
+7. Run `abel-strategy-discovery run-branch --branch ...` when declaration and
+   debug facts are ready enough for the evidence label you want.
+8. Read `evidence_ledger.json` and `frontier.md`.
+9. Update `research_journal.md` with grounded follow-up state.
 
 ## Research Judgment
 
-- start causal-first; correlation-derived signals may help, but do not replace Abel discovery as the main search prior
-- explore means new information, a new transmission path, or a genuinely different mechanism
-- weird low-attention parents are not automatically noise; explain them before discarding them
-- treat semantic failure as a signal about visibility or timing assumptions
-- treat metric failure as direction, not as a prompt to hack metrics
-- serial compounding beats pre-declaring a large experiment grid
-- stop honestly when recent rounds are no longer improving and no high-quality new direction remains
+- causal discovery is a prior, not an evidence label
+- explore means new information, a new transmission path, or a genuinely
+  different mechanism
+- branch count is not exploration breadth if every branch is the same family and
+  input claim
+- weird low-attention parents are not automatically noise
+- semantic failure is a signal about visibility or timing assumptions
+- metric failure is evidence about the mechanism, not a prompt to hack metrics
+- stop honestly when recent rounds are no longer improving and no high-quality
+  new direction remains
