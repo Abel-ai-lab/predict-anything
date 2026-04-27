@@ -1002,6 +1002,69 @@ def test_input_breadth_reports_candidate_driver_set_coverage(tmp_path) -> None:
     assert not any(term in context_text.lower() for term in forbidden)
 
 
+def test_input_breadth_warning_marks_thin_candidate_driver_coverage(tmp_path) -> None:
+    session = ni.init_session_dir("TSLA", "tsla-input-breadth-warning", tmp_path / "research")
+    ni.write_discovery(session, _sample_discovery())
+    ni.write_readiness(session, _sample_readiness())
+    graph_branch = ni.init_branch_dir(session, "graph-aapl")
+    graph_spec = _complete_candidate_spec(graph_branch, selected_drivers=["AAPL"])
+    target_branch = ni.init_branch_dir(session, "target-control")
+    target_spec = _complete_candidate_spec(target_branch, selected_drivers=[])
+    target_spec["input_claim"] = "target_only"
+    target_spec["selected_drivers"] = []
+    target_spec["selected_inputs"] = []
+
+    for index in range(4):
+        _record_synthetic_round(
+            session,
+            graph_branch,
+            spec=graph_spec,
+            result=_edge_result(traced_inputs=["AAPL"], verdict="FAIL"),
+            round_id=f"round-{index + 1:03d}",
+            decision="discard",
+        )
+        _record_synthetic_round(
+            session,
+            target_branch,
+            spec=target_spec,
+            result=_edge_result(traced_inputs=[], verdict="FAIL"),
+            round_id=f"round-{index + 1:03d}",
+            decision="discard",
+        )
+
+    ni.render_session(session)
+    frontier = json.loads((session / ni.FRONTIER_JSON_FILENAME).read_text(encoding="utf-8"))
+    context_text = (session / ni.AGENT_CONTEXT_FILENAME).read_text(encoding="utf-8")
+
+    assert frontier["input_breadth"]["input_breadth_thin"] is True
+    assert "input_breadth_thin: `true`" in context_text
+    assert ni.input_breadth_warning_lines(session) == [
+        "input_breadth_thin=true "
+        "candidate_driver_set_count=1 "
+        "discovered_driver_coverage=1/2 "
+        "target_only_recorded_round_count=4 "
+        "graph_supported_candidate_round_count=4"
+    ]
+
+    msft_branch = ni.init_branch_dir(session, "graph-msft")
+    msft_spec = _complete_candidate_spec(msft_branch, selected_drivers=["MSFT"])
+    _record_synthetic_round(
+        session,
+        msft_branch,
+        spec=msft_spec,
+        result=_edge_result(traced_inputs=["MSFT"], verdict="FAIL"),
+        round_id="round-001",
+        decision="discard",
+    )
+
+    ni.render_session(session)
+    frontier = json.loads((session / ni.FRONTIER_JSON_FILENAME).read_text(encoding="utf-8"))
+
+    assert frontier["input_breadth"]["candidate_driver_set_count"] == 2
+    assert frontier["input_breadth"]["input_breadth_thin"] is False
+    assert ni.input_breadth_warning_lines(session) == []
+
+
 def test_debug_rows_do_not_cross_initial_breadth_threshold(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-breadth-debug", tmp_path / "research")
     ni.write_discovery(session, _sample_discovery())
