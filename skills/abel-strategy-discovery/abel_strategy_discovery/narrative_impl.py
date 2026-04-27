@@ -134,7 +134,7 @@ BROAD_CHANGED_DIMENSIONS = {"drivers", "mechanism", "model_family", "complexity"
 LOCAL_CHANGED_DIMENSIONS = {"sizing", "thresholds", "filters", "window", "implementation"}
 INPUT_BREADTH_ROUND_THRESHOLD = 8
 GRAPH_PRIORITY_ROUND_MINIMUM = 3
-SAME_NEIGHBORHOOD_FAIL_THRESHOLD = 5
+RESEARCH_REFLECTION_ROUND_THRESHOLD = 3
 JOURNAL_REFERENCE_RE = re.compile(
     r"(ledger:[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+|"
     r"frontier:[A-Za-z0-9_.-]+|"
@@ -1448,6 +1448,8 @@ def build_skill_dashboard_bundle(branch: Path, *, uploaded_at: str | None = None
 
     discovered_drivers = ordered_unique_upper(ledger.get("discovered_drivers") or [])
     graph_priority = frontier.get("graph_priority") if isinstance(frontier.get("graph_priority"), dict) else {}
+    input_realization = frontier.get("input_realization") if isinstance(frontier.get("input_realization"), dict) else {}
+    research_reflection = frontier.get("research_reflection") if isinstance(frontier.get("research_reflection"), dict) else {}
     return {
         "sessionId": session.name,
         "branchId": branch.name,
@@ -1463,6 +1465,8 @@ def build_skill_dashboard_bundle(branch: Path, *, uploaded_at: str | None = None
                 "discoveredDrivers": discovered_drivers,
                 "frontierRows": frontier.get("row_count", 0),
                 "graphFirstUncovered": bool(graph_priority.get("graph_first_uncovered")),
+                "researchReflection": research_reflection,
+                "inputRealization": input_realization,
             },
             "branch": branch_payload,
             "rounds": skill_dashboard_rounds(branch, rows, ledger),
@@ -1583,6 +1587,7 @@ def skill_dashboard_rounds(branch: Path, rows: list[dict[str, str]], ledger: dic
                 "explorationClass": evidence.get("derived_exploration_class", ""),
                 "declaredInputs": evidence.get("declared_selected_inputs", []),
                 "actualReads": evidence.get("actual_auxiliary_reads", []),
+                "inputRealization": evidence.get("input_realization", {}),
                 "contextRef": evidence.get("context_ref", ""),
                 "resultRef": evidence.get("result_ref", ""),
                 "reportRef": evidence.get("report_ref", ""),
@@ -2060,10 +2065,8 @@ def run_branch_round(args: argparse.Namespace) -> int:
         render_session(session)
     for line in graph_priority_warning_lines(session):
         print(f"Exploration protocol: {line}")
-    for line in input_breadth_warning_lines(session):
-        print(f"Exploration protocol: {line}")
-    for line in pivot_checkpoint_warning_lines(session):
-        print(f"Exploration protocol: {line}")
+    for line in research_reflection_warning_lines(session):
+        print(f"Research reflection: {line}")
     print(f"Alpha context: {context_path.relative_to(session)}")
     print(f"Edge result: {result_path.relative_to(session)}")
     print(f"Edge validation: {report_path.relative_to(session)}")
@@ -2447,13 +2450,15 @@ def print_status(session: Path) -> None:
     if frontier:
         labels = frontier.get("evidence_label_counts") or {}
         graph_priority = frontier.get("graph_priority") or {}
+        reflection = frontier.get("research_reflection") or {}
         print(
             "Evidence frontier: "
             f"rows={frontier.get('row_count', 0)} "
             f"candidate_causal={labels.get('candidate_causal_evidence', 0)} "
             f"target_control={labels.get('target_control_evidence', 0)} "
             f"workflow_blockers={frontier.get('workflow_blockers', 0)} "
-            f"graph_first_uncovered={str(graph_priority.get('graph_first_uncovered', False)).lower()}"
+            f"graph_first_uncovered={str(graph_priority.get('graph_first_uncovered', False)).lower()} "
+            f"research_reflection_due={str(reflection.get('research_reflection_due', False)).lower()}"
         )
     for branch in branches:
         latest = branch["rows"][-1] if branch["rows"] else {}
@@ -2571,29 +2576,14 @@ def check_session(session: Path, *, strict: bool) -> int:
 
 def validate_exploration_protocol(session: Path, failures: list[str]) -> None:
     frontier = load_json_object(session / FRONTIER_JSON_FILENAME)
-    checkpoint = frontier.get("pivot_checkpoint") if isinstance(frontier.get("pivot_checkpoint"), dict) else {}
-    if not checkpoint:
+    reflection = frontier.get("research_reflection") if isinstance(frontier.get("research_reflection"), dict) else {}
+    if not reflection:
         return
-    reasons = [str(item) for item in checkpoint.get("pivot_checkpoint_reasons") or []]
-    if checkpoint.get("pivot_checkpoint_due") and "missing_evidence_linked_journal" in reasons:
+    if reflection.get("research_reflection_due"):
         failures.append(
-            "pivot checkpoint due without evidence-linked journal reflection: "
-            f"reasons={render_reason_list(reasons)}"
+            "research reflection due without evidence-linked journal update: "
+            f"recorded_round_count={reflection.get('recorded_round_count', 0)}"
         )
-
-
-def input_breadth_warning_lines(session: Path) -> list[str]:
-    frontier = load_json_object(session / FRONTIER_JSON_FILENAME)
-    input_breadth = frontier.get("input_breadth") if isinstance(frontier.get("input_breadth"), dict) else {}
-    if not input_breadth or not input_breadth.get("input_breadth_thin"):
-        return []
-    return [
-        "input_breadth_thin=true "
-        f"candidate_driver_set_count={input_breadth.get('candidate_driver_set_count', 0)} "
-        f"discovered_driver_coverage={input_breadth.get('discovered_driver_coverage', '0/0')} "
-        f"target_only_recorded_round_count={input_breadth.get('target_only_recorded_round_count', 0)} "
-        f"graph_supported_candidate_round_count={input_breadth.get('graph_supported_candidate_round_count', 0)}"
-    ]
 
 
 def graph_priority_warning_lines(session: Path) -> list[str]:
@@ -2618,14 +2608,14 @@ def graph_priority_warning_lines(session: Path) -> list[str]:
     return lines
 
 
-def pivot_checkpoint_warning_lines(session: Path) -> list[str]:
+def research_reflection_warning_lines(session: Path) -> list[str]:
     frontier = load_json_object(session / FRONTIER_JSON_FILENAME)
-    checkpoint = frontier.get("pivot_checkpoint") if isinstance(frontier.get("pivot_checkpoint"), dict) else {}
-    if not checkpoint or not checkpoint.get("pivot_checkpoint_due"):
+    reflection = frontier.get("research_reflection") if isinstance(frontier.get("research_reflection"), dict) else {}
+    if not reflection or not reflection.get("research_reflection_due"):
         return []
     return [
-        "pivot_checkpoint_due=true "
-        f"reasons={render_reason_list(checkpoint.get('pivot_checkpoint_reasons') or [])} "
+        "research_reflection_due=true "
+        f"recorded_round_count={reflection.get('recorded_round_count', 0)} "
         "required_action=update_research_journal_with_evidence_refs"
     ]
 
@@ -3020,7 +3010,6 @@ def build_frontier(
     branch_family_counts: dict[str, int] = {}
     neighborhood_counts: dict[str, int] = {}
     recorded_neighborhood_counts: dict[str, int] = {}
-    failed_neighborhood_counts: dict[str, int] = {}
     exploration_class_counts: dict[str, int] = {}
     model_family_counts: dict[str, int] = {}
     complexity_class_counts: dict[str, int] = {}
@@ -3028,6 +3017,9 @@ def build_frontier(
     driver_reads: set[str] = set()
     candidate_driver_sets: set[str] = set()
     candidate_discovered_drivers: set[str] = set()
+    declared_graph_supported_rounds = 0
+    realized_graph_supported_rounds = 0
+    graph_input_read_gap_rows: list[str] = []
     target_only_recorded_round_count = 0
     graph_supported_candidate_round_count = 0
     protocol_complete = 0
@@ -3054,8 +3046,19 @@ def build_frontier(
             increment_count(branch_family_counts, str(row.get("branch_family_key") or branch_family_key(row)))
             neighborhood = str(row.get("exploration_neighborhood_key") or exploration_neighborhood_key(row))
             increment_count(recorded_neighborhood_counts, neighborhood)
-            if label == "candidate_causal_evidence" and verdict == "FAIL":
-                increment_count(failed_neighborhood_counts, neighborhood)
+            input_realization = (
+                row.get("input_realization")
+                if isinstance(row.get("input_realization"), dict)
+                else {}
+            )
+            if str(input_realization.get("declared_input_claim") or row.get("declared_input_claim") or "") == "graph_supported":
+                declared_graph_supported_rounds += 1
+            if str(input_realization.get("realized_input_claim") or "") == "graph_supported":
+                realized_graph_supported_rounds += 1
+            if input_realization.get("graph_input_read_gap"):
+                graph_input_read_gap_rows.append(
+                    f"{row.get('branch_id', 'unknown')}:{row.get('round_id') or row.get('run_id') or 'unknown'}"
+                )
             if str(row.get("declared_input_claim") or "") == "target_only":
                 target_only_recorded_round_count += 1
             if label == "candidate_causal_evidence":
@@ -3099,7 +3102,6 @@ def build_frontier(
     dominant_driver_set, dominant_driver_set_count = dominant_count(driver_set_counts)
     dominant_neighborhood, dominant_neighborhood_count = dominant_count(neighborhood_counts)
     dominant_recorded_neighborhood, dominant_recorded_neighborhood_count = dominant_count(recorded_neighborhood_counts)
-    dominant_failed_neighborhood, dominant_failed_neighborhood_count = dominant_count(failed_neighborhood_counts)
     same_branch_max_rounds = max(recorded_branch_counts.values(), default=0)
     recorded_round_count = sum(recorded_branch_counts.values())
     diagnostic_row_count = sum(1 for row in rows if row.get("run_type") != "round")
@@ -3125,32 +3127,10 @@ def build_frontier(
     ablation_evidence_count = exploration_role_counts.get("ablation", 0)
     expansion_probe_count = exploration_role_counts.get("expansion_probe", 0)
     compact_journal = compact_research_journal_status(journal_status)
-    pivot_reasons: list[str] = []
-    if (
-        graph_candidates_available
-        and candidate_fail >= 4
-        and graph_supported_candidate_round_count >= 4
-        and len(candidate_driver_sets) <= 1
-    ):
-        pivot_reasons.append("same_driver_set_concentration")
-    if (
-        graph_candidates_available
-        and graph_discovery_k <= 2
-        and candidate_fail >= 4
-        and len(candidate_driver_sets) <= 1
-        and expansion_probe_count == 0
-        and ablation_evidence_count == 0
-        and control_evidence_count == 0
-    ):
-        pivot_reasons.append("graph_input_breadth_thin")
-    if comparable_candidates >= 6 and local_refinement_count * 2 >= comparable_candidates:
-        pivot_reasons.append("local_refinement_concentration")
-    if dominant_failed_neighborhood_count >= SAME_NEIGHBORHOOD_FAIL_THRESHOLD:
-        pivot_reasons.append("candidate_failure_concentration")
-    base_pivot_due = bool(pivot_reasons)
-    if base_pivot_due and not compact_journal.get("has_evidence_linked_update"):
-        pivot_reasons.append("missing_evidence_linked_journal")
-    pivot_checkpoint_due = bool(pivot_reasons)
+    research_reflection_due = (
+        recorded_round_count >= RESEARCH_REFLECTION_ROUND_THRESHOLD
+        and not compact_journal.get("has_evidence_linked_update")
+    )
     return {
         "schema_version": 1,
         "exp_id": ledger.get("exp_id", ""),
@@ -3208,23 +3188,25 @@ def build_frontier(
             "graph_priority_round_minimum": GRAPH_PRIORITY_ROUND_MINIMUM,
         },
         "research_journal": compact_journal,
-        "pivot_checkpoint": {
-            "pivot_checkpoint_due": pivot_checkpoint_due,
-            "pivot_checkpoint_reasons": pivot_reasons,
-            "candidate_failure_count": candidate_fail,
-            "candidate_driver_set_count": len(candidate_driver_sets),
-            "local_refinement_count": local_refinement_count,
-            "dominant_failed_neighborhood": dominant_failed_neighborhood,
-            "dominant_failed_neighborhood_count": dominant_failed_neighborhood_count,
-            "control_evidence_count": control_evidence_count,
-            "ablation_evidence_count": ablation_evidence_count,
-            "expansion_probe_count": expansion_probe_count,
-            "journal_has_evidence_linked_update": bool(
+        "research_reflection": {
+            "research_reflection_due": research_reflection_due,
+            "recorded_round_count": recorded_round_count,
+            "required_recorded_round_count": RESEARCH_REFLECTION_ROUND_THRESHOLD,
+            "evidence_linked_journal_update": bool(
                 compact_journal.get("has_evidence_linked_update")
             ),
             "journal_evidence_reference_count": int(
                 compact_journal.get("evidence_reference_count") or 0
             ),
+            "resolved_evidence_reference_count": int(
+                compact_journal.get("resolved_evidence_reference_count") or 0
+            ),
+        },
+        "input_realization": {
+            "declared_graph_supported_rounds": declared_graph_supported_rounds,
+            "realized_graph_supported_rounds": realized_graph_supported_rounds,
+            "graph_input_read_gap_count": len(graph_input_read_gap_rows),
+            "graph_input_read_gap_rows": graph_input_read_gap_rows,
         },
         "coverage_concentration": {
             "branch_count": len(branch_counts),
@@ -3346,7 +3328,8 @@ def render_frontier_markdown(frontier: dict) -> str:
     exploration = frontier.get("exploration_breadth") or {}
     input_breadth = frontier.get("input_breadth") or {}
     graph_priority = frontier.get("graph_priority") or {}
-    pivot_checkpoint = frontier.get("pivot_checkpoint") or {}
+    research_reflection = frontier.get("research_reflection") or {}
+    input_realization = frontier.get("input_realization") or {}
     research_journal = frontier.get("research_journal") or {}
     return f"""# Evidence Frontier
 
@@ -3444,17 +3427,21 @@ generated by Abel strategy discovery narrative layer
 - target_only_saturation: `{str(graph_priority.get("target_only_saturation", False)).lower()}`
 - graph_priority_round_minimum: `{graph_priority.get("graph_priority_round_minimum", 0)}`
 
-## Pivot Checkpoint
+## Research Reflection
 
-- pivot_checkpoint_due: `{str(pivot_checkpoint.get("pivot_checkpoint_due", False)).lower()}`
-- pivot_checkpoint_reasons: `{", ".join(pivot_checkpoint.get("pivot_checkpoint_reasons") or []) or "none"}`
-- candidate_failure_count: `{pivot_checkpoint.get("candidate_failure_count", 0)}`
-- candidate_driver_set_count: `{pivot_checkpoint.get("candidate_driver_set_count", 0)}`
-- local_refinement_count: `{pivot_checkpoint.get("local_refinement_count", 0)}`
-- dominant_failed_neighborhood: `{pivot_checkpoint.get("dominant_failed_neighborhood", "none")}`
-- dominant_failed_neighborhood_count: `{pivot_checkpoint.get("dominant_failed_neighborhood_count", 0)}`
-- journal_has_evidence_linked_update: `{str(pivot_checkpoint.get("journal_has_evidence_linked_update", False)).lower()}`
-- journal_evidence_reference_count: `{pivot_checkpoint.get("journal_evidence_reference_count", 0)}`
+- research_reflection_due: `{str(research_reflection.get("research_reflection_due", False)).lower()}`
+- recorded_round_count: `{research_reflection.get("recorded_round_count", 0)}`
+- required_recorded_round_count: `{research_reflection.get("required_recorded_round_count", 0)}`
+- evidence_linked_journal_update: `{str(research_reflection.get("evidence_linked_journal_update", False)).lower()}`
+- journal_evidence_reference_count: `{research_reflection.get("journal_evidence_reference_count", 0)}`
+- resolved_evidence_reference_count: `{research_reflection.get("resolved_evidence_reference_count", 0)}`
+
+## Input Realization
+
+- declared_graph_supported_rounds: `{input_realization.get("declared_graph_supported_rounds", 0)}`
+- realized_graph_supported_rounds: `{input_realization.get("realized_graph_supported_rounds", 0)}`
+- graph_input_read_gap_count: `{input_realization.get("graph_input_read_gap_count", 0)}`
+- graph_input_read_gap_rows: `{", ".join(input_realization.get("graph_input_read_gap_rows") or []) or "none"}`
 
 ## Research Journal
 
@@ -3505,11 +3492,6 @@ def render_inline_counts(counts: dict) -> str:
     return ", ".join(f"{key}={value}" for key, value in sorted(counts.items()))
 
 
-def render_reason_list(values: list[object]) -> str:
-    reasons = [str(item) for item in values if str(item or "").strip()]
-    return ", ".join(reasons) if reasons else "none"
-
-
 def render_session_frontier_summary(frontier: dict) -> str:
     if not frontier:
         return "- evidence_frontier: `not generated`"
@@ -3521,7 +3503,8 @@ def render_session_frontier_summary(frontier: dict) -> str:
     exploration = frontier.get("exploration_breadth") or {}
     input_breadth = frontier.get("input_breadth") or {}
     graph_priority = frontier.get("graph_priority") or {}
-    pivot_checkpoint = frontier.get("pivot_checkpoint") or {}
+    research_reflection = frontier.get("research_reflection") or {}
+    input_realization = frontier.get("input_realization") or {}
     return "\n".join(
         [
             f"- evidence_rows: `{frontier.get('row_count', 0)}`",
@@ -3540,8 +3523,8 @@ def render_session_frontier_summary(frontier: dict) -> str:
             f"- candidate_driver_set_count: `{input_breadth.get('candidate_driver_set_count', 0)}`",
             f"- graph_first_uncovered: `{str(graph_priority.get('graph_first_uncovered', False)).lower()}`",
             f"- graph_discovery_missing: `{str(graph_priority.get('graph_discovery_missing', False)).lower()}`",
-            f"- pivot_checkpoint_due: `{str(pivot_checkpoint.get('pivot_checkpoint_due', False)).lower()}`",
-            f"- pivot_checkpoint_reasons: `{render_reason_list(pivot_checkpoint.get('pivot_checkpoint_reasons') or [])}`",
+            f"- research_reflection_due: `{str(research_reflection.get('research_reflection_due', False)).lower()}`",
+            f"- graph_input_read_gap_count: `{input_realization.get('graph_input_read_gap_count', 0)}`",
             f"- local_refinement_count: `{exploration.get('local_refinement_count', 0)}`",
         ]
     )
@@ -3575,9 +3558,13 @@ generated by Abel strategy discovery narrative layer
 
 {render_agent_context_research_journal(journal_status)}
 
-## Pivot Checkpoint
+## Research Reflection
 
-{render_agent_context_pivot_checkpoint(frontier)}
+{render_agent_context_research_reflection(frontier)}
+
+## Input Realization
+
+{render_agent_context_input_realization(frontier)}
 
 ## Exploration Breadth
 
@@ -3625,19 +3612,31 @@ def render_agent_context_research_journal(journal_status: dict[str, object]) -> 
     return "\n".join(lines)
 
 
-def render_agent_context_pivot_checkpoint(frontier: dict) -> str:
-    checkpoint = frontier.get("pivot_checkpoint") or {}
-    if not checkpoint:
+def render_agent_context_research_reflection(frontier: dict) -> str:
+    reflection = frontier.get("research_reflection") or {}
+    if not reflection:
         return "- not generated"
     return "\n".join(
         [
-            f"- pivot_checkpoint_due: `{str(checkpoint.get('pivot_checkpoint_due', False)).lower()}`",
-            f"- pivot_checkpoint_reasons: `{render_reason_list(checkpoint.get('pivot_checkpoint_reasons') or [])}`",
-            f"- candidate_failure_count: `{checkpoint.get('candidate_failure_count', 0)}`",
-            f"- candidate_driver_set_count: `{checkpoint.get('candidate_driver_set_count', 0)}`",
-            f"- local_refinement_count: `{checkpoint.get('local_refinement_count', 0)}`",
-            f"- dominant_failed_neighborhood_count: `{checkpoint.get('dominant_failed_neighborhood_count', 0)}`",
-            f"- journal_has_evidence_linked_update: `{str(checkpoint.get('journal_has_evidence_linked_update', False)).lower()}`",
+            f"- research_reflection_due: `{str(reflection.get('research_reflection_due', False)).lower()}`",
+            f"- recorded_round_count: `{reflection.get('recorded_round_count', 0)}`",
+            f"- required_recorded_round_count: `{reflection.get('required_recorded_round_count', 0)}`",
+            f"- evidence_linked_journal_update: `{str(reflection.get('evidence_linked_journal_update', False)).lower()}`",
+            f"- journal_evidence_reference_count: `{reflection.get('journal_evidence_reference_count', 0)}`",
+        ]
+    )
+
+
+def render_agent_context_input_realization(frontier: dict) -> str:
+    realization = frontier.get("input_realization") or {}
+    if not realization:
+        return "- not generated"
+    return "\n".join(
+        [
+            f"- declared_graph_supported_rounds: `{realization.get('declared_graph_supported_rounds', 0)}`",
+            f"- realized_graph_supported_rounds: `{realization.get('realized_graph_supported_rounds', 0)}`",
+            f"- graph_input_read_gap_count: `{realization.get('graph_input_read_gap_count', 0)}`",
+            f"- graph_input_read_gap_rows: `{', '.join(realization.get('graph_input_read_gap_rows') or []) or 'none'}`",
         ]
     )
 
@@ -3767,6 +3766,7 @@ def build_evidence_row(
     result_path = session / result_rel if result_rel else None
     result = load_json_object(result_path) if result_path is not None else {}
     runtime = evidence_runtime_facts(result)
+    input_realization = build_input_realization(declaration=declaration, runtime=runtime)
     validation_completed = runtime["runtime_stage"] == "validation" and runtime["verdict"] in {"PASS", "FAIL"}
     workflow_status = str(runtime["workflow_status"]) if result else "blocked"
     comparable, comparable_reason = evidence_comparability(
@@ -3814,6 +3814,7 @@ def build_evidence_row(
         "actual_read_count": runtime["read_count"],
         "prepared_selected_inputs": runtime["prepared_selected_inputs"],
         "prepared_traced_inputs": runtime["prepared_traced_inputs"],
+        "input_realization": input_realization,
         "runtime_stage": runtime["runtime_stage"],
         "workflow_status": workflow_status,
         "validation_status": "completed" if validation_completed else "not_completed",
@@ -3834,6 +3835,43 @@ def build_evidence_row(
         "score": row.get("score", str(result.get("score") or "")),
         "sharpe": row.get("sharpe", metric_string(result, "sharpe")),
         "lo_adj": row.get("lo_adj", metric_string(result, "lo_adjusted")),
+    }
+
+
+def build_input_realization(
+    *,
+    declaration: dict[str, object],
+    runtime: dict[str, object],
+) -> dict[str, object]:
+    declared_claim = str(declaration.get("input_claim") or "unspecified")
+    declared_inputs = ordered_unique_upper(declaration.get("selected_inputs") or [])
+    prepared_inputs = ordered_unique_upper(runtime.get("prepared_selected_inputs") or declared_inputs)
+    actual_reads = ordered_unique_upper(runtime.get("auxiliary_reads") or [])
+    prepared_set = set(prepared_inputs or declared_inputs)
+    actual_set = set(actual_reads)
+    selected_graph_reads = sorted(prepared_set.intersection(actual_set))
+
+    if not actual_reads:
+        realized_claim = "target_only"
+    elif declared_claim == "graph_supported" and selected_graph_reads:
+        realized_claim = "graph_supported"
+    elif declared_claim in {"supplement", "mixed"}:
+        realized_claim = declared_claim
+    else:
+        realized_claim = "supplemental"
+
+    graph_input_read_gap = (
+        declared_claim == "graph_supported"
+        and bool(prepared_set)
+        and not selected_graph_reads
+    )
+    return {
+        "declared_input_claim": declared_claim,
+        "prepared_auxiliary_inputs": prepared_inputs,
+        "actual_auxiliary_reads": actual_reads,
+        "realized_input_claim": realized_claim,
+        "selected_graph_reads": selected_graph_reads,
+        "graph_input_read_gap": graph_input_read_gap,
     }
 
 

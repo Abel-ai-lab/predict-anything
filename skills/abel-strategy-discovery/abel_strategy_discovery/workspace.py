@@ -279,8 +279,9 @@ Use that path as orientation, not as a rigid script. The important boundary is:
 - `prepare-branch` resolves inputs before you treat any round as evidence
 - the starter `engine.py` is only there to verify branch wiring before a branch-specific mechanism exists
 - new sessions default to graph-first research: use causal graph inputs first,
-  then strategy variants, then parameters; use `research_journal.md` to record
-  evidence-linked reflection before deep local refinement
+  then strategy variants, then parameters
+- when `research_reflection_due=true`, update `research_journal.md` with
+  evidence-linked reflection before continuing
 
 ## Re-entry
 
@@ -297,6 +298,8 @@ Use that path as orientation, not as a rigid script. The important boundary is:
 - branch owns `branch.yaml`
 - edge owns the market-data cache
 - `prepare-branch` should run before a recorded round
+- `frontier.md` reports input realization: declared graph-supported inputs only
+  count as realized when the engine reads prepared auxiliary inputs
 - `upload-dashboard-bundle` uploads branch evidence from the current workspace
   surfaces, not promotion or replay artifacts
 - session `backtest_start` is a default target; branch `requested_start` can override it explicitly
@@ -371,9 +374,11 @@ readiness as advisory context; the branch's explicit `requested_start` is the
 runtime start when it is set. Treat this workspace `.venv` as the canonical
 runtime for daily work. Treat branch count as a file-organization fact, not as
 proof of graph/input breadth. Use `research_journal.md` to record your own
-evidence-linked insight and pivot reasoning. When a branch has candidate
-evidence worth external inspection, `upload-dashboard-bundle` sends branch
-evidence from the current workspace surfaces.
+evidence-linked insight and continue/pivot reasoning, especially when
+`research_reflection_due=true`. Check input realization before treating a
+declared graph-supported branch as graph-supported evidence. When a branch has
+candidate evidence worth external inspection, `upload-dashboard-bundle` sends
+branch evidence from the current workspace surfaces.
 This workspace is for alpha-managed branch research, so do not create a
 standalone `causal-edge init` project inside it. Put standalone edge work in a
 separate directory.

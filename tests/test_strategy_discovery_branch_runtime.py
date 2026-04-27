@@ -896,7 +896,8 @@ def test_frontier_surfaces_candidate_failures_and_resume_facts(tmp_path) -> None
     assert concentration["target_control_evidence"] == 0
     assert "candidate_causal_evidence.FAIL: `6`" in frontier_text
     assert "## Research Journal" in context_text
-    assert "## Pivot Checkpoint" in context_text
+    assert "## Research Reflection" in context_text
+    assert "## Input Realization" in context_text
     forbidden = ["try next", "recommend", "open a sibling", "switch mechanism"]
     assert not any(term in frontier_text.lower() for term in forbidden)
     assert not any(term in context_text.lower() for term in forbidden)
@@ -974,8 +975,8 @@ def test_journal_prose_without_refs_is_not_evidence_linked(tmp_path) -> None:
     assert status["recent_excerpt"] == "This direction feels too narrow."
 
 
-def test_pivot_checkpoint_catches_same_driver_set_concentration(tmp_path) -> None:
-    session = ni.init_session_dir("TSLA", "tsla-pivot-same-driver", tmp_path / "research")
+def test_research_reflection_due_after_recorded_evidence_without_journal(tmp_path) -> None:
+    session = ni.init_session_dir("TSLA", "tsla-reflection-due", tmp_path / "research")
     ni.write_discovery(session, _sample_discovery())
     branch_a = ni.init_branch_dir(session, "momentum-parents")
     branch_b = ni.init_branch_dir(session, "regime-parents")
@@ -1034,23 +1035,17 @@ def test_pivot_checkpoint_catches_same_driver_set_concentration(tmp_path) -> Non
 
     assert frontier["graph_priority"]["graph_first_uncovered"] is False
     assert frontier["exploration_breadth"]["branch_family_count"] == 2
-    checkpoint = frontier["pivot_checkpoint"]
-    assert checkpoint["pivot_checkpoint_due"] is True
-    assert checkpoint["candidate_driver_set_count"] == 1
-    assert checkpoint["dominant_failed_neighborhood_count"] == 5
-    assert checkpoint["pivot_checkpoint_reasons"] == [
-        "same_driver_set_concentration",
-        "graph_input_breadth_thin",
-        "local_refinement_concentration",
-        "candidate_failure_concentration",
-        "missing_evidence_linked_journal",
-    ]
-    assert "pivot_checkpoint_due: `true`" in context_text
-    assert ni.pivot_checkpoint_warning_lines(session) == [
-        "pivot_checkpoint_due=true "
-        "reasons=same_driver_set_concentration, graph_input_breadth_thin, "
-        "local_refinement_concentration, candidate_failure_concentration, "
-        "missing_evidence_linked_journal "
+    reflection = frontier["research_reflection"]
+    assert reflection["research_reflection_due"] is True
+    assert reflection["recorded_round_count"] == 6
+    assert reflection["required_recorded_round_count"] == 3
+    assert reflection["evidence_linked_journal_update"] is False
+    assert "research_reflection_due: `true`" in context_text
+    assert "same_driver_set_concentration" not in json.dumps(frontier)
+    assert "pivot_checkpoint" not in frontier
+    assert ni.research_reflection_warning_lines(session) == [
+        "research_reflection_due=true "
+        "recorded_round_count=6 "
         "required_action=update_research_journal_with_evidence_refs"
     ]
 
@@ -1063,9 +1058,8 @@ def test_pivot_checkpoint_catches_same_driver_set_concentration(tmp_path) -> Non
     ni.render_session(session)
     updated = json.loads((session / ni.FRONTIER_JSON_FILENAME).read_text(encoding="utf-8"))
 
-    assert updated["pivot_checkpoint"]["pivot_checkpoint_due"] is True
-    assert "missing_evidence_linked_journal" not in updated["pivot_checkpoint"]["pivot_checkpoint_reasons"]
-    assert updated["pivot_checkpoint"]["journal_has_evidence_linked_update"] is True
+    assert updated["research_reflection"]["research_reflection_due"] is False
+    assert updated["research_reflection"]["evidence_linked_journal_update"] is True
 
 
 def test_exploration_breadth_marks_single_branch_local_refinement(tmp_path) -> None:
@@ -1109,10 +1103,10 @@ def test_exploration_breadth_marks_single_branch_local_refinement(tmp_path) -> N
     assert exploration["exploration_class_counts"]["broad_explore"] == 1
     assert exploration["exploration_class_counts"]["local_refinement"] == 5
     assert ledger["rows"][-1]["same_neighborhood_failed_rows"] == 5
-    assert "pivot_checkpoint_due: `true`" in context_text
+    assert "research_reflection_due: `true`" in context_text
 
 
-def test_distinct_driver_sets_avoid_same_driver_pivot_reason(tmp_path) -> None:
+def test_distinct_driver_sets_are_factual_not_checkpoint_reasons(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-breadth-second-family", tmp_path / "research")
     ni.write_discovery(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
@@ -1172,7 +1166,9 @@ def test_distinct_driver_sets_avoid_same_driver_pivot_reason(tmp_path) -> None:
     assert frontier["exploration_breadth"]["branch_family_count"] == 2
     assert frontier["exploration_breadth"]["model_family_counts"]["linear_model"] == 1
     assert frontier["input_breadth"]["candidate_driver_set_count"] == 2
-    assert "same_driver_set_concentration" not in frontier["pivot_checkpoint"]["pivot_checkpoint_reasons"]
+    assert frontier["research_reflection"]["research_reflection_due"] is True
+    assert "pivot_checkpoint" not in frontier
+    assert "same_driver_set_concentration" not in json.dumps(frontier)
 
 
 def test_input_breadth_reports_candidate_driver_set_coverage(tmp_path) -> None:
@@ -1231,7 +1227,102 @@ def test_input_breadth_reports_candidate_driver_set_coverage(tmp_path) -> None:
     assert not any(term in context_text.lower() for term in forbidden)
 
 
-def test_input_breadth_warning_marks_thin_candidate_driver_coverage(tmp_path) -> None:
+def test_research_reflection_and_input_realization_for_empty_workspace_9_shape(tmp_path) -> None:
+    session = ni.init_session_dir("TSLA", "tsla-empty-workspace-9-shape", tmp_path / "research")
+    ni.write_discovery(session, _sample_discovery())
+    ni.write_readiness(session, _sample_readiness())
+
+    graph_read = ni.init_branch_dir(session, "tree-graph")
+    graph_read_spec = _complete_candidate_spec(
+        graph_read,
+        selected_inputs=["AAPL", "MSFT"],
+        mechanism_family="tree_ml_direction",
+        model_family="tree_model",
+        complexity_class="learned_model",
+    )
+    graph_gap = ni.init_branch_dir(session, "momentum-regime")
+    graph_gap_spec = _complete_candidate_spec(
+        graph_gap,
+        selected_inputs=["AAPL", "MSFT"],
+        mechanism_family="momentum_regime",
+        complexity_class="regime",
+    )
+    target_one = ni.init_branch_dir(session, "target-momentum")
+    target_one_spec = _complete_candidate_spec(
+        target_one,
+        selected_inputs=[],
+        mechanism_family="target_momentum",
+    )
+    target_one_spec["input_claim"] = "target_only"
+    target_one_spec["selected_inputs"] = []
+    target_two = ni.init_branch_dir(session, "target-ensemble")
+    target_two_spec = _complete_candidate_spec(
+        target_two,
+        selected_inputs=[],
+        mechanism_family="target_ensemble",
+        model_family="hybrid",
+        complexity_class="hybrid",
+    )
+    target_two_spec["input_claim"] = "target_only"
+    target_two_spec["selected_inputs"] = []
+
+    _record_synthetic_round(
+        session,
+        graph_read,
+        spec=graph_read_spec,
+        result=_edge_result(traced_inputs=["AAPL", "MSFT"], verdict="FAIL"),
+        decision="discard",
+    )
+    _record_synthetic_round(
+        session,
+        graph_gap,
+        spec=graph_gap_spec,
+        result=_edge_result(traced_inputs=[], verdict="FAIL"),
+        decision="discard",
+    )
+    _record_synthetic_round(
+        session,
+        target_one,
+        spec=target_one_spec,
+        result=_edge_result(traced_inputs=[], verdict="FAIL"),
+        decision="discard",
+    )
+    _record_synthetic_round(
+        session,
+        target_two,
+        spec=target_two_spec,
+        result=_edge_result(traced_inputs=[], verdict="FAIL"),
+        decision="discard",
+    )
+
+    ni.render_session(session)
+    ledger = json.loads((session / ni.EVIDENCE_LEDGER_FILENAME).read_text(encoding="utf-8"))
+    frontier = json.loads((session / ni.FRONTIER_JSON_FILENAME).read_text(encoding="utf-8"))
+    frontier_text = (session / ni.FRONTIER_MARKDOWN_FILENAME).read_text(encoding="utf-8")
+    context_text = (session / ni.AGENT_CONTEXT_FILENAME).read_text(encoding="utf-8")
+
+    labels = frontier["evidence_label_counts"]
+    assert labels["candidate_causal_evidence"] == 1
+    assert labels["target_control_evidence"] == 3
+    assert frontier["research_reflection"]["research_reflection_due"] is True
+    assert frontier["research_reflection"]["recorded_round_count"] == 4
+    assert frontier["input_realization"] == {
+        "declared_graph_supported_rounds": 2,
+        "realized_graph_supported_rounds": 1,
+        "graph_input_read_gap_count": 1,
+        "graph_input_read_gap_rows": ["momentum-regime:round-001"],
+    }
+
+    gap_row = next(row for row in ledger["rows"] if row["branch_id"] == "momentum-regime")
+    assert gap_row["evidence_label"] == "target_control_evidence"
+    assert gap_row["input_realization"]["graph_input_read_gap"] is True
+    assert gap_row["input_realization"]["realized_input_claim"] == "target_only"
+    assert "research_reflection_due: `true`" in frontier_text
+    assert "graph_input_read_gap_count: `1`" in context_text
+    assert "pivot_checkpoint" not in json.dumps(frontier)
+
+
+def test_input_breadth_remains_factual_without_route_warning(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-input-breadth-warning", tmp_path / "research")
     ni.write_discovery(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
@@ -1268,13 +1359,9 @@ def test_input_breadth_warning_marks_thin_candidate_driver_coverage(tmp_path) ->
     assert frontier["input_breadth"]["input_breadth_thin"] is True
     assert frontier["graph_priority"]["graph_candidates_available"] is True
     assert "input_breadth_thin: `true`" in context_text
-    assert ni.input_breadth_warning_lines(session) == [
-        "input_breadth_thin=true "
-        "candidate_driver_set_count=1 "
-        "discovered_driver_coverage=1/2 "
-        "target_only_recorded_round_count=4 "
-        "graph_supported_candidate_round_count=4"
-    ]
+    assert "input_breadth_thin=true" not in "\n".join(
+        ni.research_reflection_warning_lines(session)
+    )
 
     msft_branch = ni.init_branch_dir(session, "graph-msft")
     msft_spec = _complete_candidate_spec(msft_branch, selected_inputs=["MSFT"])
@@ -1292,7 +1379,6 @@ def test_input_breadth_warning_marks_thin_candidate_driver_coverage(tmp_path) ->
 
     assert frontier["input_breadth"]["candidate_driver_set_count"] == 2
     assert frontier["input_breadth"]["input_breadth_thin"] is False
-    assert ni.input_breadth_warning_lines(session) == []
 
 
 def test_graph_priority_warns_when_graph_candidates_are_uncovered(tmp_path) -> None:

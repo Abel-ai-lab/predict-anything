@@ -34,6 +34,8 @@ After live discovery, the session owns:
 - `frontier.md`: factual exploration coverage
 
 The branch then selects inputs from that session context in `branch.yaml`.
+The evidence ledger later records whether those selected graph inputs were
+actually read at runtime.
 
 ## Priority Order
 
@@ -67,6 +69,8 @@ When moving from discovery into a branch:
 - write it into `branch.yaml` as `selected_inputs`
 - use readiness to understand coverage, not to auto-ban ideas
 - run `prepare-branch` before a recorded round
+- after the round, check input realization facts before treating a declared
+  graph-supported branch as graph-supported evidence
 
 Readiness is advisory. Do not collapse every branch onto the latest common start
 unless the branch thesis truly requires strict overlap.

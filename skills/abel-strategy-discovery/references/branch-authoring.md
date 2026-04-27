@@ -37,6 +37,18 @@ The evidence ledger derives labels from explicit declaration fields plus actual
 edge runtime facts. `frontier.md` and `frontier.json` report coverage facts; they
 are not a strategy advisor.
 
+Input realization is recorded separately from declaration:
+
+- declared input claim: what `branch.yaml` says the branch intends
+- prepared auxiliary inputs: what `prepare-branch` made available
+- actual auxiliary reads: what the engine read at runtime
+- realized input claim: what kind of evidence the round actually supports
+
+If `input_claim=graph_supported` but runtime does not read the prepared graph
+inputs, the round is a graph input read gap. It can still be useful control or
+diagnostic evidence, but the declaration alone does not make it candidate
+causal evidence.
+
 ## Exploration Shape
 
 Use branch fields to describe the hypothesis family:
@@ -64,7 +76,7 @@ parameters last. Target-only controls are useful contrast evidence, but they do
 not cover graph-supported candidate input breadth when live graph candidates
 exist.
 
-## Journal And Pivot
+## Journal And Research Reflection
 
 `agent_context.md` is the compact factual resume surface. `research_journal.md`
 is the agent-owned research state.
@@ -74,17 +86,17 @@ Use the journal for:
 - hypotheses and observations
 - failed neighborhoods
 - open questions
-- reasons to continue or pivot
+- reasons to continue, pivot, add contrast evidence, or stop
 - cross-branch comparisons
 - final research summaries
 
 When an insight should survive as a research conclusion, cite evidence such as
 `ledger:<branch_id>:<round_id>`, `frontier.md`, or a raw artifact path.
 
-After repeated same-neighborhood validation failures, use the frontier facts and
-journal to decide whether you are continuing the neighborhood, pivoting
-graph/input, changing strategy family, adding control/ablation, or stopping. The
-framework exposes the shape of the search; it should not choose the route.
+When `research_reflection_due=true`, use frontier facts and the journal to state
+whether you are continuing the neighborhood, pivoting graph/input, changing
+strategy family, adding contrast evidence, or stopping. The framework exposes
+the shape of the search; it should not choose the route.
 
 ## Prepared Inputs
 

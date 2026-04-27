@@ -34,7 +34,8 @@ unavailable.
 Each round should answer a mechanism question, not just consume compute.
 
 1. Read `agent_context.md` when resuming.
-2. Use `frontier.md` to understand coverage, concentration, and pivot facts.
+2. Use `frontier.md` to understand coverage, concentration, input
+   realization, and research reflection facts.
 3. Use `research_journal.md` for your own hypotheses, observations, open
    questions, and pivot/continue reasoning.
 4. Declare the branch hypothesis in `branch.yaml`.
@@ -43,8 +44,9 @@ Each round should answer a mechanism question, not just consume compute.
 7. Run `run-branch` only when declaration and debug facts are ready enough for
    the evidence label you want.
 8. Re-read `evidence_ledger.json` and `frontier.md`.
-9. Update `research_journal.md` with evidence references when the result should
-   survive as research insight.
+9. If `research_reflection_due=true`, update `research_journal.md` with
+   evidence references before continuing. Even when it is false, update the
+   journal when a result should survive as research insight.
 
 ## Layer Ownership
 
@@ -68,6 +70,15 @@ After each render, treat:
 - `agent_context.md` as the compact factual resume surface
 - `research_journal.md` as agent-owned research state
 
+`research_reflection_due=true` means enough recorded evidence exists that the
+agent should preserve evidence-linked research judgment before continuing. It
+does not mean the system has chosen a route.
+
+Input realization separates declaration from runtime behavior: a branch can
+declare `input_claim=graph_supported`, but if the strategy does not read
+prepared auxiliary inputs, that round is summarized as a graph input read gap
+and cannot count as candidate causal evidence solely from the declaration.
+
 The generated surfaces should show what happened, not tell you which driver,
 proxy, threshold, model family, or mechanism to try next.
 
@@ -89,6 +100,7 @@ The dashboard bundle is branch evidence only:
 - session identity and current graph/evidence frontier facts
 - branch target, selected inputs, requested start, and current evidence status
 - recorded rounds and evidence labels
+- input realization facts for declared versus realized graph input usage
 - evidence-linked `research_journal.md` lines for that branch
 - branch events
 

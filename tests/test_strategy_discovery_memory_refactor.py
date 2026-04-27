@@ -68,7 +68,8 @@ def test_render_writes_agent_context_with_journal_view(tmp_path: Path) -> None:
     context_text = (session / ni.AGENT_CONTEXT_FILENAME).read_text(encoding="utf-8")
     assert "## Evidence Frontier" in context_text
     assert "## Research Journal" in context_text
-    assert "## Pivot Checkpoint" in context_text
+    assert "## Research Reflection" in context_text
+    assert "## Input Realization" in context_text
 
 
 def test_run_branch_round_updates_ledger_and_agent_context(
@@ -348,8 +349,15 @@ def test_build_skill_dashboard_bundle_uses_current_evidence_surfaces(tmp_path: P
     }
     assert bundle["payload"]["branch"]["selectedInputs"] == ["AAPL"]
     assert bundle["payload"]["branch"]["latestEvidenceLabel"] == "candidate_causal_evidence"
+    assert bundle["payload"]["session"]["inputRealization"] == {
+        "declared_graph_supported_rounds": 1,
+        "realized_graph_supported_rounds": 1,
+        "graph_input_read_gap_count": 0,
+        "graph_input_read_gap_rows": [],
+    }
     assert bundle["payload"]["rounds"][0]["roundId"] == "round-001"
     assert bundle["payload"]["rounds"][0]["evidenceLabel"] == "candidate_causal_evidence"
+    assert bundle["payload"]["rounds"][0]["inputRealization"]["realized_input_claim"] == "graph_supported"
     assert any(
         "Driver concentration matters" in item["summary"]
         for item in bundle["payload"]["branchInsights"]
