@@ -1,123 +1,121 @@
 # Experiment Loop
 
-## Workspace Preflight
-
-Before following the loop below, determine where the workspace root actually
-is:
-
-- if `./alpha.workspace.yaml` exists, the current directory is already the workspace root
-- else if `./abel-strategy-discovery-workspace/alpha.workspace.yaml` exists, reuse that child workspace
-- only if neither manifest exists should you bootstrap a new workspace
-
-Do not decide that "the workspace does not exist" by checking only whether
-`./abel-strategy-discovery-workspace/` is present.
+Use this reference after workspace preflight is complete and
+`abel-strategy-discovery doctor` is ready.
 
 ## Standard Path
 
 ```bash
-abel-strategy-discovery init-session --ticker <TICKER> --exp-id <exp-id> --discover
-abel-strategy-discovery frontier-status --session research/<ticker>/<exp_id>
-abel-strategy-discovery probe-nodes --session research/<ticker>/<exp_id> --node <node_id>
-abel-strategy-discovery expand-frontier --session research/<ticker>/<exp_id> --from-node <node_id>
-abel-strategy-discovery init-branch --session research/<ticker>/<exp_id> --branch-id graph-v1
+abel-strategy-discovery init-session --ticker <TICKER> --exp-id <exp-id>
+abel-strategy-discovery init-branch --session research/<ticker>/<exp_id> --branch-id <family-a-branch>
+abel-strategy-discovery init-branch --session research/<ticker>/<exp_id> --branch-id <family-b-branch>
 
-# first make the branch explicit
-abel-strategy-discovery select-inputs --branch research/<ticker>/<exp_id>/branches/graph-v1 --node <node_id> --replace
-edit research/<ticker>/<exp_id>/branches/graph-v1/engine.py
+# make each branch declaration explicit
+edit research/<ticker>/<exp_id>/branches/<family-a-branch>/branch.yaml
+edit research/<ticker>/<exp_id>/branches/<family-b-branch>/branch.yaml
+edit research/<ticker>/<exp_id>/research_journal.md
 
-abel-strategy-discovery prepare-branch --branch research/<ticker>/<exp_id>/branches/graph-v1
-abel-strategy-discovery debug-branch --branch research/<ticker>/<exp_id>/branches/graph-v1
-abel-strategy-discovery run-branch --branch research/<ticker>/<exp_id>/branches/graph-v1 -d "baseline"
+# implement, prepare, debug, and record the agent-chosen branch round
+edit research/<ticker>/<exp_id>/branches/<chosen-branch>/engine.py
+abel-strategy-discovery prepare-branch --branch research/<ticker>/<exp_id>/branches/<chosen-branch>
+abel-strategy-discovery debug-branch --branch research/<ticker>/<exp_id>/branches/<chosen-branch>
+abel-strategy-discovery run-branch --branch research/<ticker>/<exp_id>/branches/<chosen-branch> -d "baseline"
+edit research/<ticker>/<exp_id>/research_journal.md  # add the round's ledger ref and insight before another run
+
+# when the branch has candidate evidence worth external inspection
+abel-strategy-discovery upload-dashboard-bundle --branch research/<ticker>/<exp_id>/branches/<chosen-branch> --base-url <router-base-url>
 ```
 
-Before this loop, the workspace should already exist and `abel-strategy-discovery doctor`
-should already be acceptable.
-Inside an Abel strategy discovery workspace, keep the research on this session/branch path
-under `research/` rather than creating a standalone `causal-edge init`
-sidecar project.
-This is a compounding search loop, not a checklist of unrelated backtests.
-Each round should answer a question about mechanism, not just consume compute.
+New sessions run live graph discovery by default. Use `--no-discover` only when
+auth, service access, or continuity constraints make live graph discovery
+unavailable.
 
-## What Each Layer Owns
+## Research Loop
 
-- session: discovery, frontier expansion, and readiness
-- branch: branch spec and `compute_decisions(self, ctx)` implementation
+Each round should answer a mechanism question, not just consume compute.
+
+1. Read `agent_context.md` when resuming.
+2. Use `frontier.md` to understand coverage, concentration, input
+   realization, and research reflection facts.
+3. Use `research_journal.md` for your own hypotheses, observations, open
+   questions, and pivot/continue reasoning.
+4. Declare the branch hypothesis in `branch.yaml`.
+5. Run `prepare-branch` before trusting branch inputs.
+6. Run `debug-branch` before recording evidence.
+7. Run `run-branch` only when declaration and debug facts are ready enough for
+   the evidence label you want.
+8. Re-read `evidence_ledger.json` and `frontier.md`.
+9. Update `research_journal.md` for the recorded round before starting another
+   recorded round. Cite the round ledger ref and capture what changed, what
+   happened, what was learned, and what that implies next.
+
+## Layer Ownership
+
+- session: discovery and readiness
+- branch: branch declaration and `compute_decisions(self, ctx)`
 - edge cache: market data reuse
 - prepare step: branch input resolution and runtime contract materialization
 - debug step: semantic preflight
-- run step: evaluation and recording
+- run step: evaluation and evidence recording
 
 Session `backtest_start` is the default exploration target. When
-`branch.yaml.requested_start` is set explicitly, that branch start should drive
+`branch.yaml.requested_start` is explicit, that branch start should drive
 prepare/debug/run for the branch.
 
-## Branch Rules
+## Evidence Reading
 
-Before a recorded round, the branch should already have:
+After each render, treat:
 
-- `branch.yaml`
-- `engine.py`
-- `inputs/dependencies.json` from `prepare-branch`
-- `inputs/runtime_profile.json`
-- `inputs/execution_constraints.json`
-- `inputs/data_manifest.json`
-- `inputs/window_availability.json`
-- `inputs/context_guide.md`
-- `inputs/probe_samples.json`
+- `evidence_ledger.json` as the evidence record
+- `frontier.md` / `frontier.json` as factual coverage reports
+- `agent_context.md` as the compact factual resume surface
+- `research_journal.md` as agent-owned research state
 
-`run-branch` is not the place to decide the branch universe implicitly.
-`debug-branch` is the place to test whether the branch can see the world it
-thinks it can see.
+`journal_coverage_complete=false` means at least one recorded round still needs
+an agent-written journal entry. `research_reflection_due=true` is derived from
+that missing coverage; it does not mean the system has chosen a route.
 
-## KEEP Rule
+Input realization separates declaration from runtime behavior: a branch can
+declare `input_claim=graph_supported`, but if the strategy does not read
+prepared auxiliary inputs, that round is summarized as a graph input read gap
+and cannot count as candidate causal evidence solely from the declaration.
 
+The generated surfaces should show what happened, not tell you which driver,
+proxy, threshold, model family, or mechanism to try next.
+
+## Dashboard Upload
+
+After a branch has recorded candidate evidence worth inspecting, upload the
+branch evidence bundle to the skill dashboard:
+
+```bash
+abel-strategy-discovery upload-dashboard-bundle --branch research/<ticker>/<exp_id>/branches/<branch-id> --base-url <router-base-url>
 ```
-KEEP if: semantic preflight is clean enough to trust the run AND causal-edge verdict == "PASS" AND metrics improve vs latest KEEP baseline
-DISCARD: everything else
-```
 
-Each KEEP updates the baseline. The next round should compound on the latest
-credible result rather than on a pre-declared static experiment grid.
-DISCARD is not wasted motion when it narrows the mechanism honestly.
+The upload window starts from the branch `created_at` timestamp and ends at the
+upload time. Keep those timestamps timezone-aware because the router maps the
+window to request-log time.
 
-## Explore vs Exploit
+The dashboard bundle is branch evidence only:
 
-- explore: genuinely new information or a different causal angle
-- exploit: parameter tuning, threshold tuning, or local refinement on the same idea
+- session identity and current graph/evidence frontier facts
+- branch target, selected inputs, requested start, and current evidence status
+- recorded rounds and evidence labels
+- input realization facts for declared versus realized graph input usage
+- evidence-linked `research_journal.md` lines for that branch
+- branch events
 
-Use branch history to compound on the latest credible baseline instead of
-pre-defining a large static experiment grid.
-If multiple exploit variants die the same death, stop polishing and force a
-real explore move.
+Do not include promotion bundles, replay snapshots, paper-trading summaries, or
+finished strategy narratives. Those are downstream presentation artifacts, not
+branch evidence.
 
-## Failure Interpretation
+## Exploration Discipline
 
-Treat failures as localization signals:
+- graph/input exploration comes first
+- strategy variants come second
+- parameter tuning comes last
+- multiple branches on one driver set can still be graph/input narrow
+- local refinement is useful only while it is still learning something
 
-- data/setup failure: fix branch spec or prepare step
-- semantic/runtime failure: fix engine visibility assumptions or output semantics
-- validation failure: change the strategy idea
-
-Do not mix these categories together. A branch that fails validation is still a
-useful research result if it tells you which mechanism is weak.
-The wrong lesson is "the branch failed." The useful lesson is "what failed:
-data path, semantic assumptions, implementation, or idea?"
-
-## Compounding Rule
-
-Serial execution preserves learning. Static grids destroy it.
-
-- if a round reveals a stronger mechanism, compound from that mechanism
-- if a round only reveals a local implementation defect, fix the defect before changing the thesis
-- if repeated exploit variants keep failing the same way, force a genuine explore move
-- if the failure signature changes after a branch edit, that change is itself evidence about the mechanism
-
-## Honest Stop
-
-Do not stop at the first dry patch, and do not keep searching just to avoid
-reporting failure.
-
-- repeated discards are acceptable when the branch is still exploring real new dimensions
-- repeated versions of the same weak idea are not progress
-- a clean "no usable signal yet" conclusion is better than a noisy pseudo-KEEP
-- honest failure is part of research discipline, not an embarrassment to hide
+If repeated variants fail in the same neighborhood, use the frontier and journal
+to make that concentration explicit before continuing.
