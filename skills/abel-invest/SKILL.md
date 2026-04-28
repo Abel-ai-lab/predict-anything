@@ -4,6 +4,11 @@ description: >
   Use when the user wants Abel strategy discovery, candidate screening,
   graph-grounded trading research, or continuing/preparing/debugging an Abel
   strategy discovery workspace.
+metadata:
+  openclaw:
+    requires:
+      bins:
+        - python3
 ---
 
 # Abel Strategy Discovery

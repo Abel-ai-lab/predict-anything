@@ -54,7 +54,9 @@ python3 maintainers/abel-ask/smoke_cap_probe.py --skill-root skills/abel-ask
 
 ## Build A ClawHub Release Version
 
-Use this when you want the publishable ClawHub artifact for the main `abel` entry skill.
+Use this when you want the publishable ClawHub package artifact for OpenClaw.
+The artifact is a native OpenClaw plugin with `openclaw.plugin.json` and all
+Abel skills under `skills/`.
 
 ```bash
 python3 scripts/build_clawhub_release.py
@@ -88,11 +90,8 @@ Or with a custom build root:
 python3 scripts/publish_clawhub_release.py --output-root dist/test-clawhub --dry-run
 ```
 
-The dry-run should print a `clawhub publish ...` command for:
-
-- `--slug abel`
-- `--name Abel`
-- the current source version from `skills/abel/SKILL.md`
+The dry-run should print a `clawhub package publish ... --dry-run` command for
+the built bundle artifact.
 
 ## Real ClawHub Publish
 

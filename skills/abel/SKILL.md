@@ -10,6 +10,7 @@ metadata:
     requires:
       bins:
         - python
+    primaryEnv: ABEL_API_KEY
     homepage: https://github.com/Abel-ai-causality/Abel-skills
 ---
 

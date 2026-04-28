@@ -10,7 +10,7 @@ metadata:
       env:
         - ABEL_API_KEY
       bins:
-        - python
+        - python3
     primaryEnv: ABEL_API_KEY
     homepage: https://github.com/Abel-ai-causality/Abel-skills
 ---
