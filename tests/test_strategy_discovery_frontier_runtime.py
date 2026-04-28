@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from abel_strategy_discovery import narrative_impl as ni
+from abel_invest import narrative_impl as ni
 
 
 def _seed_discovery() -> dict:

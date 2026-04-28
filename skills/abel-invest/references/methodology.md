@@ -14,7 +14,7 @@ agent = strategy judgment and research insight
 ```
 
 `causal-edge` owns runtime legality and validation metrics.
-`abel-strategy-discovery` owns branch declarations, evidence labels, frontier
+`abel-invest` owns branch declarations, evidence labels, frontier
 facts, and the research journal surface.
 
 ## Core Principles

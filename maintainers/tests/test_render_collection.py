@@ -29,7 +29,7 @@ def test_render_collection_renders_all_skills(tmp_path) -> None:
     assert (output_dir / "abel" / "SKILL.md").exists()
     assert (output_dir / "abel-ask" / "SKILL.md").exists()
     assert (output_dir / "abel-auth" / "SKILL.md").exists()
-    assert (output_dir / "abel-strategy-discovery" / "SKILL.md").exists()
+    assert (output_dir / "abel-invest" / "SKILL.md").exists()
 
     rendered_probe_usage = (
         output_dir / "abel-ask" / "references" / "probe-usage.md"

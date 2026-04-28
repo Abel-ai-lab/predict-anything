@@ -1,5 +1,5 @@
 ---
-name: abel-strategy-discovery
+name: abel-invest
 description: >
   Use when the user wants Abel strategy discovery, candidate screening,
   graph-grounded trading research, or continuing/preparing/debugging an Abel
@@ -25,10 +25,10 @@ Always start by resolving workspace state before strategy work.
 2. Resolve the workspace root:
    - if `alpha.workspace.yaml` is in the current directory, use the current
      directory
-   - else if `abel-strategy-discovery-workspace/alpha.workspace.yaml` exists
+   - else if `abel-invest-workspace/alpha.workspace.yaml` exists
      under the current directory, use that child workspace
    - else bootstrap a workspace before deep research work
-3. Run `abel-strategy-discovery doctor --path <workspace-root>`.
+3. Run `abel-invest doctor --path <workspace-root>`.
 4. If doctor reports `auth_missing`, use `abel-auth`, then rerun doctor.
 5. Only start or continue session/branch work after doctor is ready, unless the
    user explicitly asks you to inspect or repair setup.
@@ -58,7 +58,7 @@ Always start by resolving workspace state before strategy work.
 1. Treat this as a workspace-first flow, not a one-shot answer flow.
 2. Reuse the default workspace when it already exists.
 3. Bootstrap the workspace before deep strategy work when it does not exist yet.
-4. Use `abel-strategy-discovery` commands, not old command aliases.
+4. Use `abel-invest` commands, not old command aliases.
 5. Reuse existing Abel auth first. If live access is still missing, use
    `abel-auth`.
 6. Treat `branch.yaml` as a research declaration, not evidence truth.
@@ -79,7 +79,7 @@ Always start by resolving workspace state before strategy work.
     inputs.
 14. When a branch has meaningful candidate evidence worth inspecting, upload
     the branch evidence bundle to the skill dashboard with
-    `abel-strategy-discovery upload-dashboard-bundle --branch <branch>
+    `abel-invest upload-dashboard-bundle --branch <branch>
     --base-url <router-base-url>`. Upload only branch evidence from the current
     workspace surfaces; do not upload promotion bundles, replay snapshots,
     paper-trading summaries, or finished strategy narratives as dashboard

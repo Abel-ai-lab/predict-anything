@@ -14,14 +14,14 @@ space without pretending to pre-solve the strategy.
 Live discovery is the normal session opening:
 
 ```bash
-abel-strategy-discovery init-session --ticker <TICKER> --exp-id <exp-id>
+abel-invest init-session --ticker <TICKER> --exp-id <exp-id>
 ```
 
 Use an explicit no-discovery fallback only when auth, service access, or
 continuity constraints make live graph discovery unavailable:
 
 ```bash
-abel-strategy-discovery init-session --ticker <TICKER> --exp-id <exp-id> --no-discover
+abel-invest init-session --ticker <TICKER> --exp-id <exp-id> --no-discover
 ```
 
 ## Session Model

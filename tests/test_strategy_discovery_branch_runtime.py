@@ -6,7 +6,7 @@ import sys
 from argparse import Namespace
 from pathlib import Path
 
-from abel_strategy_discovery import narrative_impl as ni
+from abel_invest import narrative_impl as ni
 
 
 def _sample_discovery() -> dict:
@@ -503,7 +503,7 @@ def test_init_session_cli_runs_live_discovery_by_default(
         sys,
         "argv",
         [
-            "abel-strategy-discovery",
+            "abel-invest",
             "init-session",
             "--ticker",
             "TSLA",
@@ -541,7 +541,7 @@ def test_init_session_cli_no_discover_is_explicit_pending_fallback(
         sys,
         "argv",
         [
-            "abel-strategy-discovery",
+            "abel-invest",
             "init-session",
             "--ticker",
             "TSLA",

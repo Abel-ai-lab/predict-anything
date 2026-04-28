@@ -12,7 +12,7 @@ def main() -> int:
     if str(skill_root) not in sys.path:
         sys.path.insert(0, str(skill_root))
 
-    from abel_strategy_discovery.cli import main as cli_main
+    from abel_invest.cli import main as cli_main
 
     sys.argv = [sys.argv[0], "workspace", "bootstrap", *sys.argv[1:]]
     return cli_main()

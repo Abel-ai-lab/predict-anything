@@ -1,5 +1,5 @@
 [project]
-name = "abel-strategy-discovery"
+name = "abel-invest"
 version = "3.5.0"
 description = "Workspace-oriented research orchestration for Abel-driven strategy discovery"
 requires-python = ">=3.11"
@@ -15,11 +15,11 @@ test = [
 ]
 
 [project.scripts]
-abel-strategy-discovery = "abel_strategy_discovery.cli:main"
+abel-invest = "abel_invest.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["abel_strategy_discovery*"]
+include = ["abel_invest*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

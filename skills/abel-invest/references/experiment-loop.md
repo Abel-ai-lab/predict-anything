@@ -1,14 +1,14 @@
 # Experiment Loop
 
 Use this reference after workspace preflight is complete and
-`abel-strategy-discovery doctor` is ready.
+`abel-invest doctor` is ready.
 
 ## Standard Path
 
 ```bash
-abel-strategy-discovery init-session --ticker <TICKER> --exp-id <exp-id>
-abel-strategy-discovery init-branch --session research/<ticker>/<exp_id> --branch-id <family-a-branch>
-abel-strategy-discovery init-branch --session research/<ticker>/<exp_id> --branch-id <family-b-branch>
+abel-invest init-session --ticker <TICKER> --exp-id <exp-id>
+abel-invest init-branch --session research/<ticker>/<exp_id> --branch-id <family-a-branch>
+abel-invest init-branch --session research/<ticker>/<exp_id> --branch-id <family-b-branch>
 
 # make each branch declaration explicit
 edit research/<ticker>/<exp_id>/branches/<family-a-branch>/branch.yaml
@@ -17,13 +17,13 @@ edit research/<ticker>/<exp_id>/research_journal.md
 
 # implement, prepare, debug, and record the agent-chosen branch round
 edit research/<ticker>/<exp_id>/branches/<chosen-branch>/engine.py
-abel-strategy-discovery prepare-branch --branch research/<ticker>/<exp_id>/branches/<chosen-branch>
-abel-strategy-discovery debug-branch --branch research/<ticker>/<exp_id>/branches/<chosen-branch>
-abel-strategy-discovery run-branch --branch research/<ticker>/<exp_id>/branches/<chosen-branch> -d "baseline"
+abel-invest prepare-branch --branch research/<ticker>/<exp_id>/branches/<chosen-branch>
+abel-invest debug-branch --branch research/<ticker>/<exp_id>/branches/<chosen-branch>
+abel-invest run-branch --branch research/<ticker>/<exp_id>/branches/<chosen-branch> -d "baseline"
 edit research/<ticker>/<exp_id>/research_journal.md  # add the round's ledger ref and insight before another run
 
 # when the branch has candidate evidence worth external inspection
-abel-strategy-discovery upload-dashboard-bundle --branch research/<ticker>/<exp_id>/branches/<chosen-branch> --base-url <router-base-url>
+abel-invest upload-dashboard-bundle --branch research/<ticker>/<exp_id>/branches/<chosen-branch> --base-url <router-base-url>
 ```
 
 New sessions run live graph discovery by default. Use `--no-discover` only when
@@ -89,7 +89,7 @@ After a branch has recorded candidate evidence worth inspecting, upload the
 branch evidence bundle to the skill dashboard:
 
 ```bash
-abel-strategy-discovery upload-dashboard-bundle --branch research/<ticker>/<exp_id>/branches/<branch-id> --base-url <router-base-url>
+abel-invest upload-dashboard-bundle --branch research/<ticker>/<exp_id>/branches/<branch-id> --base-url <router-base-url>
 ```
 
 The upload window starts from the branch `created_at` timestamp and ends at the

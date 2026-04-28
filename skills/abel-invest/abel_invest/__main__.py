@@ -1,8 +1,8 @@
-"""Allow `python -m abel_strategy_discovery`."""
+"""Allow `python -m abel_invest`."""
 
 from __future__ import annotations
 
-from abel_strategy_discovery.cli import main
+from abel_invest.cli import main
 
 
 if __name__ == "__main__":

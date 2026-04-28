@@ -1,6 +1,6 @@
 # Workspace Bootstrap
 
-`abel-strategy-discovery` is workspace-first. Do not start strategy research
+`abel-invest` is workspace-first. Do not start strategy research
 until you know which workspace root owns the run.
 
 ## Preflight
@@ -8,18 +8,18 @@ until you know which workspace root owns the run.
 From the user's current directory:
 
 1. If `alpha.workspace.yaml` exists here, this directory is the workspace root.
-2. Else if `abel-strategy-discovery-workspace/alpha.workspace.yaml` exists here,
+2. Else if `abel-invest-workspace/alpha.workspace.yaml` exists here,
    reuse that child workspace.
 3. Else run:
 
 ```bash
-abel-strategy-discovery workspace bootstrap --path abel-strategy-discovery-workspace
+abel-invest workspace bootstrap --path abel-invest-workspace
 ```
 
 4. Then run:
 
 ```bash
-abel-strategy-discovery doctor --path <workspace-root>
+abel-invest doctor --path <workspace-root>
 ```
 
 Only move into session or branch work when doctor reports `Status: ready`.
@@ -49,9 +49,9 @@ doctor is ready.
 ## Common Commands
 
 ```bash
-abel-strategy-discovery workspace status --path <workspace-root>
-abel-strategy-discovery doctor --path <workspace-root>
-abel-strategy-discovery env init
+abel-invest workspace status --path <workspace-root>
+abel-invest doctor --path <workspace-root>
+abel-invest env init
 ```
 
 Use `env init` only when doctor reports an environment or edge-runtime setup

@@ -26,5 +26,5 @@ Do not guess from shell environment alone.
    user's original request.
 2. If the user wants quant strategy search, backtesting, candidate discovery, a research workspace,
    session continuation, branch preparation, branch debugging, or branch runs,
-   use `abel-strategy-discovery`.
+   use `abel-invest`.
 3. For other graph-native or decision-oriented Abel reads, use `abel-ask`.

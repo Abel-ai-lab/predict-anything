@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from abel_strategy_discovery.narrative_impl import main as narrative_main
+from abel_invest.narrative_impl import main as narrative_main
 
 
 def main() -> int:

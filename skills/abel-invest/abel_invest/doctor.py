@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from abel_strategy_discovery.edge_runtime import (
+from abel_invest.edge_runtime import (
     probe_abel_auth,
     probe_causal_edge_cli,
     probe_causal_edge_import,
     probe_edge_context_json,
     probe_edge_discovery_payload,
 )
-from abel_strategy_discovery.workspace import (
+from abel_invest.workspace import (
     default_workspace_path,
     load_workspace_manifest,
     resolve_workspace_entry,
@@ -29,7 +29,7 @@ def build_auth_recovery_instruction(root: Path | str) -> str:
     """Return the agent-facing recovery instruction when reusable auth is missing."""
     return (
         "Use abel-auth, then rerun "
-        f"abel-strategy-discovery doctor --path {Path(root)}."
+        f"abel-invest doctor --path {Path(root)}."
     )
 
 
@@ -58,7 +58,7 @@ def run_doctor(start: Path | None = None) -> dict[str, object]:
                 "auth": "not_run",
             },
             "next_step": (
-                "abel-strategy-discovery workspace bootstrap --path "
+                "abel-invest workspace bootstrap --path "
                 f"{default_workspace_path(start_path)}"
             ),
         }
@@ -109,7 +109,7 @@ def run_doctor(start: Path | None = None) -> dict[str, object]:
             {
                 "status": "env_missing",
                 "summary": f"Workspace python does not exist at {python_path}",
-                "next_step": "abel-strategy-discovery env init  # or use --runtime-python /path/to/python",
+                "next_step": "abel-invest env init  # or use --runtime-python /path/to/python",
             }
         )
         return result
@@ -121,7 +121,7 @@ def run_doctor(start: Path | None = None) -> dict[str, object]:
             {
                 "status": "edge_missing",
                 "summary": f"Workspace python cannot import causal_edge: {import_check.get('error', 'unknown error')}",
-                "next_step": "abel-strategy-discovery env init  # or use --runtime-python /path/to/python",
+                "next_step": "abel-invest env init  # or use --runtime-python /path/to/python",
             }
         )
         return result
@@ -148,7 +148,7 @@ def run_doctor(start: Path | None = None) -> dict[str, object]:
                     "Workspace Python can import Abel-edge, but the installed runtime is missing "
                     "required alpha contracts such as structured discovery or `--context-json`."
                 ),
-                "next_step": "abel-strategy-discovery env init  # or install a newer Abel-edge into the workspace runtime",
+                "next_step": "abel-invest env init  # or install a newer Abel-edge into the workspace runtime",
             }
         )
         return result
@@ -176,7 +176,7 @@ def run_doctor(start: Path | None = None) -> dict[str, object]:
                 "for alpha-managed branch research."
             ),
             "next_step": (
-                "abel-strategy-discovery init-session --ticker <TICKER> --exp-id <session-id>  "
+                "abel-invest init-session --ticker <TICKER> --exp-id <session-id>  "
                 "# runs live graph discovery by default, then init-branch -> edit branch.yaml -> prepare-branch"
             ),
         }

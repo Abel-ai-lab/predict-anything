@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from shutil import which
 
-from abel_strategy_discovery.edge_runtime import probe_edge_context_json, probe_edge_discovery_payload
-from abel_strategy_discovery.workspace import (
+from abel_invest.edge_runtime import probe_edge_context_json, probe_edge_discovery_payload
+from abel_invest.workspace import (
     default_workspace_path,
     resolve_workspace_entry,
     load_workspace_manifest,
@@ -22,7 +22,7 @@ from abel_strategy_discovery.workspace import (
 
 @dataclass
 class EnvInitResult:
-    """Structured result for `abel-strategy-discovery env init`."""
+    """Structured result for `abel-invest env init`."""
 
     workspace_root: Path
     venv_path: Path
@@ -54,7 +54,7 @@ def init_workspace_env(
         target = default_workspace_path(start)
         raise RuntimeError(
             "No Abel strategy discovery workspace found. Run "
-            f"`abel-strategy-discovery workspace bootstrap --path {target}` first."
+            f"`abel-invest workspace bootstrap --path {target}` first."
         )
 
     manifest = load_workspace_manifest(workspace_root)
@@ -89,7 +89,7 @@ def init_workspace_env(
                     "will automatically try `uv venv --seed` when uv is installed, "
                     "but that fallback also failed here. "
                     "In locked-down environments, create or choose an existing interpreter "
-                    "and rerun `abel-strategy-discovery env init --runtime-python /path/to/python`.\n\n"
+                    "and rerun `abel-invest env init --runtime-python /path/to/python`.\n\n"
                     f"Underlying error:\n{exc}"
                 ) from exc
             created_venv = True
@@ -217,7 +217,7 @@ def resolve_alpha_source(explicit: str | Path | None = None) -> Path:
 
     raise RuntimeError(
         "Could not resolve a local Abel strategy discovery source tree. "
-        "Pass `--alpha-source /path/to/skills/abel-strategy-discovery`."
+        "Pass `--alpha-source /path/to/skills/abel-invest`."
     )
 
 

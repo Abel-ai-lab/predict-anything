@@ -23,18 +23,18 @@ from urllib.request import Request, urlopen
 
 import yaml
 
-from abel_strategy_discovery.doctor import (
+from abel_invest.doctor import (
     build_auth_recovery_instruction,
     doctor_exit_code,
     render_doctor_report,
     run_doctor,
 )
-from abel_strategy_discovery.edge_runtime import (
+from abel_invest.edge_runtime import (
     build_workspace_runtime_env,
     resolve_runtime_auth_env_file,
 )
-from abel_strategy_discovery.env import init_workspace_env
-from abel_strategy_discovery.workspace import (
+from abel_invest.env import init_workspace_env
+from abel_invest.workspace import (
     DEFAULT_WORKSPACE_NAME,
     build_default_manifest,
     default_workspace_path,
@@ -194,7 +194,7 @@ Write against DecisionContext instead of raw research helpers:
   - ctx.feed(name).asof_series("close")
   - ctx.points()
   - ctx.decisions(next_position)
-If data or runtime setup is broken, let the error surface and inspect it with `abel-strategy-discovery debug-branch`;
+If data or runtime setup is broken, let the error surface and inspect it with `abel-invest debug-branch`;
 do not hide setup failures behind synthetic outputs.
 Current readiness warning: {readiness_warning}
 Coverage hints: {coverage_hints_text}
@@ -212,7 +212,7 @@ class BranchEngine(StrategyEngine):
             raise RuntimeError(
                 "The default Abel strategy discovery baseline loaded no usable target bars. "
                 "Confirm the requested window in branch.yaml, then rerun "
-                "`abel-strategy-discovery prepare-branch`."
+                "`abel-invest prepare-branch`."
             )
         # Debug-safe starting point: a simple target-trend starter baseline.
         # It exists to make the first branch runnable and comparable, not to
@@ -586,7 +586,7 @@ def main() -> int:
             print(f"  warning: {warning}")
         print("")
         print("From here:")
-        print(f"  abel-strategy-discovery status --session {session}")
+        print(f"  abel-invest status --session {session}")
         return 0
     if args.command == "set-hypothesis":
         branch = resolve_workspace_arg_path(args.branch).resolve()
@@ -618,8 +618,8 @@ def main() -> int:
         print(f"  hypothesis: {hypothesis}")
         print("")
         print("From here:")
-        print(f"  abel-strategy-discovery debug-branch --branch {branch}")
-        print(f"  abel-strategy-discovery run-branch --branch {branch} -d \"baseline\"")
+        print(f"  abel-invest debug-branch --branch {branch}")
+        print(f"  abel-invest run-branch --branch {branch} -d \"baseline\"")
         return 0
     if args.command == "init-branch":
         session = resolve_workspace_arg_path(args.session)
@@ -656,9 +656,9 @@ def main() -> int:
         print("")
         print("From here:")
         print(f"  edit {branch / BRANCH_SPEC_FILENAME}")
-        print(f"  abel-strategy-discovery prepare-branch --branch {branch}")
-        print(f"  abel-strategy-discovery debug-branch --branch {branch}")
-        print(f"  abel-strategy-discovery run-branch --branch {branch} -d \"baseline\"")
+        print(f"  abel-invest prepare-branch --branch {branch}")
+        print(f"  abel-invest debug-branch --branch {branch}")
+        print(f"  abel-invest run-branch --branch {branch} -d \"baseline\"")
         print(f"  edit {branch / 'engine.py'}")
         return 0
     if args.command == "prepare-branch":
@@ -694,16 +694,16 @@ def handle_workspace_command(args: argparse.Namespace) -> int:
             print(f"Existing workspace root for this area: {related_root}")
             print("")
             print("Continue there instead:")
-            print(f"  abel-strategy-discovery workspace status --path {related_root}")
-            print(f"  abel-strategy-discovery doctor --path {related_root}")
+            print(f"  abel-invest workspace status --path {related_root}")
+            print(f"  abel-invest doctor --path {related_root}")
             return 1
         if target_state == "launch_root_child_workspace" and related_root is not None:
             print(f"Workspace already exists at the default child path: {related_root}")
             print("Reuse it instead of creating another workspace for the same area.")
             print("")
             print("Continue there instead:")
-            print(f"  abel-strategy-discovery workspace status --path {related_root}")
-            print(f"  abel-strategy-discovery doctor --path {related_root}")
+            print(f"  abel-invest workspace status --path {related_root}")
+            print(f"  abel-invest doctor --path {related_root}")
             return 1
         root = scaffold_workspace(args.name, target_root=target_root)
         manifest = build_default_manifest(args.name)
@@ -724,8 +724,8 @@ def handle_workspace_command(args: argparse.Namespace) -> int:
         print("")
         print("From here:")
         print(f"  cd {root}")
-        print("  abel-strategy-discovery workspace status")
-        print(f"  abel-strategy-discovery workspace bootstrap --path {root}")
+        print("  abel-invest workspace status")
+        print(f"  abel-invest workspace bootstrap --path {root}")
         return 0
     if args.workspace_command == "bootstrap":
         target_root = Path(args.path).expanduser().resolve()
@@ -738,16 +738,16 @@ def handle_workspace_command(args: argparse.Namespace) -> int:
             print(f"Existing workspace root for this area: {related_root}")
             print("")
             print("Continue there instead:")
-            print(f"  abel-strategy-discovery workspace status --path {related_root}")
-            print(f"  abel-strategy-discovery doctor --path {related_root}")
+            print(f"  abel-invest workspace status --path {related_root}")
+            print(f"  abel-invest doctor --path {related_root}")
             return 1
         if target_state == "launch_root_child_workspace" and related_root is not None:
             print(f"Workspace already exists at the default child path: {related_root}")
             print("Reuse it instead of bootstrapping another workspace for the same area.")
             print("")
             print("Continue there instead:")
-            print(f"  abel-strategy-discovery workspace status --path {related_root}")
-            print(f"  abel-strategy-discovery doctor --path {related_root}")
+            print(f"  abel-invest workspace status --path {related_root}")
+            print(f"  abel-invest doctor --path {related_root}")
             return 1
         reused_workspace = False
         if target_root.exists():
@@ -811,7 +811,7 @@ def handle_workspace_command(args: argparse.Namespace) -> int:
         if doctor_exit_code(doctor_result) == 0:
             print(f"  cd {root}")
             print(f"  {default_activate_command()}")
-            print("  abel-strategy-discovery init-session --ticker <TICKER> --exp-id <session-id>  # runs live graph discovery by default")
+            print("  abel-invest init-session --ticker <TICKER> --exp-id <session-id>  # runs live graph discovery by default")
         else:
             print(f"  cd {root}")
             next_step = str(doctor_result.get("next_step") or "").strip()
@@ -858,7 +858,7 @@ def handle_env_command(args: argparse.Namespace) -> int:
     print(f"  edge_install_mode: {result.edge_install_mode}")
     print(f"  edge_install_target: {result.edge_install_target}")
     print(f"  alpha_install_mode: {'editable' if result.alpha_editable else 'regular'}")
-    print("  alpha_install_reason: installs the packaged abel-strategy-discovery CLI into this workspace runtime")
+    print("  alpha_install_reason: installs the packaged abel-invest CLI into this workspace runtime")
     print("  canonical_runtime_note: use this workspace runtime as the canonical environment for daily research work")
     if result.runtime_mode == "existing_python":
         print("  runtime_override_note: using an existing interpreter instead of creating the workspace .venv")
@@ -870,10 +870,10 @@ def handle_env_command(args: argparse.Namespace) -> int:
     if result.edge_discovery_payload_capable is False or result.edge_context_json_capable is False:
         print("Warning:")
         print("  Installed Abel-edge is missing required alpha contracts.")
-        print("  Run `abel-strategy-discovery doctor` and upgrade the workspace runtime before starting research.")
+        print("  Run `abel-invest doctor` and upgrade the workspace runtime before starting research.")
         print("")
     print("From here:")
-    print("  abel-strategy-discovery doctor")
+    print("  abel-invest doctor")
     print(f"  {default_activate_command()}")
     print(
         "  # once doctor is ready: init-session -> declare branches -> "
@@ -906,8 +906,8 @@ def render_breadth_first_start_lines(session: Path) -> list[str]:
     return [
         "graph-first research loop:",
         f"edit {session / RESEARCH_JOURNAL_FILENAME}",
-        f"abel-strategy-discovery init-branch --session {session} --branch-id <family-a-branch>",
-        f"abel-strategy-discovery init-branch --session {session} --branch-id <family-b-branch>",
+        f"abel-invest init-branch --session {session} --branch-id <family-a-branch>",
+        f"abel-invest init-branch --session {session} --branch-id <family-b-branch>",
         "edit each branch.yaml with graph/input hypotheses and agent-chosen mechanism-family declarations",
         "after evidence accumulates, update research_journal.md with evidence-linked reflection before deep local refinement",
     ]
@@ -1061,7 +1061,7 @@ def fetch_live_discovery(ticker: str, *, limit: int) -> dict:
             "init-session live graph discovery is blocked on Abel auth. "
             "No reusable auth was found. "
             f"{build_auth_recovery_instruction(workspace_root or Path.cwd())}\n\n"
-            "After auth is ready, retry `abel-strategy-discovery init-session --ticker "
+            "After auth is ready, retry `abel-invest init-session --ticker "
             f"{ticker.upper()} --exp-id <exp-id>`."
         ) from exc
 
@@ -1294,7 +1294,7 @@ def prepare_branch_inputs(args: argparse.Namespace) -> int:
             raise RuntimeError(
                 "Branch preparation is blocked on Abel auth. "
                 "Use abel-auth, then rerun "
-                f"`abel-strategy-discovery prepare-branch --branch {branch}`."
+                f"`abel-invest prepare-branch --branch {branch}`."
             )
         raise RuntimeError(
             "Abel-edge warm-cache did not produce dependencies output. "
@@ -1400,11 +1400,11 @@ def prepare_branch_inputs(args: argparse.Namespace) -> int:
     print("From here:")
     if auth_handoff_needed:
         print("  Use abel-auth")
-        print(f"  abel-strategy-discovery prepare-branch --branch {branch}")
+        print(f"  abel-invest prepare-branch --branch {branch}")
     else:
         print("  The branch inputs are ready; use debug preflight first, then record a round once the engine reflects the branch thesis.")
-        print(f"  abel-strategy-discovery debug-branch --branch {branch}")
-        print(f"  abel-strategy-discovery run-branch --branch {branch} -d \"baseline\"")
+        print(f"  abel-invest debug-branch --branch {branch}")
+        print(f"  abel-invest run-branch --branch {branch} -d \"baseline\"")
     return completed.returncode
 
 
@@ -1854,7 +1854,7 @@ def run_branch_round(args: argparse.Namespace) -> int:
     if not branch_inputs_ready(branch):
         print(
             "Branch inputs have not been prepared yet. "
-            "Run `abel-strategy-discovery prepare-branch --branch ...` before recording a round.",
+            "Run `abel-invest prepare-branch --branch ...` before recording a round.",
             file=sys.stderr,
         )
         return 2
@@ -2127,7 +2127,7 @@ def run_branch_round(args: argparse.Namespace) -> int:
         print("Dashboard upload:")
         print(
             "  "
-            f"abel-strategy-discovery upload-dashboard-bundle --branch {branch} "
+            f"abel-invest upload-dashboard-bundle --branch {branch} "
             "--base-url <router-base-url>"
         )
     return 0
@@ -2168,7 +2168,7 @@ def record_workflow_blocker_round(
     handoff_path.write_text(
         json.dumps(
             {
-                "contract": "abel-strategy-discovery.workflow-blocker/v1",
+                "contract": "abel-invest.workflow-blocker/v1",
                 "ok": False,
                 "verdict": "ERROR",
                 "failure_signature": failure_signature,
@@ -2277,7 +2277,7 @@ def build_workflow_blocker_result(
             "returncode": returncode,
         },
         "runtime_facts": {
-            "contract": "abel-strategy-discovery.workflow-blocker/v1",
+            "contract": "abel-invest.workflow-blocker/v1",
             "verdict": "ERROR",
             "semantic_verdict": "missing",
             "runtime_stage": runtime_stage,
@@ -5405,7 +5405,7 @@ def build_context_guide_markdown(
         "## Protocol Checklist",
         "1. Inspect `probe_samples.json` and `data_manifest.json`.",
         "2. Edit `engine.py` against `DecisionContext`.",
-        "3. Run `abel-strategy-discovery debug-branch --branch ...` first to read semantic preflight.",
+        "3. Run `abel-invest debug-branch --branch ...` first to read semantic preflight.",
         "4. Only record a round after the branch expresses a real mechanism.",
     ]
     return "\n".join(lines) + "\n"
@@ -5686,7 +5686,7 @@ def build_debug_snapshot(
     next_step = (
         hints[0]
         if hints
-        else "Fix the semantic blocker in engine.py, then rerun `abel-strategy-discovery debug-branch`."
+        else "Fix the semantic blocker in engine.py, then rerun `abel-invest debug-branch`."
     )
     return {
         "updated_at": _now(),

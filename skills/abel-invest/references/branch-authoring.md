@@ -63,7 +63,7 @@ Use branch fields to describe the hypothesis family:
 Use `run-branch --changed-dimension` to describe factual round changes:
 
 ```bash
-abel-strategy-discovery run-branch --branch ... -d "..." \
+abel-invest run-branch --branch ... -d "..." \
   --changed-dimension drivers
 ```
 
@@ -121,13 +121,13 @@ inputs over discovery-side inference.
 ## What To Do
 
 1. State the branch thesis in `branch.yaml`.
-2. Run `abel-strategy-discovery prepare-branch --branch ...`.
+2. Run `abel-invest prepare-branch --branch ...`.
 3. Inspect `inputs/context_guide.md`, `probe_samples.json`, and
    `inputs/data_manifest.json`.
 4. Implement or revise `compute_decisions(self, ctx)`.
-5. Run `abel-strategy-discovery debug-branch --branch ...`.
+5. Run `abel-invest debug-branch --branch ...`.
 6. Read the semantic verdict and traces.
-7. Run `abel-strategy-discovery run-branch --branch ...` when declaration and
+7. Run `abel-invest run-branch --branch ...` when declaration and
    debug facts are ready enough for the evidence label you want.
 8. Read `evidence_ledger.json` and `frontier.md`.
 9. Update `research_journal.md` with grounded follow-up state.

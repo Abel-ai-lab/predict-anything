@@ -1,5 +1,6 @@
 __pycache__/
 *.egg-info/
+.venv/
 dist/
 causal-abel/.env.skills
 causal-abel/.env.skill

@@ -9,7 +9,7 @@ import yaml
 
 MANIFEST_NAME = "alpha.workspace.yaml"
 DEFAULT_EDGE_SPEC = "git+https://github.com/Abel-ai-causality/Abel-edge.git@main"
-DEFAULT_WORKSPACE_NAME = "abel-strategy-discovery-workspace"
+DEFAULT_WORKSPACE_NAME = "abel-invest-workspace"
 
 
 def find_workspace_root(start: Path | None = None) -> Path | None:
@@ -175,7 +175,7 @@ def build_default_manifest(name: str) -> dict:
         "version": 1,
         "workspace": {
             "name": name,
-            "kind": "abel-strategy-discovery",
+            "kind": "abel-invest",
         },
         "paths": {
             "research_root": "research",
@@ -248,7 +248,7 @@ This is an Abel strategy discovery research workspace.
 Treat this directory as the canonical workspace for this working area.
 Treat this workspace's `.venv` as the canonical runtime for daily research.
 If `alpha.workspace.yaml` already exists here, this directory is already the
-workspace root. Do not bootstrap `./abel-strategy-discovery-workspace` inside it.
+workspace root. Do not bootstrap `./abel-invest-workspace` inside it.
 
 The CLI commands below are the tools Abel strategy discovery uses to continue research
 inside this workspace. The point is not to memorize a checklist. The point is
@@ -258,20 +258,20 @@ into branch evidence.
 ## A Usual Path
 
 ```bash
-abel-strategy-discovery doctor
+abel-invest doctor
 {default_activate_command()}
-abel-strategy-discovery init-session --ticker TSLA --exp-id tsla-v1
-abel-strategy-discovery init-branch --session research/tsla/tsla-v1 --branch-id <family-a-branch>
-abel-strategy-discovery init-branch --session research/tsla/tsla-v1 --branch-id <family-b-branch>
+abel-invest init-session --ticker TSLA --exp-id tsla-v1
+abel-invest init-branch --session research/tsla/tsla-v1 --branch-id <family-a-branch>
+abel-invest init-branch --session research/tsla/tsla-v1 --branch-id <family-b-branch>
 edit research/tsla/tsla-v1/branches/<family-a-branch>/branch.yaml
 edit research/tsla/tsla-v1/branches/<family-b-branch>/branch.yaml
 edit research/tsla/tsla-v1/research_journal.md
 edit research/tsla/tsla-v1/branches/<chosen-branch>/engine.py
-abel-strategy-discovery prepare-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
-abel-strategy-discovery debug-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
-abel-strategy-discovery run-branch --branch research/tsla/tsla-v1/branches/<chosen-branch> -d "baseline"
+abel-invest prepare-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
+abel-invest debug-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
+abel-invest run-branch --branch research/tsla/tsla-v1/branches/<chosen-branch> -d "baseline"
 edit research/tsla/tsla-v1/research_journal.md
-abel-strategy-discovery upload-dashboard-bundle --branch research/tsla/tsla-v1/branches/<chosen-branch> --base-url <router-base-url>
+abel-invest upload-dashboard-bundle --branch research/tsla/tsla-v1/branches/<chosen-branch> --base-url <router-base-url>
 ```
 
 Use that path as orientation, not as a rigid script. The important boundary is:
@@ -286,9 +286,9 @@ Use that path as orientation, not as a rigid script. The important boundary is:
 
 ## Re-entry
 
-- if `alpha.workspace.yaml` exists in the current directory, continue here and do not create `./abel-strategy-discovery-workspace`
+- if `alpha.workspace.yaml` exists in the current directory, continue here and do not create `./abel-invest-workspace`
 - if you open this workspace root again later, continue here
-- if you open the parent launch directory later, reuse its child `abel-strategy-discovery-workspace` before creating another one
+- if you open the parent launch directory later, reuse its child `abel-invest-workspace` before creating another one
 - do not create a second workspace in the same area unless you want one intentionally
 
 ## What This Workspace Makes Explicit
@@ -314,18 +314,18 @@ Use that path as orientation, not as a rigid script. The important boundary is:
 - If you need a standalone Abel-edge project, create it in a separate directory outside this workspace.
 
 If the workspace runtime is missing or you want to replace it, run
-`abel-strategy-discovery env init` again.
+`abel-invest env init` again.
 If your environment cannot create a new venv, point alpha at an existing
-interpreter with `abel-strategy-discovery env init --runtime-python /path/to/python`.
+interpreter with `abel-invest env init --runtime-python /path/to/python`.
 
 ## Readiness Gate
 
-Run `abel-strategy-discovery doctor` before opening a session.
+Run `abel-invest doctor` before opening a session.
 
 - `ready`: you can start research
 - `ready` means continue with `init-session -> init-branch -> branch.yaml -> prepare-branch`
 - `auth_missing`: no reusable auth was found; use `abel-auth`, then rerun `doctor`
-- `env_missing`, `edge_missing`, or `edge_contract_missing`: rerun `abel-strategy-discovery env init`
+- `env_missing`, `edge_missing`, or `edge_contract_missing`: rerun `abel-invest env init`
 """
 
 
@@ -342,28 +342,28 @@ follow a rigid script.
 
 ### Check whether this directory is a valid workspace
 ```bash
-abel-strategy-discovery workspace status
-abel-strategy-discovery doctor
+abel-invest workspace status
+abel-invest doctor
 ```
 
 If `alpha.workspace.yaml` is already present in this directory, this directory
-is the workspace root. Do not create `./abel-strategy-discovery-workspace` inside it.
+is the workspace root. Do not create `./abel-invest-workspace` inside it.
 
 ### Start a new exploration session
 ```bash
-abel-strategy-discovery doctor
-abel-strategy-discovery init-session --ticker TSLA --exp-id tsla-v1
-abel-strategy-discovery init-branch --session research/tsla/tsla-v1 --branch-id <family-a-branch>
-abel-strategy-discovery init-branch --session research/tsla/tsla-v1 --branch-id <family-b-branch>
+abel-invest doctor
+abel-invest init-session --ticker TSLA --exp-id tsla-v1
+abel-invest init-branch --session research/tsla/tsla-v1 --branch-id <family-a-branch>
+abel-invest init-branch --session research/tsla/tsla-v1 --branch-id <family-b-branch>
 edit research/tsla/tsla-v1/branches/<family-a-branch>/branch.yaml
 edit research/tsla/tsla-v1/branches/<family-b-branch>/branch.yaml
 edit research/tsla/tsla-v1/research_journal.md
 edit research/tsla/tsla-v1/branches/<chosen-branch>/engine.py
-abel-strategy-discovery prepare-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
-abel-strategy-discovery debug-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
-abel-strategy-discovery run-branch --branch research/tsla/tsla-v1/branches/<chosen-branch> -d "baseline"
+abel-invest prepare-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
+abel-invest debug-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
+abel-invest run-branch --branch research/tsla/tsla-v1/branches/<chosen-branch> -d "baseline"
 edit research/tsla/tsla-v1/research_journal.md
-abel-strategy-discovery upload-dashboard-bundle --branch research/tsla/tsla-v1/branches/<chosen-branch> --base-url <router-base-url>
+abel-invest upload-dashboard-bundle --branch research/tsla/tsla-v1/branches/<chosen-branch> --base-url <router-base-url>
 ```
 
 Run `doctor` before `init-session`. If it reports `auth_missing`, use
@@ -387,9 +387,9 @@ separate directory.
 
 ### Run one research round
 ```bash
-abel-strategy-discovery debug-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
-abel-strategy-discovery run-branch --branch research/tsla/tsla-v1/branches/<chosen-branch> -d "baseline"
-abel-strategy-discovery promote-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
+abel-invest debug-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
+abel-invest run-branch --branch research/tsla/tsla-v1/branches/<chosen-branch> -d "baseline"
+abel-invest promote-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
 ```
 
 ### Understand the workspace layout
@@ -401,7 +401,7 @@ abel-strategy-discovery promote-branch --branch research/tsla/tsla-v1/branches/<
 ### Re-enter this workspace later
 - if `alpha.workspace.yaml` is in the current directory, continue here directly and do not bootstrap a child workspace
 - if you are already in this workspace root, continue here directly
-- if you are in the parent launch directory, reuse its `abel-strategy-discovery-workspace` child before creating another one
+- if you are in the parent launch directory, reuse its `abel-invest-workspace` child before creating another one
 """
 
 
