@@ -493,11 +493,16 @@ def test_init_session_cli_runs_live_discovery_by_default(
 ) -> None:
     calls: list[tuple[str, int]] = []
 
-    def fake_fetch_live_discovery(ticker: str, *, limit: int) -> dict:
+    def fake_fetch_live_graph_frontier(ticker: str, *, limit: int, backtest_start: str) -> dict:
         calls.append((ticker, limit))
-        return _sample_discovery()
+        return ni.graph_frontier_from_discovery_payload(
+            _sample_discovery(),
+            backtest_start=backtest_start,
+            expansion_mode="all",
+            expansion_limit=limit,
+        )
 
-    monkeypatch.setattr(ni, "fetch_live_discovery", fake_fetch_live_discovery)
+    monkeypatch.setattr(ni, "fetch_live_graph_frontier", fake_fetch_live_graph_frontier)
     monkeypatch.setattr(ni, "refresh_data_readiness", lambda **_kwargs: _sample_readiness())
     monkeypatch.setattr(
         sys,
@@ -516,16 +521,17 @@ def test_init_session_cli_runs_live_discovery_by_default(
 
     assert ni.main() == 0
     out = capsys.readouterr().out
-    discovery = json.loads(
-        (tmp_path / "research" / "tsla" / "tsla-cli-default" / "discovery.json").read_text(
+    frontier = json.loads(
+        (tmp_path / "research" / "tsla" / "tsla-cli-default" / ni.GRAPH_FRONTIER_FILENAME).read_text(
             encoding="utf-8"
         )
     )
 
     assert calls == [("TSLA", 10)]
-    assert discovery["source"] == "abel_live"
-    assert discovery["K_discovery"] == 2
-    assert "discovery_source: abel_live (K=2)" in out
+    assert frontier["source"] == "abel_live"
+    assert len(frontier["nodes"]) == 3
+    assert not (tmp_path / "research" / "tsla" / "tsla-cli-default" / "discovery.json").exists()
+    assert "frontier_source: abel_live (nodes=3)" in out
 
 
 def test_init_session_cli_no_discover_is_explicit_pending_fallback(
@@ -533,10 +539,10 @@ def test_init_session_cli_no_discover_is_explicit_pending_fallback(
     monkeypatch,
     capsys,
 ) -> None:
-    def fail_fetch_live_discovery(*_args, **_kwargs) -> dict:
+    def fail_fetch_live_graph_frontier(*_args, **_kwargs) -> dict:
         raise AssertionError("live discovery should not run with --no-discover")
 
-    monkeypatch.setattr(ni, "fetch_live_discovery", fail_fetch_live_discovery)
+    monkeypatch.setattr(ni, "fetch_live_graph_frontier", fail_fetch_live_graph_frontier)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -555,15 +561,16 @@ def test_init_session_cli_no_discover_is_explicit_pending_fallback(
 
     assert ni.main() == 0
     out = capsys.readouterr().out
-    discovery = json.loads(
-        (tmp_path / "research" / "tsla" / "tsla-cli-pending" / "discovery.json").read_text(
+    frontier = json.loads(
+        (tmp_path / "research" / "tsla" / "tsla-cli-pending" / ni.GRAPH_FRONTIER_FILENAME).read_text(
             encoding="utf-8"
         )
     )
 
-    assert discovery["source"] == "pending"
-    assert discovery["K_discovery"] == 0
-    assert "discovery_source: pending (live discovery not run)" in out
+    assert frontier["source"] == "pending"
+    assert frontier["nodes"][0]["node_id"] == "TSLA.price"
+    assert not (tmp_path / "research" / "tsla" / "tsla-cli-pending" / "discovery.json").exists()
+    assert "frontier_source: pending (live discovery not run)" in out
 
 
 def test_complete_branch_declaration_requires_selected_inputs(tmp_path) -> None:

@@ -67,6 +67,7 @@ DEFAULT_BACKTEST_START = "2020-01-01"
 SESSION_STATE_FILENAME = "session_state.json"
 BRANCH_STATE_FILENAME = "branch_state.json"
 READINESS_FILENAME = "readiness.json"
+GRAPH_FRONTIER_FILENAME = "graph_frontier.json"
 BRANCH_SPEC_FILENAME = "branch.yaml"
 DEPENDENCIES_FILENAME = "dependencies.json"
 RUNTIME_PROFILE_FILENAME = "runtime_profile.json"
@@ -364,7 +365,7 @@ def main() -> int:
         dest="discover",
         action="store_true",
         default=True,
-        help="Run live Abel discovery and persist it into discovery.json (default)",
+        help=f"Run live Abel discovery and persist it into {GRAPH_FRONTIER_FILENAME} (default)",
     )
     discovery_group.add_argument(
         "--no-discover",
@@ -533,17 +534,18 @@ def main() -> int:
         )
         discovery = load_discovery(session)
         readiness = load_readiness(session)
+        frontier = load_graph_frontier(session)
         print(f"Created Abel strategy discovery session at {session}")
         print(f"  ticker: {discovery.get('ticker', args.ticker.upper())}")
-        print(f"  discovery: {session / 'discovery.json'}")
+        print(f"  graph_frontier: {session / GRAPH_FRONTIER_FILENAME}")
         print(f"  journal: {session / RESEARCH_JOURNAL_FILENAME}")
         print(f"  events: {session / 'events.tsv'}")
         if readiness:
             print(f"  readiness: {session / READINESS_FILENAME}")
         if args.discover:
             print(
-                f"  discovery_source: {discovery.get('source', 'unknown')} "
-                f"(K={discovery.get('K_discovery', 0)})"
+                f"  frontier_source: {frontier.get('source', 'unknown')} "
+                f"(nodes={len(frontier.get('nodes') or [])})"
             )
             readiness_summary = format_data_readiness_summary(readiness)
             if readiness_summary:
@@ -554,7 +556,7 @@ def main() -> int:
             if warning:
                 print(f"  warning: {warning}")
         else:
-            print("  discovery_source: pending (live discovery not run)")
+            print("  frontier_source: pending (live discovery not run)")
         print("")
         print("From here:")
         for line in render_breadth_first_start_lines(session):
@@ -947,37 +949,30 @@ def init_session_dir(
     session = root / ticker.lower() / exp_id
     session.mkdir(parents=True, exist_ok=True)
     ensure_research_journal(session)
-    discovery_data = None
+    graph_frontier = None
     readiness_report = None
     if discover:
-        discovery_data = fetch_live_discovery(ticker, limit=discover_limit)
-        discovery_data["backtest"] = {"start": backtest_start}
+        graph_frontier = fetch_live_graph_frontier(
+            ticker,
+            limit=discover_limit,
+            backtest_start=backtest_start,
+        )
+        discovery_data = graph_frontier_to_discovery(graph_frontier)
         readiness_report = refresh_data_readiness(
             session=session,
             discovery_data=discovery_data,
+            backtest_start=backtest_start,
+        )
+    else:
+        graph_frontier = build_pending_graph_frontier(
+            ticker,
             backtest_start=backtest_start,
         )
     with SessionLock(session):
         write_tsv_header(session / "events.tsv", EVENTS_HEADER)
         if not session_state_path(session).exists():
             write_session_state(session, {})
-        discovery_path = session / "discovery.json"
-        if discovery_data is not None:
-            write_discovery(session, discovery_data)
-        elif not discovery_path.exists():
-            write_discovery(
-                session,
-                {
-                    "ticker": ticker.upper(),
-                    "source": "pending",
-                    "parents": [],
-                    "blanket_new": [],
-                    "children": [],
-                    "K_discovery": 0,
-                    "backtest": {"start": backtest_start},
-                    "created_at": _now(),
-                },
-            )
+        write_graph_frontier(session, graph_frontier)
         if readiness_report is not None:
             write_readiness(session, readiness_report)
         append_tsv_row(
@@ -995,22 +990,41 @@ def init_session_dir(
                 "artifact_path": "",
             },
         )
-        if discovery_data is not None:
+        append_tsv_row(
+            session / "events.tsv",
+            EVENTS_HEADER,
+            {
+                "timestamp": _now(),
+                "event": "frontier_initialized",
+                "branch_id": "",
+                "round_id": "",
+                "mode": "",
+                "verdict": "",
+                "decision": "",
+                "description": (
+                    f"Initialized graph frontier from {graph_frontier.get('source', 'unknown')} "
+                    f"with {len(graph_frontier.get('nodes') or [])} nodes"
+                ),
+                "artifact_path": GRAPH_FRONTIER_FILENAME,
+            },
+        )
+        if discover:
             append_tsv_row(
                 session / "events.tsv",
                 EVENTS_HEADER,
                 {
                     "timestamp": _now(),
-                    "event": "discovery_recorded",
+                    "event": "frontier_expanded",
                     "branch_id": "",
                     "round_id": "",
                     "mode": "",
                     "verdict": "",
                     "decision": "",
                     "description": (
-                        f"Recorded live Abel discovery with K={discovery_data['K_discovery']}"
+                        f"Recorded live Abel frontier expansion with "
+                        f"{len(graph_frontier.get('nodes') or [])} frontier nodes"
                     ),
-                    "artifact_path": str(discovery_path.relative_to(session)),
+                    "artifact_path": GRAPH_FRONTIER_FILENAME,
                 },
             )
             if readiness_report:
@@ -1036,7 +1050,12 @@ def init_session_dir(
     return session
 
 
-def fetch_live_discovery(ticker: str, *, limit: int) -> dict:
+def fetch_live_graph_frontier(
+    ticker: str,
+    *,
+    limit: int,
+    backtest_start: str,
+) -> dict:
     try:
         from abel_edge.plugins.abel.credentials import (
             MissingAbelApiKeyError,
@@ -1066,16 +1085,280 @@ def fetch_live_discovery(ticker: str, *, limit: int) -> dict:
         ) from exc
 
     payload = discover_graph_payload(ticker.upper(), mode="all", limit=limit)
-    payload["backtest"] = {"start": DEFAULT_BACKTEST_START}
-    payload.setdefault("created_at", _now())
-    return payload
+    return graph_frontier_from_discovery_payload(
+        payload,
+        backtest_start=backtest_start,
+        expansion_mode="all",
+        expansion_limit=limit,
+    )
 
 
 def write_discovery(session: Path, discovery_data: dict) -> None:
-    (session / "discovery.json").write_text(
-        json.dumps(discovery_data, indent=2),
+    write_graph_frontier(
+        session,
+        graph_frontier_from_discovery_payload(
+            discovery_data,
+            backtest_start=_get_backtest_start(discovery_data),
+            expansion_mode=str(discovery_data.get("mode") or "all"),
+            expansion_limit=int(discovery_data.get("K_discovery") or 10),
+        ),
+    )
+
+
+def graph_frontier_path(session: Path) -> Path:
+    return session / GRAPH_FRONTIER_FILENAME
+
+
+def load_graph_frontier(session: Path) -> dict:
+    path = graph_frontier_path(session)
+    if not path.exists():
+        return build_pending_graph_frontier(
+            session.parent.name.upper(),
+            backtest_start=DEFAULT_BACKTEST_START,
+        )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return payload if isinstance(payload, dict) else {}
+
+
+def write_graph_frontier(session: Path, frontier: dict) -> None:
+    graph_frontier_path(session).write_text(
+        json.dumps(frontier, indent=2, sort_keys=True),
         encoding="utf-8",
     )
+
+
+def build_pending_graph_frontier(
+    ticker: str,
+    *,
+    backtest_start: str,
+) -> dict:
+    now = _now()
+    target_asset = str(ticker or "").strip().upper()
+    target_node = default_graph_node_id(target_asset)
+    return {
+        "schema_version": 1,
+        "target_asset": target_asset,
+        "target_node": target_node,
+        "requested_window": {"start": backtest_start, "end": None},
+        "source": "pending",
+        "created_at": now,
+        "updated_at": now,
+        "nodes": [
+            build_frontier_node(
+                node_id=target_node,
+                roles=["target"],
+                discovered_from="session",
+                depth=0,
+                seen_at=now,
+            )
+        ],
+        "expansions": [],
+    }
+
+
+def graph_frontier_from_discovery_payload(
+    payload: dict,
+    *,
+    backtest_start: str,
+    expansion_mode: str,
+    expansion_limit: int,
+) -> dict:
+    now = str(payload.get("created_at") or _now())
+    target_asset = str(
+        payload.get("target_asset") or payload.get("ticker") or ""
+    ).strip().upper()
+    target_node = str(payload.get("target_node") or "").strip() or default_graph_node_id(
+        target_asset
+    )
+    nodes: dict[str, dict] = {}
+
+    def remember(node: dict) -> None:
+        key = str(node.get("node_id") or "").strip()
+        if not key:
+            return
+        if key not in nodes:
+            nodes[key] = node
+            return
+        existing = nodes[key]
+        existing["discovery_roles"] = ordered_unique_strings(
+            list(existing.get("discovery_roles") or [])
+            + list(node.get("discovery_roles") or [])
+        )
+        existing["discovered_from"] = ordered_unique_strings(
+            list(existing.get("discovered_from") or [])
+            + list(node.get("discovered_from") or [])
+        )
+        existing["depth"] = min(int(existing.get("depth") or 0), int(node.get("depth") or 0))
+
+    remember(
+        build_frontier_node(
+            node_id=target_node,
+            roles=["target"],
+            discovered_from="session",
+            depth=0,
+            seen_at=now,
+        )
+    )
+    for section, role in (
+        ("parents", "parent"),
+        ("blanket_new", "blanket"),
+        ("children", "child"),
+    ):
+        for item in payload.get(section) or []:
+            node_id = graph_node_id_from_item(item)
+            if not node_id or node_id == target_node:
+                continue
+            roles = graph_roles_from_item(item, fallback=role)
+            remember(
+                build_frontier_node(
+                    node_id=node_id,
+                    roles=roles,
+                    discovered_from=target_node,
+                    depth=1,
+                    seen_at=now,
+                )
+            )
+    expansion_nodes = [
+        node_id for node_id in sorted(nodes) if node_id != target_node
+    ]
+    expansion_id = frontier_expansion_id(
+        anchor_node=target_node,
+        mode=expansion_mode,
+        timestamp=now,
+    )
+    return {
+        "schema_version": 1,
+        "target_asset": target_asset,
+        "target_node": target_node,
+        "requested_window": {"start": backtest_start, "end": None},
+        "source": str(payload.get("source") or "abel_live"),
+        "created_at": now,
+        "updated_at": now,
+        "nodes": list(nodes.values()),
+        "expansions": [
+            {
+                "expansion_id": expansion_id,
+                "anchor_node": target_node,
+                "mode": expansion_mode,
+                "limit": expansion_limit,
+                "source": str(payload.get("source") or "abel_live"),
+                "new_nodes": expansion_nodes,
+                "updated_nodes": [],
+                "created_at": now,
+            }
+        ],
+    }
+
+
+def graph_frontier_to_discovery(frontier: dict) -> dict:
+    target_asset = str(frontier.get("target_asset") or "").strip().upper()
+    target_node = str(frontier.get("target_node") or "").strip() or default_graph_node_id(
+        target_asset
+    )
+    discovery = {
+        "ticker": target_asset,
+        "target_asset": target_asset,
+        "target_node": target_node,
+        "source": frontier.get("source", "unknown"),
+        "parents": [],
+        "blanket_new": [],
+        "children": [],
+        "K_discovery": 0,
+        "backtest": {"start": (frontier.get("requested_window") or {}).get("start", DEFAULT_BACKTEST_START)},
+        "created_at": frontier.get("created_at", "unknown"),
+    }
+    for node in frontier.get("nodes") or []:
+        if not isinstance(node, dict):
+            continue
+        node_id = str(node.get("node_id") or "").strip()
+        if not node_id or node_id == target_node:
+            continue
+        item = {
+            "node_id": node_id,
+            "ticker": str(node.get("asset") or "").strip().upper(),
+            "field": str(node.get("field") or "price").strip(),
+        }
+        roles = [str(role) for role in node.get("discovery_roles") or []]
+        if "parent" in roles:
+            discovery["parents"].append(item)
+        elif "child" in roles:
+            discovery["children"].append(item)
+        else:
+            item["roles"] = roles or ["neighbor"]
+            discovery["blanket_new"].append(item)
+    discovery["K_discovery"] = (
+        len(discovery["parents"])
+        + len(discovery["blanket_new"])
+        + len(discovery["children"])
+    )
+    return discovery
+
+
+def build_frontier_node(
+    *,
+    node_id: str,
+    roles: list[str],
+    discovered_from: str,
+    depth: int,
+    seen_at: str,
+) -> dict:
+    asset, field = split_graph_node_id(node_id)
+    return {
+        "node_id": node_id,
+        "asset": asset,
+        "field": field,
+        "discovery_roles": ordered_unique_strings(roles),
+        "discovered_from": ordered_unique_strings([discovered_from]),
+        "depth": depth,
+        "first_seen_at": seen_at,
+        "last_expanded_at": None,
+        "availability_summary": None,
+        "branch_usage": [],
+    }
+
+
+def graph_node_id_from_item(item: object) -> str:
+    if isinstance(item, dict):
+        node_id = str(item.get("node_id") or "").strip()
+        if node_id:
+            return node_id
+        asset = str(item.get("ticker") or item.get("symbol") or "").strip().upper()
+        field = str(item.get("field") or "price").strip().lower()
+        return f"{asset}.{field}" if asset else ""
+    value = str(item or "").strip()
+    if not value:
+        return ""
+    return value if "." in value else default_graph_node_id(value)
+
+
+def graph_roles_from_item(item: object, *, fallback: str) -> list[str]:
+    roles: list[str] = []
+    if isinstance(item, dict):
+        roles = [
+            str(role).strip()
+            for role in item.get("roles") or []
+            if str(role).strip()
+        ]
+    return ordered_unique_strings([fallback, *roles])
+
+
+def split_graph_node_id(node_id: str) -> tuple[str, str]:
+    value = str(node_id or "").strip()
+    if "." not in value:
+        return value.upper(), "price"
+    asset, field = value.split(".", 1)
+    return asset.strip().upper(), field.strip().lower() or "price"
+
+
+def default_graph_node_id(asset: str) -> str:
+    return f"{str(asset or '').strip().upper()}.price"
+
+
+def frontier_expansion_id(*, anchor_node: str, mode: str, timestamp: str) -> str:
+    safe_anchor = re.sub(r"[^A-Za-z0-9]+", "-", anchor_node).strip("-").lower()
+    safe_mode = re.sub(r"[^A-Za-z0-9]+", "-", mode).strip("-").lower()
+    safe_time = re.sub(r"[^0-9A-Za-z]+", "", timestamp)[:15]
+    return f"{safe_time}-{safe_anchor}-{safe_mode}".strip("-")
 
 
 def write_readiness(session: Path, readiness_report: dict) -> None:
@@ -3355,7 +3638,7 @@ def fraction_pair(count: int, total: int) -> str:
 def discovered_driver_tickers(discovery: dict) -> list[str]:
     target = str(discovery.get("ticker") or discovery.get("target_asset") or "").strip().upper()
     raw_nodes: list[object] = []
-    for key in ("parents", "blanket_new"):
+    for key in ("parents", "blanket_new", "children"):
         values = discovery.get(key) or []
         if isinstance(values, list):
             raw_nodes.extend(values)
@@ -4798,7 +5081,7 @@ def build_branch_context(
         "data_manifest_path": str(data_manifest_path(branch).resolve()),
         "context_guide_path": str(context_guide_path(branch).resolve()),
         "probe_samples_path": str(probe_samples_path(branch).resolve()),
-        "discovery_path": str((session / "discovery.json").resolve()),
+        "graph_frontier_path": str(graph_frontier_path(session).resolve()),
         "readiness_path": str((session / READINESS_FILENAME).resolve()),
         "ticker": discovery.get("ticker", session.parent.name.upper()),
         "backtest_start": backtest_start,
@@ -4955,17 +5238,18 @@ def load_branches(session: Path) -> list[dict]:
 
 
 def load_discovery(session: Path) -> dict:
-    path = session / "discovery.json"
-    if not path.exists():
-        return {
-            "ticker": session.parent.name.upper(),
-            "source": "unknown",
-            "parents": [],
-            "blanket_new": [],
-            "K_discovery": 0,
-        }
-    return json.loads(path.read_text(encoding="utf-8"))
-
+    frontier_path = graph_frontier_path(session)
+    if frontier_path.exists():
+        return graph_frontier_to_discovery(load_graph_frontier(session))
+    return {
+        "ticker": session.parent.name.upper(),
+        "source": "unknown",
+        "parents": [],
+        "blanket_new": [],
+        "children": [],
+        "K_discovery": 0,
+        "backtest": {"start": DEFAULT_BACKTEST_START},
+    }
 
 def load_readiness(session: Path) -> dict:
     path = session / READINESS_FILENAME
@@ -5515,16 +5799,18 @@ def update_backtest_start(
     backtest_start: str,
     source: str,
 ) -> tuple[dict, dict]:
-    discovery = load_discovery(session)
-    updated_discovery = dict(discovery)
-    updated_discovery["backtest"] = {"start": backtest_start}
+    frontier = load_graph_frontier(session)
+    updated_frontier = dict(frontier)
+    updated_frontier["requested_window"] = {"start": backtest_start, "end": None}
+    updated_frontier["updated_at"] = _now()
+    updated_discovery = graph_frontier_to_discovery(updated_frontier)
     readiness = refresh_data_readiness(
         session=session,
         discovery_data=updated_discovery,
         backtest_start=backtest_start,
     )
     with SessionLock(session):
-        write_discovery(session, updated_discovery)
+        write_graph_frontier(session, updated_frontier)
         readiness_path = session / READINESS_FILENAME
         if readiness:
             write_readiness(session, readiness)
@@ -5547,7 +5833,7 @@ def update_backtest_start(
                 "description": (
                     f"Updated session backtest start to {backtest_start} via {source}"
                 ),
-                "artifact_path": "discovery.json",
+                "artifact_path": GRAPH_FRONTIER_FILENAME,
             },
         )
         if readiness:
