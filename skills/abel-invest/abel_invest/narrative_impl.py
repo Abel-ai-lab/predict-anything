@@ -986,7 +986,7 @@ def render_breadth_first_start_lines(session: Path) -> list[str]:
         f"edit {session / RESEARCH_JOURNAL_FILENAME}",
         f"abel-invest init-branch --session {session} --branch-id <family-a-branch>",
         f"abel-invest init-branch --session {session} --branch-id <family-b-branch>",
-        "edit each branch.yaml with graph/input hypotheses and agent-chosen mechanism-family declarations",
+        "edit each branch.yaml with graph-node hypotheses and agent-chosen mechanism-family declarations",
         "after evidence accumulates, update research_journal.md with evidence-linked reflection before deep local refinement",
     ]
 
@@ -1204,7 +1204,7 @@ def fetch_live_graph_expansion(
     return discover_graph_payload(anchor_node, mode=mode, limit=limit)
 
 
-def write_discovery(session: Path, discovery_data: dict) -> None:
+def write_graph_frontier_from_discovery_payload(session: Path, discovery_data: dict) -> None:
     write_graph_frontier(
         session,
         graph_frontier_from_discovery_payload(
@@ -1634,8 +1634,8 @@ def refresh_data_readiness(
     discovery_data: dict,
     backtest_start: str,
 ) -> dict | None:
-    """Compute the edge-owned data readiness report for a live discovery payload."""
-    fd, temp_name = tempfile.mkstemp(dir=session, suffix="-discovery.json")
+    """Compute the edge-owned data readiness report for a frontier-derived graph payload."""
+    fd, temp_name = tempfile.mkstemp(dir=session, suffix="-frontier-readiness.json")
     os.close(fd)
     discovery_path = Path(temp_name)
     discovery_path.write_text(json.dumps(discovery_data, indent=2), encoding="utf-8")

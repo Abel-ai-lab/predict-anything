@@ -365,7 +365,7 @@ def test_evidence_runtime_facts_prefers_edge_contract() -> None:
 
 def test_prepare_branch_inputs_writes_runtime_contract_artifacts(tmp_path, monkeypatch) -> None:
     session = ni.init_session_dir("TSLA", "tsla-v1", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     branch = ni.init_branch_dir(session, "graph-v1")
 
@@ -458,7 +458,7 @@ def test_prepare_branch_inputs_writes_runtime_contract_artifacts(tmp_path, monke
 
 def test_default_branch_spec_starts_as_graph_first_draft_declaration(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-decl", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     branch = ni.init_branch_dir(session, "graph-v1")
 
@@ -622,7 +622,7 @@ def test_init_session_cli_no_discover_is_explicit_pending_fallback(
 
 def test_complete_branch_declaration_requires_selected_inputs(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-decl-complete", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     branch = ni.init_branch_dir(session, "graph-v1")
     spec = ni.load_branch_spec(branch)
@@ -666,7 +666,7 @@ def test_removed_source_type_and_method_family_do_not_complete_declaration() -> 
 
 def test_evidence_ledger_marks_missing_hypothesis_as_protocol_incomplete(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-ledger-missing", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     branch = ni.init_branch_dir(session, "graph-v1")
     spec = ni.load_branch_spec(branch)
@@ -690,7 +690,7 @@ def test_evidence_ledger_marks_missing_hypothesis_as_protocol_incomplete(tmp_pat
 
 def test_evidence_ledger_classifies_complete_target_control(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-ledger-control", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     branch = ni.init_branch_dir(session, "control-v1")
     spec = ni.load_branch_spec(branch)
@@ -716,7 +716,7 @@ def test_evidence_ledger_classifies_complete_target_control(tmp_path) -> None:
 
 def test_evidence_ledger_classifies_missing_edge_result_as_workflow_blocker(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-ledger-blocker", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     branch = ni.init_branch_dir(session, "control-v1")
     spec = ni.load_branch_spec(branch)
@@ -747,7 +747,7 @@ def test_evidence_ledger_classifies_missing_edge_result_as_workflow_blocker(tmp_
 
 def test_run_branch_round_records_network_failure_as_workflow_blocker(tmp_path, monkeypatch) -> None:
     session = ni.init_session_dir("TSLA", "tsla-network-blocker", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     branch = ni.init_branch_dir(session, "graph-v1")
     _write_runtime_files(branch)
@@ -802,7 +802,7 @@ def test_run_branch_round_records_network_failure_as_workflow_blocker(tmp_path, 
 
 def test_starter_scaffold_round_is_diagnostic_only_not_candidate(tmp_path, monkeypatch) -> None:
     session = ni.init_session_dir("TSLA", "tsla-scaffold-diagnostic", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     branch = ni.init_branch_dir(session, "graph-v1")
     _write_runtime_files(branch)
@@ -860,7 +860,7 @@ def test_starter_scaffold_round_is_diagnostic_only_not_candidate(tmp_path, monke
 
 def test_frontier_reports_coverage_without_route_recommendation(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-frontier", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     branch = ni.init_branch_dir(session, "graph-v1")
     spec = ni.load_branch_spec(branch)
@@ -892,7 +892,7 @@ def test_frontier_reports_coverage_without_route_recommendation(tmp_path) -> Non
 
 def test_evidence_rows_record_graph_node_runtime_facts(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-graph-node-runtime", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     branch = ni.init_branch_dir(session, "graph-node-v1")
     spec = ni.load_branch_spec(branch)
@@ -936,7 +936,7 @@ def test_evidence_rows_record_graph_node_runtime_facts(tmp_path) -> None:
 
 def test_frontier_surfaces_candidate_failures_and_resume_facts(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-frontier-fail-facts", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     branch = ni.init_branch_dir(session, "graph-v1")
     spec = ni.load_branch_spec(branch)
@@ -1020,7 +1020,7 @@ def test_init_session_creates_research_journal(tmp_path) -> None:
 
 def test_agent_context_reads_evidence_linked_research_journal(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-journal-linked", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     branch = ni.init_branch_dir(session, "graph-v1")
     spec = ni.load_branch_spec(branch)
     spec.update(
@@ -1079,7 +1079,7 @@ def test_journal_prose_without_refs_is_not_evidence_linked(tmp_path) -> None:
 
 def test_journal_coverage_required_after_recorded_evidence_without_round_entries(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-reflection-due", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     branch_a = ni.init_branch_dir(session, "momentum-parents")
     branch_b = ni.init_branch_dir(session, "regime-parents")
     spec_a = ni.load_branch_spec(branch_a)
@@ -1186,7 +1186,7 @@ def test_journal_coverage_required_after_recorded_evidence_without_round_entries
 
 def test_exploration_breadth_marks_single_branch_local_refinement(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-breadth-local", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     branch = ni.init_branch_dir(session, "graph-v1")
     spec = ni.load_branch_spec(branch)
@@ -1230,7 +1230,7 @@ def test_exploration_breadth_marks_single_branch_local_refinement(tmp_path) -> N
 
 def test_distinct_driver_sets_are_factual_not_checkpoint_reasons(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-breadth-second-family", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     first = ni.init_branch_dir(session, "graph-v1")
     first_spec = ni.load_branch_spec(first)
@@ -1295,7 +1295,7 @@ def test_distinct_driver_sets_are_factual_not_checkpoint_reasons(tmp_path) -> No
 
 def test_input_breadth_reports_candidate_driver_set_coverage(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-input-breadth", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     graph_branch = ni.init_branch_dir(session, "graph-aapl")
     graph_spec = _complete_candidate_spec(graph_branch, selected_inputs=["AAPL"])
@@ -1351,7 +1351,7 @@ def test_input_breadth_reports_candidate_driver_set_coverage(tmp_path) -> None:
 
 def test_research_reflection_and_input_realization_for_empty_workspace_9_shape(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-empty-workspace-9-shape", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
 
     graph_read = ni.init_branch_dir(session, "tree-graph")
@@ -1446,7 +1446,7 @@ def test_research_reflection_and_input_realization_for_empty_workspace_9_shape(t
 
 def test_input_breadth_remains_factual_without_route_warning(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-input-breadth-warning", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     graph_branch = ni.init_branch_dir(session, "graph-aapl")
     graph_spec = _complete_candidate_spec(graph_branch, selected_inputs=["AAPL"])
@@ -1505,7 +1505,7 @@ def test_input_breadth_remains_factual_without_route_warning(tmp_path) -> None:
 
 def test_graph_priority_warns_when_graph_candidates_are_uncovered(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-graph-uncovered", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     target_branch = ni.init_branch_dir(session, "target-control")
     target_spec = _complete_candidate_spec(target_branch, selected_inputs=[])
@@ -1538,7 +1538,7 @@ def test_graph_priority_warns_when_graph_candidates_are_uncovered(tmp_path) -> N
 
 def test_mixed_graph_reads_remain_supplemental_for_graph_priority(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-mixed-supplemental", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     branch = ni.init_branch_dir(session, "mixed-aapl")
     spec = _complete_candidate_spec(branch, selected_inputs=["AAPL"])
@@ -1596,7 +1596,7 @@ def test_graph_priority_warns_when_discovery_is_missing_and_target_only_saturate
 
 def test_debug_rows_do_not_count_as_recorded_candidate_rounds(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-breadth-debug", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     branch = ni.init_branch_dir(session, "graph-v1")
     spec = _complete_candidate_spec(branch)
@@ -1661,7 +1661,7 @@ def test_init_session_output_uses_graph_first_research_loop() -> None:
 
 def test_tsla_replay_fixture_keeps_broad_failed_search_as_frontier_facts(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-third-party-replay", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
 
     for index in range(6):
@@ -1781,7 +1781,7 @@ def test_tsla_replay_fixture_keeps_broad_failed_search_as_frontier_facts(tmp_pat
 
 def test_prepare_branch_inputs_passes_csv_adapter_and_path(tmp_path, monkeypatch) -> None:
     session = ni.init_session_dir("TSLA", "tsla-v1-csv", tmp_path / "research")
-    ni.write_discovery(session, _sample_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
     branch = ni.init_branch_dir(session, "baseline-v1")
 
@@ -1860,7 +1860,7 @@ def test_build_branch_context_prefers_prepared_runtime_inputs(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-v2", tmp_path / "research")
     discovery = _sample_discovery()
     readiness = _sample_readiness()
-    ni.write_discovery(session, discovery)
+    ni.write_graph_frontier_from_discovery_payload(session, discovery)
     ni.write_readiness(session, readiness)
     branch = ni.init_branch_dir(session, "graph-v1")
 
@@ -1891,7 +1891,7 @@ def test_build_branch_context_preserves_csv_feed_path(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-v2-csv", tmp_path / "research")
     discovery = _sample_discovery()
     readiness = _sample_readiness()
-    ni.write_discovery(session, discovery)
+    ni.write_graph_frontier_from_discovery_payload(session, discovery)
     ni.write_readiness(session, readiness)
     branch = ni.init_branch_dir(session, "graph-v1")
 
@@ -1934,7 +1934,7 @@ def test_build_branch_context_includes_experiment_metadata(tmp_path, monkeypatch
     session = ni.init_session_dir("TSLA", "tsla-v4-context", tmp_path / "research")
     discovery = _sample_discovery()
     readiness = _sample_readiness()
-    ni.write_discovery(session, discovery)
+    ni.write_graph_frontier_from_discovery_payload(session, discovery)
     ni.write_readiness(session, readiness)
     branch = ni.init_branch_dir(session, "graph-v1")
 

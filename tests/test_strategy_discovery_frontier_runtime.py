@@ -24,7 +24,7 @@ def _seed_discovery() -> dict:
 
 def test_evidence_frontier_is_the_current_frontier_runtime_surface(tmp_path: Path) -> None:
     session = ni.init_session_dir("TSLA", "frontier-v1", tmp_path / "research")
-    ni.write_discovery(session, _seed_discovery())
+    ni.write_graph_frontier_from_discovery_payload(session, _seed_discovery())
 
     ni.render_session(session)
 
