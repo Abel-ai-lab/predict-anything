@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 from abel_invest import narrative_impl as ni
@@ -50,6 +51,65 @@ def test_seed_only_session_keeps_graph_first_gap_visible(tmp_path: Path) -> None
     assert ledger["graph_discovery_source"] == "pending"
     assert frontier["graph_priority"]["graph_candidates_available"] is False
     assert "discovery_source: `pending`" in readme
+
+
+def test_frontier_expand_cli_updates_graph_frontier(tmp_path: Path, monkeypatch, capsys) -> None:
+    session = ni.init_session_dir("TSLA", "frontier-expand", tmp_path / "research")
+
+    def fake_fetch_live_graph_expansion(anchor_node: str, *, mode: str, limit: int) -> dict:
+        assert anchor_node == "TSLA.price"
+        assert mode == "all"
+        assert limit == 20
+        return {
+            "ticker": "TSLA",
+            "target_asset": "TSLA",
+            "target_node": "TSLA.price",
+            "source": "abel_live",
+            "parents": [{"node_id": "AAPL.price", "ticker": "AAPL", "field": "price"}],
+            "blanket_new": [
+                {
+                    "node_id": "MSFT.volume",
+                    "ticker": "MSFT",
+                    "field": "volume",
+                    "roles": ["spouse"],
+                }
+            ],
+            "children": [],
+            "created_at": "2026-04-29T00:00:00+00:00",
+        }
+
+    monkeypatch.setattr(ni, "fetch_live_graph_expansion", fake_fetch_live_graph_expansion)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "abel-invest",
+            "frontier",
+            "expand",
+            "--session",
+            str(session),
+            "--anchor",
+            "TSLA.price",
+            "--mode",
+            "all",
+            "--limit",
+            "20",
+        ],
+    )
+
+    assert ni.main() == 0
+    out = capsys.readouterr().out
+    graph_frontier = json.loads((session / ni.GRAPH_FRONTIER_FILENAME).read_text(encoding="utf-8"))
+    node_ids = [node["node_id"] for node in graph_frontier["nodes"]]
+    events = (session / "events.tsv").read_text(encoding="utf-8")
+
+    assert node_ids == ["AAPL.price", "MSFT.volume", "TSLA.price"]
+    assert graph_frontier["nodes"][2]["last_expanded_at"] == "2026-04-29T00:00:00+00:00"
+    assert graph_frontier["expansions"][-1]["new_nodes"] == ["AAPL.price", "MSFT.volume"]
+    assert "event\tbranch_id\tround_id" in events
+    assert "frontier_expanded" in events
+    assert "new_nodes: 2" in out
+    assert "Fields: price=2, volume=1" in out
 
 
 def test_failed_live_discovery_attempt_surfaces_as_auth_or_runtime_error(

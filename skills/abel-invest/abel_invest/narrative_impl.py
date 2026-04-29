@@ -350,6 +350,26 @@ def main() -> int:
         help="Emit machine-readable JSON output",
     )
 
+    frontier_parser = sub.add_parser("frontier", help="Inspect or expand the session graph frontier")
+    frontier_sub = frontier_parser.add_subparsers(dest="frontier_command", required=True)
+    frontier_status = frontier_sub.add_parser("status", help="Show graph frontier facts")
+    frontier_status.add_argument("--session", required=True)
+    frontier_expand = frontier_sub.add_parser("expand", help="Expand graph frontier from an anchor node")
+    frontier_expand.add_argument("--session", required=True)
+    frontier_expand.add_argument("--anchor", required=True, help="Graph node anchor such as TSLA.price")
+    frontier_expand.add_argument(
+        "--mode",
+        default="all",
+        choices=["parents", "mb", "all"],
+        help="CAP discovery mode",
+    )
+    frontier_expand.add_argument(
+        "--limit",
+        type=int,
+        default=10,
+        help="Maximum nodes to request from CAP",
+    )
+
     init_session = sub.add_parser("init-session", help="Create a narrative session")
     init_session.add_argument("--ticker", required=True)
     init_session.add_argument("--exp-id", required=True)
@@ -523,6 +543,8 @@ def main() -> int:
         return handle_env_command(args)
     if args.command == "doctor":
         return handle_doctor_command(args)
+    if args.command == "frontier":
+        return handle_frontier_command(args)
     if args.command == "init-session":
         session = init_session_dir(
             args.ticker,
@@ -893,6 +915,60 @@ def handle_doctor_command(args: argparse.Namespace) -> int:
     return doctor_exit_code(result)
 
 
+def handle_frontier_command(args: argparse.Namespace) -> int:
+    session = resolve_workspace_arg_path(args.session)
+    if args.frontier_command == "status":
+        print_graph_frontier_status(session)
+        return 0
+    if args.frontier_command == "expand":
+        anchor = normalize_graph_node_ref(args.anchor)
+        with SessionLock(session):
+            frontier = load_graph_frontier(session)
+            expansion_payload = fetch_live_graph_expansion(
+                anchor,
+                mode=args.mode,
+                limit=args.limit,
+            )
+            updated, expansion = merge_graph_frontier_expansion(
+                frontier,
+                expansion_payload,
+                anchor_node=anchor,
+                mode=args.mode,
+                limit=args.limit,
+            )
+            write_graph_frontier(session, updated)
+            append_tsv_row(
+                session / "events.tsv",
+                EVENTS_HEADER,
+                {
+                    "timestamp": _now(),
+                    "event": "frontier_expanded",
+                    "branch_id": "",
+                    "round_id": "",
+                    "mode": args.mode,
+                    "verdict": "",
+                    "decision": "",
+                    "description": (
+                        f"Expanded graph frontier from {anchor}: "
+                        f"new_nodes={len(expansion.get('new_nodes') or [])} "
+                        f"updated_nodes={len(expansion.get('updated_nodes') or [])}"
+                    ),
+                    "artifact_path": GRAPH_FRONTIER_FILENAME,
+                },
+            )
+            render_session(session)
+        print(f"Expanded graph frontier at {session / GRAPH_FRONTIER_FILENAME}")
+        print(f"  anchor: {anchor}")
+        print(f"  mode: {args.mode}")
+        print(f"  new_nodes: {len(expansion.get('new_nodes') or [])}")
+        print(f"  updated_nodes: {len(expansion.get('updated_nodes') or [])}")
+        print("")
+        print("Frontier status:")
+        print_graph_frontier_status(session)
+        return 0
+    return 1
+
+
 def resolve_session_root(root_arg: str | None) -> Path:
     """Resolve the session root from an explicit argument or current workspace."""
     if root_arg:
@@ -1093,6 +1169,41 @@ def fetch_live_graph_frontier(
     )
 
 
+def fetch_live_graph_expansion(
+    anchor_node: str,
+    *,
+    mode: str,
+    limit: int,
+) -> dict:
+    try:
+        from abel_edge.plugins.abel.credentials import (
+            MissingAbelApiKeyError,
+            require_api_key,
+        )
+        from abel_edge.plugins.abel.discover import discover_graph_payload
+    except ImportError as exc:
+        raise RuntimeError(
+            "Live Abel frontier expansion requires abel-edge with the Abel plugin installed. "
+            "Create a virtual environment, install abel-edge, then retry."
+        ) from exc
+    workspace_root, _ = resolve_workspace_entry()
+    if workspace_root is not None:
+        auth_env = resolve_runtime_auth_env_file(workspace_root)
+        if auth_env is not None:
+            os.environ.setdefault("ABEL_AUTH_ENV_FILE", str(auth_env))
+
+    try:
+        require_api_key()
+    except MissingAbelApiKeyError as exc:
+        raise RuntimeError(
+            "frontier expand is blocked on Abel auth. "
+            "No reusable auth was found. "
+            f"{build_auth_recovery_instruction(workspace_root or Path.cwd())}"
+        ) from exc
+
+    return discover_graph_payload(anchor_node, mode=mode, limit=limit)
+
+
 def write_discovery(session: Path, discovery_data: dict) -> None:
     write_graph_frontier(
         session,
@@ -1127,6 +1238,56 @@ def write_graph_frontier(session: Path, frontier: dict) -> None:
     )
 
 
+def print_graph_frontier_status(session: Path) -> None:
+    frontier = load_graph_frontier(session)
+    facts = graph_frontier_facts(frontier)
+    print(f"Session: {session.name}")
+    print(f"Graph frontier: {session / GRAPH_FRONTIER_FILENAME}")
+    print(f"Target node: {facts['target_node']}")
+    print(f"Source: {facts['source']}")
+    print(f"Nodes: {facts['node_count']}")
+    print(f"Expansions: {facts['expansion_count']}")
+    print(f"Expanded anchors: {facts['expanded_anchor_count']}")
+    print(f"Unexpanded nodes: {facts['unexpanded_node_count']}")
+    print(f"Fields: {render_inline_counts(facts['field_counts'])}")
+    print(f"Roles: {render_inline_counts(facts['role_counts'])}")
+
+
+def graph_frontier_facts(frontier: dict) -> dict[str, object]:
+    nodes = [node for node in frontier.get("nodes") or [] if isinstance(node, dict)]
+    expansions = [
+        item for item in frontier.get("expansions") or [] if isinstance(item, dict)
+    ]
+    expanded_anchors = {
+        str(item.get("anchor_node") or "").strip()
+        for item in expansions
+        if str(item.get("anchor_node") or "").strip()
+    }
+    field_counts: dict[str, int] = {}
+    role_counts: dict[str, int] = {}
+    for node in nodes:
+        increment_count(field_counts, str(node.get("field") or "unknown"))
+        roles = node.get("discovery_roles") or ["unknown"]
+        for role in roles:
+            increment_count(role_counts, str(role or "unknown"))
+    unexpanded = [
+        node
+        for node in nodes
+        if str(node.get("node_id") or "") not in expanded_anchors
+        and "target" not in set(str(role) for role in node.get("discovery_roles") or [])
+    ]
+    return {
+        "target_node": str(frontier.get("target_node") or "unknown"),
+        "source": str(frontier.get("source") or "unknown"),
+        "node_count": len(nodes),
+        "expansion_count": len(expansions),
+        "expanded_anchor_count": len(expanded_anchors),
+        "unexpanded_node_count": len(unexpanded),
+        "field_counts": dict(sorted(field_counts.items())),
+        "role_counts": dict(sorted(role_counts.items())),
+    }
+
+
 def build_pending_graph_frontier(
     ticker: str,
     *,
@@ -1154,6 +1315,98 @@ def build_pending_graph_frontier(
         ],
         "expansions": [],
     }
+
+
+def merge_graph_frontier_expansion(
+    frontier: dict,
+    payload: dict,
+    *,
+    anchor_node: str,
+    mode: str,
+    limit: int,
+) -> tuple[dict, dict]:
+    now = str(payload.get("created_at") or _now())
+    anchor_node = normalize_graph_node_ref(anchor_node)
+    updated = dict(frontier)
+    updated.setdefault("schema_version", 1)
+    updated.setdefault("target_asset", split_graph_node_id(anchor_node)[0])
+    updated.setdefault("target_node", anchor_node)
+    updated.setdefault("requested_window", {"start": DEFAULT_BACKTEST_START, "end": None})
+    updated["source"] = "abel_live" if updated.get("source") in {"", "pending", None} else updated.get("source")
+    updated["updated_at"] = now
+
+    node_map = {
+        str(node.get("node_id") or ""): dict(node)
+        for node in updated.get("nodes") or []
+        if isinstance(node, dict) and str(node.get("node_id") or "")
+    }
+    anchor = node_map.get(anchor_node)
+    if anchor is None:
+        anchor = build_frontier_node(
+            node_id=anchor_node,
+            roles=["expansion_anchor"],
+            discovered_from="agent",
+            depth=0,
+            seen_at=now,
+        )
+        node_map[anchor_node] = anchor
+    anchor["last_expanded_at"] = now
+    anchor_depth = int(anchor.get("depth") or 0)
+
+    new_nodes: list[str] = []
+    updated_nodes: list[str] = []
+    for section, role in (
+        ("parents", "parent"),
+        ("blanket_new", "blanket"),
+        ("children", "child"),
+    ):
+        for item in payload.get(section) or []:
+            node_id = normalize_graph_node_ref(graph_node_id_from_item(item))
+            if not node_id or node_id == anchor_node:
+                continue
+            roles = graph_roles_from_item(item, fallback=role)
+            if node_id not in node_map:
+                node_map[node_id] = build_frontier_node(
+                    node_id=node_id,
+                    roles=roles,
+                    discovered_from=anchor_node,
+                    depth=anchor_depth + 1,
+                    seen_at=now,
+                )
+                new_nodes.append(node_id)
+                continue
+            existing = node_map[node_id]
+            existing["discovery_roles"] = ordered_unique_strings(
+                list(existing.get("discovery_roles") or []) + roles
+            )
+            existing["discovered_from"] = ordered_unique_strings(
+                list(existing.get("discovered_from") or []) + [anchor_node]
+            )
+            existing["depth"] = min(
+                int(existing.get("depth") or anchor_depth + 1),
+                anchor_depth + 1,
+            )
+            updated_nodes.append(node_id)
+
+    expansion = {
+        "expansion_id": frontier_expansion_id(
+            anchor_node=anchor_node,
+            mode=mode,
+            timestamp=now,
+        ),
+        "anchor_node": anchor_node,
+        "mode": mode,
+        "limit": limit,
+        "source": str(payload.get("source") or "abel_live"),
+        "new_nodes": ordered_unique_strings(new_nodes),
+        "updated_nodes": ordered_unique_strings(updated_nodes),
+        "created_at": now,
+    }
+    expansions = [item for item in updated.get("expansions") or [] if isinstance(item, dict)]
+    expansions.append(expansion)
+    updated["nodes"] = sorted(node_map.values(), key=lambda item: str(item.get("node_id") or ""))
+    updated["expansions"] = expansions
+    return updated, expansion
 
 
 def graph_frontier_from_discovery_payload(
@@ -1348,6 +1601,13 @@ def split_graph_node_id(node_id: str) -> tuple[str, str]:
         return value.upper(), "price"
     asset, field = value.split(".", 1)
     return asset.strip().upper(), field.strip().lower() or "price"
+
+
+def normalize_graph_node_ref(value: str) -> str:
+    asset, field = split_graph_node_id(value)
+    if not asset:
+        return ""
+    return f"{asset}.{field}"
 
 
 def default_graph_node_id(asset: str) -> str:
