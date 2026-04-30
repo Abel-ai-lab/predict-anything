@@ -48,6 +48,14 @@ def _get_backtest_start(discovery: dict) -> str:
     return DEFAULT_BACKTEST_START
 
 
+def branch_requested_start(branch: Path, discovery: dict) -> str:
+    branch_spec = load_branch_spec(branch)
+    requested = str(branch_spec.get("requested_start") or "").strip()
+    if requested:
+        return requested
+    return _get_backtest_start(discovery)
+
+
 def normalize_evidence_intent(branch_spec: dict) -> str:
     configured = str(branch_spec.get("evidence_intent") or "").strip().lower()
     if configured in EVIDENCE_INTENTS:
