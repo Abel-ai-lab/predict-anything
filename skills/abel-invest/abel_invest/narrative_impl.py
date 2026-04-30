@@ -77,14 +77,19 @@ from abel_invest.edge_commands import (
 from abel_invest.env import init_workspace_env
 from abel_invest.evidence import (
     annotate_exploration_protocol,
+    build_evidence_ledger,
+    build_evidence_row,
+    build_evidence_rows_for_branch,
     build_input_realization,
     derive_evidence_label,
     derive_exploration_class,
     evidence_comparability,
     evidence_runtime_facts,
+    load_json_object,
     metric_string,
     normalize_optional_note,
     parse_changed_dimensions,
+    write_evidence_ledger,
 )
 from abel_invest.frontier import (
     branch_family_key,
@@ -2825,31 +2830,6 @@ Latest decision is `{latest.get("decision", "pending")}` with verdict `{latest.g
 """
 
 
-def write_evidence_ledger(session: Path, discovery: dict, branches: list[dict]) -> dict:
-    ledger = build_evidence_ledger(session, discovery, branches)
-    write_json_file(session / EVIDENCE_LEDGER_FILENAME, ledger)
-    return ledger
-
-
-def build_evidence_ledger(session: Path, discovery: dict, branches: list[dict]) -> dict:
-    rows: list[dict[str, object]] = []
-    for branch in branches:
-        rows.extend(build_evidence_rows_for_branch(session, branch))
-    annotate_exploration_protocol(rows)
-    discovered_drivers = discovered_driver_tickers(discovery)
-    return {
-        "schema_version": 1,
-        "exp_id": session.name,
-        "asset_scope": discovery.get("ticker", session.parent.name.upper()),
-        "generated_at": _now(),
-        "graph_discovery_source": discovery.get("source", "unknown"),
-        "graph_discovery_k": int(discovery.get("K_discovery") or len(discovered_drivers)),
-        "discovered_drivers": discovered_drivers,
-        "experiment": session_experiment_metadata(branches, rows),
-        "rows": rows,
-    }
-
-
 def write_frontier(session: Path, ledger: dict) -> dict:
     journal_status = build_research_journal_status(session, ledger=ledger, frontier={})
     frontier = build_frontier(
@@ -2862,160 +2842,6 @@ def write_frontier(session: Path, ledger: dict) -> dict:
         encoding="utf-8",
     )
     return frontier
-
-
-
-
-def build_evidence_rows_for_branch(session: Path, branch: dict) -> list[dict[str, object]]:
-    branch_dir = branch["branch_dir"]
-    rows: list[dict[str, object]] = []
-    debug_snapshot = latest_debug_snapshot(branch_dir)
-    if debug_snapshot:
-        rows.append(
-            build_evidence_row(
-                session=session,
-                branch_dir=branch_dir,
-                branch_id=branch["branch_id"],
-                row={},
-                note=debug_snapshot,
-                run_type="debug",
-                run_id="debug",
-            )
-        )
-    for result_row in branch["rows"]:
-        round_id = result_row.get("round_id", "")
-        rows.append(
-            build_evidence_row(
-                session=session,
-                branch_dir=branch_dir,
-                branch_id=branch["branch_id"],
-                row=result_row,
-                note=read_round_note(branch_dir, round_id),
-                run_type="round",
-                run_id=round_id,
-            )
-        )
-    return rows
-
-
-def build_evidence_row(
-    *,
-    session: Path,
-    branch_dir: Path,
-    branch_id: str,
-    row: dict[str, str],
-    note: dict[str, str],
-    run_type: str,
-    run_id: str,
-) -> dict[str, object]:
-    context_rel = note.get("context_path", "")
-    context = load_json_object(session / context_rel) if context_rel else {}
-    branch_spec = context.get("branch_spec") if isinstance(context.get("branch_spec"), dict) else None
-    if branch_spec is None:
-        branch_spec = load_branch_spec(branch_dir)
-    declaration = branch_declaration_status(branch_spec)
-    engine_scaffold_status = str(context.get("engine_scaffold_status") or "").strip()
-
-    result_rel = note.get("result_path") or row.get("result_path", "")
-    result_path = session / result_rel if result_rel else None
-    result = load_json_object(result_path) if result_path is not None else {}
-    runtime = evidence_runtime_facts(result)
-    runtime = augment_runtime_graph_facts(
-        runtime=runtime,
-        declaration=declaration,
-        context=context,
-    )
-    input_realization = build_input_realization(declaration=declaration, runtime=runtime)
-    validation_completed = runtime["runtime_stage"] == "validation" and runtime["verdict"] in {"PASS", "FAIL"}
-    workflow_status = str(runtime["workflow_status"]) if result else "blocked"
-    comparable, comparable_reason = evidence_comparability(
-        declaration=declaration,
-        runtime=runtime,
-        validation_completed=validation_completed,
-        result=result,
-    )
-    label = derive_evidence_label(
-        declaration=declaration,
-        runtime=runtime,
-        validation_completed=validation_completed,
-        comparable=comparable,
-        run_type=run_type,
-        result_present=bool(result),
-        engine_scaffold_status=engine_scaffold_status,
-    )
-    changed_dimensions = parse_changed_dimensions(note.get("changed_dimensions", ""))
-    exploration_class = derive_exploration_class(
-        run_type=run_type,
-        declared_mode=row.get("mode", ""),
-        evidence_label=label,
-        declaration=declaration,
-        changed_dimensions=changed_dimensions,
-    )
-    return {
-        "branch_id": branch_id,
-        "run_id": run_id,
-        "run_type": run_type,
-        "round_id": run_id if run_type == "round" else "",
-        "declared_mode": row.get("mode", run_type),
-        "decision": row.get("decision", ""),
-        "declaration_protocol_complete": bool(declaration["protocol_complete"]),
-        "declaration_gaps": list(declaration["protocol_gaps"]),
-        "declared_evidence_intent": declaration["evidence_intent"],
-        "declared_input_claim": declaration["input_claim"],
-        "declared_mechanism_family": declaration["mechanism_family"],
-        "declared_model_family": declaration["model_family"],
-        "declared_complexity_class": declaration["complexity_class"],
-        "declared_exploration_role": declaration["exploration_role"],
-        "declared_selected_inputs": list(declaration["selected_inputs"]),
-        "declared_selected_graph_nodes": list(declaration["selected_graph_nodes"]),
-        "changed_dimensions": changed_dimensions,
-        "engine_scaffold_status": engine_scaffold_status or "unknown",
-        "actual_auxiliary_reads": runtime["auxiliary_reads"],
-        "actual_graph_node_reads": runtime["actual_graph_node_reads"],
-        "actual_graph_node_read_source": runtime["actual_graph_node_read_source"],
-        "actual_read_count": runtime["read_count"],
-        "prepared_selected_inputs": runtime["prepared_selected_inputs"],
-        "prepared_selected_graph_nodes": runtime["prepared_selected_graph_nodes"],
-        "prepared_traced_inputs": runtime["prepared_traced_inputs"],
-        "prepared_traced_graph_nodes": runtime["prepared_traced_graph_nodes"],
-        "graph_node_read_gap": input_realization["graph_node_read_gap"],
-        "input_realization": input_realization,
-        "runtime_stage": runtime["runtime_stage"],
-        "workflow_status": workflow_status,
-        "validation_status": "completed" if validation_completed else "not_completed",
-        "verdict": runtime["verdict"],
-        "semantic_verdict": runtime["semantic_verdict"],
-        "metric_failure_metrics": runtime["metric_failure_metrics"],
-        "metric_failures": runtime["metric_failures"],
-        "evidence_label": label,
-        "derived_exploration_class": exploration_class,
-        "exploration_neighborhood_key": "",
-        "comparable": comparable,
-        "comparable_reason": comparable_reason,
-        "metrics_ref": result_rel,
-        "result_ref": result_rel,
-        "report_ref": note.get("report_path") or row.get("report_path", ""),
-        "handoff_ref": note.get("handoff_path") or row.get("handoff_path", ""),
-        "context_ref": context_rel,
-        "experiment": context_experiment_metadata(context),
-        "score": row.get("score", str(result.get("score") or "")),
-        "sharpe": row.get("sharpe", metric_string(result, "sharpe")),
-        "lo_adj": row.get("lo_adj", metric_string(result, "lo_adjusted")),
-    }
-
-
-
-def load_json_object(path: Path | None) -> dict:
-    if path is None or not path.exists():
-        return {}
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return {}
-    return payload if isinstance(payload, dict) else {}
-
-
-
 def render_section(title: str, lines: list[str]) -> None:
     if not lines:
         return
