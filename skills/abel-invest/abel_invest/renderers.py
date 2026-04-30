@@ -4,17 +4,60 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from abel_invest.branch_spec import normalize_hypothesis_text, ordered_unique_strings
+from abel_invest.branch_spec import (
+    _get_backtest_start,
+    branch_declaration_status_for_branch,
+    branch_selected_inputs,
+    has_explicit_hypothesis,
+    load_branch_spec,
+    normalize_hypothesis_text,
+    ordered_unique_strings,
+)
 from abel_invest.constants import (
     AGENT_CONTEXT_FILENAME,
+    BRANCH_SPEC_FILENAME,
+    CONTEXT_GUIDE_FILENAME,
+    DATA_MANIFEST_FILENAME,
     DEFAULT_BACKTEST_START,
+    DEPENDENCIES_FILENAME,
     EVIDENCE_LEDGER_FILENAME,
+    EXECUTION_CONSTRAINTS_FILENAME,
     FRONTIER_MARKDOWN_FILENAME,
+    FRONTIER_JSON_FILENAME,
+    PROBE_SAMPLES_FILENAME,
     RESEARCH_JOURNAL_FILENAME,
+    RUNTIME_PROFILE_FILENAME,
 )
+from abel_invest.context import (
+    branch_parent_branch_id,
+    format_discovery_nodes,
+    format_simple_nodes,
+)
+from abel_invest.evidence import load_json_object
 from abel_invest.frontier import render_inline_counts, render_session_frontier_summary
-from abel_invest.io import _today
+from abel_invest.io import _today, read_tsv_rows
 from abel_invest.journal import build_research_journal_status
+from abel_invest.paths import (
+    context_guide_path,
+    data_manifest_path,
+    execution_constraints_path,
+    probe_samples_path,
+    runtime_profile_path,
+)
+from abel_invest.readiness import (
+    readiness_start_covered_tickers,
+    readiness_usable_tickers,
+    render_discovery_readiness_section,
+)
+from abel_invest.state import (
+    branch_inputs_ready,
+    branch_progression,
+    build_branch_snapshot_line,
+    current_branch_hypothesis,
+    format_risks,
+    latest_debug_snapshot,
+    read_round_note,
+)
 
 
 def render_agent_context(*, session: Path, ledger: dict, frontier: dict) -> None:
@@ -296,3 +339,326 @@ def render_round_note(**kwargs) -> str:
 - summary: `{kwargs.get("summary") or f"Recorded {result.get('verdict', 'ERROR')} {result.get('score', '?/?')}."}`
 - next_step: `{kwargs.get("next_step") or "not recorded"}`
 """
+
+
+def build_session_readme(
+    session: Path,
+    discovery: dict,
+    readiness: dict,
+    branches: list[dict],
+) -> str:
+    keep_branches = [
+        branch
+        for branch in branches
+        if branch["rows"] and branch["rows"][-1].get("decision") == "keep"
+    ]
+    discard_branches = [
+        branch
+        for branch in branches
+        if branch["rows"] and branch["rows"][-1].get("decision") == "discard"
+    ]
+    recorded_round_count = sum(len(branch["rows"]) for branch in branches)
+    debugged_branches = [
+        branch for branch in branches if latest_debug_snapshot(branch["branch_dir"])
+    ]
+    frontier = load_json_object(session / FRONTIER_JSON_FILENAME)
+    executive = "No validated evidence rows yet."
+    if branches and not any(branch["rows"] for branch in branches):
+        executive = f"{len(branches)} branch(es) have been initialized, but no validated rounds exist yet."
+        if debugged_branches:
+            latest_debug_branch = max(
+                debugged_branches,
+                key=lambda branch: latest_debug_snapshot(branch["branch_dir"]).get("updated_at", ""),
+            )
+            debug_note = latest_debug_snapshot(latest_debug_branch["branch_dir"])
+            executive += (
+                f" {len(debugged_branches)} branch(es) have already been debugged; "
+                f"latest blocker is `{latest_debug_branch['branch_id']}` with signature "
+                f"`{debug_note.get('failure_signature', 'unknown')}`."
+            )
+        else:
+            executive += " Evidence labels remain empty until a runtime result is recorded."
+    elif recorded_round_count:
+        executive = (
+            f"Session has {len(branches)} branch(es) and {recorded_round_count} recorded round(s): "
+            f"{len(keep_branches)} keep and {len(discard_branches)} discard. "
+            "Evidence labels, coverage, and runtime facts are summarized below without ranking branches by metrics."
+        )
+
+    branch_lines = (
+        "\n".join(
+            (
+                f"1. `{branch['branch_id']}` - {len(branch['rows'])} rounds, latest "
+                f"`{branch['rows'][-1].get('round_id', 'none')}` {branch['rows'][-1].get('decision', 'pending')}"
+                if branch["rows"]
+                else (
+                    f"1. `{branch['branch_id']}` - pending, latest debug "
+                    f"`{latest_debug_snapshot(branch['branch_dir']).get('failure_signature', 'not run')}`"
+                    if latest_debug_snapshot(branch["branch_dir"])
+                    else f"1. `{branch['branch_id']}` - scaffolded, no rounds or debug runs yet"
+                )
+            )
+            for branch in branches
+        )
+        or "1. `No branches yet.`"
+    )
+
+    snapshot_lines = (
+        "\n".join(
+            line
+            for branch in branches
+            for line in (
+                [build_branch_snapshot_line(branch)]
+                if branch["rows"]
+                else (
+                    [
+                        (
+                            f"1. `{branch['branch_id']}` -> `debug` / "
+                            f"`{latest_debug_snapshot(branch['branch_dir']).get('verdict', 'ERROR')}` / "
+                            f"signature `{latest_debug_snapshot(branch['branch_dir']).get('failure_signature', 'unknown')}`. "
+                            f"Why: `{current_branch_hypothesis(branch['branch_dir'], branch['rows']) or latest_debug_snapshot(branch['branch_dir']).get('summary', 'not recorded')}`."
+                        )
+                    ]
+                    if latest_debug_snapshot(branch["branch_dir"])
+                    else []
+                )
+            )
+        )
+        or "1. `No branch outcomes yet.`"
+    )
+    activity_lines = (
+        "\n".join(
+            format_event_line(row) for row in read_tsv_rows(session / "events.tsv")[-5:]
+        )
+        or "1. `No events yet.`"
+    )
+
+    return f"""# {discovery.get("ticker", session.parent.name.upper())} Exploration Session {session.name}
+
+generated by Abel strategy discovery narrative layer
+
+## Executive Summary
+
+{executive}
+
+## Session Summary
+
+- ticker: `{discovery.get("ticker", session.parent.name.upper())}`
+- exp_id: `{session.name}`
+- started_at: `{discovery.get("created_at", "unknown")}`
+- discovery_source: `{discovery.get("source", "unknown")}`
+- backtest_start: `{_get_backtest_start(discovery)}`
+- current_status: `{"has_keep" if keep_branches else "active" if branches else "exploring"}`
+- branch_count: `{len(branches)}`
+
+## Session Goal
+
+Explore {discovery.get("ticker", session.parent.name.upper())} in session `{session.name}` using discovery source `{discovery.get("source", "unknown")}` and compare candidate branches through validated rounds.
+
+## Discovery Readiness
+
+{render_discovery_readiness_section(readiness)}
+
+## Evidence State
+
+This session tracks {len(branches)} branch(es). Current outcomes: {len(keep_branches)} keep, {len(discard_branches)} discard, {len(branches) - len(keep_branches) - len(discard_branches)} pending.
+
+{render_session_frontier_summary(frontier)}
+
+## Branches
+
+{branch_lines}
+
+## Branch Outcome Snapshot
+
+{snapshot_lines}
+
+## Recent Activity
+
+{activity_lines}
+"""
+
+
+def build_branch_readme(branch: dict, latest_note: dict[str, str], exp_id: str) -> str:
+    rows = branch["rows"]
+    latest = rows[-1] if rows else {}
+    debug_note = latest_debug_snapshot(branch["branch_dir"])
+    diagnostics_note = latest_note or debug_note
+    keep_rows = [row for row in rows if row.get("decision") == "keep"]
+    branch_hypothesis = current_branch_hypothesis(branch["branch_dir"], rows)
+    parent_branch_id = branch_parent_branch_id(branch["branch_dir"])
+    declaration = branch_declaration_status_for_branch(branch["branch_dir"])
+    protocol_gaps = ", ".join(str(item) for item in declaration["protocol_gaps"]) or "none"
+    ledger = (
+        "\n".join(
+            f"1. `{row.get('round_id', '?')}` - {row.get('description', '?')} [{row.get('score', '?')}] {row.get('decision', '?')}"
+            for row in rows
+        )
+        or "`No rounds yet.`"
+    )
+    return f"""# {branch["branch_id"]}
+
+generated by Abel strategy discovery narrative layer
+
+## Basic Info
+
+- branch_id: `{branch["branch_id"]}`
+- ticker: `{latest.get("ticker", branch["ticker"])}`
+- exp_id: `{exp_id}`
+- evidence_intent: `{declaration["evidence_intent"] or "not_declared"}`
+- input_claim: `{declaration["input_claim"] or "not_declared"}`
+- mechanism_family: `{declaration["mechanism_family"] or "not_declared"}`
+- declaration_protocol_complete: `{declaration["protocol_complete"]}`
+- declaration_gaps: `{protocol_gaps}`
+- parent_branch_id: `{parent_branch_id or 'none'}`
+- current_status: `{latest.get("decision", "debugged" if debug_note else "scaffolded" if not rows else "exploring")}`
+- total_rounds: `{len(rows)}`
+- latest_round: `{latest.get("round_id", "debug" if debug_note else "none")}`
+- validation_status: `{latest.get("verdict", diagnostics_note.get("verdict", "not_validated"))}`
+
+## Branch Thesis
+
+See `branch.yaml` for the explicit branch inputs and `thesis.md` for the branch hypothesis.
+
+## Latest Conclusion
+
+- decision: `{latest.get("decision", "pending")}`
+- summary: `{latest.get("description", diagnostics_note.get("summary", "No rounds recorded yet."))}`
+- evidence_label_source: `{EVIDENCE_LEDGER_FILENAME}`
+
+## Latest Diagnostics
+
+- failure_signature: `{diagnostics_note.get("failure_signature", "not recorded")}`
+- runtime_stage: `{diagnostics_note.get("runtime_stage", "not recorded")}`
+- signal_activity: `{diagnostics_note.get("signal_activity", "not recorded")}`
+- diagnostic_hints: `{diagnostics_note.get("diagnostic_hints", "not recorded")}`
+
+## Latest Artifacts
+
+- alpha_context_mode: `{diagnostics_note.get("context_mode", "not recorded")}`
+- alpha_context: `{diagnostics_note.get("context_path", "not recorded")}`
+- branch_spec: `{BRANCH_SPEC_FILENAME}`
+- prepared_inputs: `{"inputs/" if branch_inputs_ready(branch["branch_dir"]) else "not prepared"}`
+- runtime_profile: `{"inputs/" + RUNTIME_PROFILE_FILENAME if runtime_profile_path(branch["branch_dir"]).exists() else "not prepared"}`
+- execution_constraints: `{"inputs/" + EXECUTION_CONSTRAINTS_FILENAME if execution_constraints_path(branch["branch_dir"]).exists() else "not prepared"}`
+- data_manifest: `{"inputs/" + DATA_MANIFEST_FILENAME if data_manifest_path(branch["branch_dir"]).exists() else "not prepared"}`
+- context_guide: `{"inputs/" + CONTEXT_GUIDE_FILENAME if context_guide_path(branch["branch_dir"]).exists() else "not prepared"}`
+- probe_samples: `{"inputs/" + PROBE_SAMPLES_FILENAME if probe_samples_path(branch["branch_dir"]).exists() else "not prepared"}`
+- edge_result: `{diagnostics_note.get("result_path", latest.get("result_path", "not recorded"))}`
+- edge_report: `{diagnostics_note.get("report_path", latest.get("report_path", "not recorded"))}`
+- edge_handoff: `{diagnostics_note.get("handoff_path", latest.get("handoff_path", "not recorded"))}`
+
+## Decision Rationale
+
+1. latest_hypothesis: `{branch_hypothesis or latest_note.get("hypothesis", "not recorded")}`
+1. latest_summary: `{diagnostics_note.get("summary", latest.get("description", "not recorded"))}`
+1. latest_failures: `{diagnostics_note.get("failures", "none")}`
+1. hypothesis_status: `{"explicit" if has_explicit_hypothesis(branch_hypothesis) else "needs work"}`
+
+## Round Ledger
+
+{ledger}
+
+## Metric Progression
+
+{branch_progression(rows)}
+
+## Baseline
+
+- keep_rounds: `{len(keep_rows)}`
+- latest_keep: `{keep_rows[-1].get("round_id", "none") if keep_rows else "none"}`
+"""
+
+
+def build_promotion_bundle_readme(
+    *,
+    branch: Path,
+    branch_spec: dict,
+    latest: dict[str, str],
+) -> str:
+    selected = format_simple_nodes(branch_selected_inputs(branch_spec), limit=12)
+    return f"""# {branch.name} Promotion Bundle
+
+generated by Abel strategy discovery narrative layer
+
+## Summary
+
+- branch_id: `{branch.name}`
+- target: `{branch_spec.get("target", "unknown")}`
+- requested_start: `{branch_spec.get("requested_start", "unknown")}`
+- overlap_mode: `{branch_spec.get("overlap_mode", "target_only")}`
+- selected_inputs: `{selected}`
+- latest_round: `{latest.get("round_id", "none")}`
+- latest_decision: `{latest.get("decision", "n/a")}`
+- latest_verdict: `{latest.get("verdict", "n/a")}`
+- latest_score: `{latest.get("score", "n/a")}`
+
+## Included Files
+
+- `engine.py`: branch implementation snapshot
+- `{BRANCH_SPEC_FILENAME}`: explicit branch definition
+- `{DEPENDENCIES_FILENAME}`: prepared input/cache dependency view when available
+
+## Handoff
+
+Bundle contents are ready for explicit downstream promotion review.
+"""
+
+
+def build_thesis(branch: dict, discovery: dict, readiness: dict) -> str:
+    rows = branch["rows"]
+    latest = rows[-1] if rows else {}
+    hypothesis = current_branch_hypothesis(branch["branch_dir"], rows)
+    branch_spec = load_branch_spec(branch["branch_dir"])
+    latest_note = (
+        read_round_note(branch["branch_dir"], latest.get("round_id", ""))
+        if latest
+        else {}
+    )
+    parents = format_discovery_nodes(discovery.get("parents", []), limit=5)
+    blanket = format_discovery_nodes(discovery.get("blanket_new", []), limit=5)
+    usable = format_simple_nodes(readiness_usable_tickers(readiness), limit=8)
+    start_covered = format_simple_nodes(readiness_start_covered_tickers(readiness), limit=8)
+    selected = format_simple_nodes(branch_selected_inputs(branch_spec), limit=8)
+    return f"""# {branch["branch_id"]} Thesis
+
+generated by Abel strategy discovery narrative layer
+
+## Alpha Source
+
+Branch `{branch["branch_id"]}` currently assumes: `{hypothesis or latest.get("description", "Initial branch hypothesis not recorded yet")}`.
+Latest decision is `{latest.get("decision", "pending")}` with verdict `{latest.get("verdict", "not_validated")}`.
+
+## Hypothesis Checklist
+
+- causal claim: `state what should drive the target and why`
+- expected sign / regime: `state when the signal should be long, short, or flat`
+- invalidation condition: `state what evidence would make this branch unconvincing`
+
+## Input Universe
+
+- target: `{discovery.get("ticker", branch["ticker"])}`
+- discovery_source: `{discovery.get("source", "unknown")}`
+- direct_parents: `{parents}`
+- blanket_candidates: `{blanket}`
+- selected_inputs: `{selected}`
+- usable_tickers: `{usable}`
+- start_covered_tickers: `{start_covered}`
+
+## Main Risks
+
+{format_risks(latest_note.get("failures", "none"))}
+"""
+
+
+def format_event_line(row: dict[str, str]) -> str:
+    tail = " ".join(
+        part
+        for part in (
+            row.get("branch_id", ""),
+            row.get("round_id", ""),
+            row.get("decision", ""),
+        )
+        if part
+    )
+    return f"1. `{row.get('timestamp', '')}` {row.get('event', '')} {tail} - {row.get('description', '')}".rstrip()
