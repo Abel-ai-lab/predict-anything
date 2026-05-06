@@ -60,8 +60,6 @@ def test_workspace_bootstrap_rejects_nested_target_with_reentry_hint(
         name="abel-invest-workspace",
         base_python=None,
         alpha_source=None,
-        edge_spec=None,
-        edge_source=None,
         runtime_python=None,
         no_editable=False,
     )

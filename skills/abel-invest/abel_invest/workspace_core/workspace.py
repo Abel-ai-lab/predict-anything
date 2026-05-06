@@ -8,7 +8,6 @@ from pathlib import Path
 import yaml
 
 MANIFEST_NAME = "alpha.workspace.yaml"
-DEFAULT_EDGE_SPEC = "git+https://github.com/Abel-ai-causality/Abel-edge.git@main"
 DEFAULT_WORKSPACE_NAME = "abel-invest-workspace"
 
 
@@ -120,14 +119,6 @@ def resolve_runtime_python(root: Path, manifest: dict | None = None) -> Path:
     return root / configured
 
 
-def resolve_edge_spec(root: Path, manifest: dict | None = None) -> str:
-    """Resolve the configured Abel-edge install spec for this workspace."""
-    manifest = manifest or load_workspace_manifest(root)
-    runtime = manifest.get("runtime") or {}
-    configured = str(runtime.get("edge_spec") or "").strip()
-    return configured or DEFAULT_EDGE_SPEC
-
-
 def scaffold_workspace(
     name: str,
     *,
@@ -186,8 +177,6 @@ def build_default_manifest(name: str) -> dict:
         },
         "runtime": {
             "python": default_python_path(),
-            "edge_package": "abel-edge",
-            "edge_spec": DEFAULT_EDGE_SPEC,
             "auth_strategy": "reuse_abel_auth_first",
         },
         "defaults": {
@@ -234,7 +223,7 @@ def render_workspace_status(root: Path, manifest: dict | None = None) -> str:
         f"Venv: {resolved['venv']}",
         f"Runtime python: {runtime_python}",
         f"Runtime python exists: {'yes' if runtime_python.exists() else 'no'}",
-        f"Edge install target: {resolve_edge_spec(root, manifest)}",
+        "Edge dependency: managed by abel-invest package dependencies",
     ]
     return "\n".join(lines)
 

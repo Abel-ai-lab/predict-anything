@@ -13,7 +13,6 @@ from shutil import which
 
 MANIFEST_NAME = "alpha.workspace.yaml"
 DEFAULT_WORKSPACE_NAME = "abel-invest-workspace"
-DEFAULT_EDGE_SPEC = "git+https://github.com/Abel-ai-causality/Abel-edge.git@main"
 
 
 def main() -> int:
@@ -26,8 +25,6 @@ def main() -> int:
         skill_root=skill_root,
         base_python=args.base_python,
         runtime_python=args.runtime_python,
-        edge_spec=args.edge_spec,
-        edge_source=args.edge_source,
         editable=not args.no_editable,
     )
     refresh_workspace_guidance(python_path=python_path, root=root, name=args.name)
@@ -69,16 +66,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--runtime-python",
         default=None,
         help="Use an existing interpreter instead of creating the workspace venv",
-    )
-    parser.add_argument(
-        "--edge-spec",
-        default=None,
-        help="Pip-installable Abel-edge target",
-    )
-    parser.add_argument(
-        "--edge-source",
-        default=None,
-        help="Optional local Abel-edge source tree override for development",
     )
     parser.add_argument(
         "--alpha-source",
@@ -148,8 +135,6 @@ def ensure_workspace_runtime(
     skill_root: Path,
     base_python: str | None,
     runtime_python: str | None,
-    edge_spec: str | None,
-    edge_source: str | None,
     editable: bool,
 ) -> Path:
     if runtime_python:
@@ -167,27 +152,12 @@ def ensure_workspace_runtime(
             )
 
     run_command([str(python_path), "-m", "pip", "install", "--upgrade", "pip"], cwd=root)
-    if edge_source:
-        edge_target = str(Path(edge_source).expanduser().resolve())
-        run_command(
-            [str(python_path), "-m", "pip", "install", "-e", edge_target],
-            cwd=root,
-        )
-    else:
-        edge_target = edge_spec or DEFAULT_EDGE_SPEC
-        run_command(
-            [str(python_path), "-m", "pip", "install", edge_target],
-            cwd=root,
-        )
-    update_manifest_value(root / MANIFEST_NAME, "  edge_spec:", f"  edge_spec: {edge_target}")
-    run_command([str(python_path), "-m", "pip", "install", "PyYAML>=6.0"], cwd=root)
 
     install_command = [str(python_path), "-m", "pip", "install"]
     if editable:
         install_command.extend(["-e", str(skill_root)])
     else:
         install_command.append(str(skill_root))
-    install_command.append("--no-deps")
     run_command(install_command, cwd=root)
     return python_path
 
@@ -270,8 +240,6 @@ paths:
   venv: .venv
 runtime:
   python: {default_python_path()}
-  edge_package: abel-edge
-  edge_spec: {DEFAULT_EDGE_SPEC}
   auth_strategy: reuse_abel_auth_first
 defaults:
   backtest_start: '2020-01-01'

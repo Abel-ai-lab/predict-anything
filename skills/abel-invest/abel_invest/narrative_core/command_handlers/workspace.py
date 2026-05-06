@@ -125,8 +125,6 @@ def handle_workspace_command(args: argparse.Namespace) -> int:
             start=root,
             base_python=args.base_python,
             alpha_source=args.alpha_source,
-            edge_spec=args.edge_spec,
-            edge_source=args.edge_source,
             runtime_python=args.runtime_python,
             alpha_editable=not args.no_editable,
         )
@@ -141,8 +139,7 @@ def handle_workspace_command(args: argparse.Namespace) -> int:
         print(f"  activation: {default_activate_command()}")
         print(f"  runtime_mode: {env_result.runtime_mode}")
         print(f"  venv_provider: {env_result.venv_provider}")
-        print(f"  edge_install_mode: {env_result.edge_install_mode}")
-        print(f"  edge_install_target: {env_result.edge_install_target}")
+        print("  dependency_install_mode: abel-invest package metadata")
         print(f"  alpha_install_mode: {'editable' if env_result.alpha_editable else 'regular'}")
         print(
             "  workspace_reuse: "
@@ -261,8 +258,6 @@ def handle_env_command(args: argparse.Namespace) -> int:
         start=Path(args.path).expanduser(),
         base_python=args.base_python,
         alpha_source=args.alpha_source,
-        edge_spec=args.edge_spec,
-        edge_source=args.edge_source,
         runtime_python=args.runtime_python,
         alpha_editable=not args.no_editable,
     )
@@ -272,10 +267,9 @@ def handle_env_command(args: argparse.Namespace) -> int:
     print(f"  alpha_source: {result.alpha_source}")
     print(f"  runtime_mode: {result.runtime_mode}")
     print(f"  venv_provider: {result.venv_provider}")
-    print(f"  edge_install_mode: {result.edge_install_mode}")
-    print(f"  edge_install_target: {result.edge_install_target}")
+    print("  dependency_install_mode: abel-invest package metadata")
     print(f"  alpha_install_mode: {'editable' if result.alpha_editable else 'regular'}")
-    print("  alpha_install_reason: installs the packaged abel-invest CLI into this workspace runtime")
+    print("  alpha_install_reason: installs the packaged abel-invest CLI and declared dependencies into this workspace runtime")
     print("  canonical_runtime_note: use this workspace runtime as the canonical environment for daily research work")
     if result.runtime_mode == "existing_python":
         print("  runtime_override_note: using an existing interpreter instead of creating the workspace .venv")

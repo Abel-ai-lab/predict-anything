@@ -1,7 +1,12 @@
 import ast
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
+
+import pytest
+
+from abel_invest.narrative_core.cli_parser import build_parser
 
 
 def test_strategy_discovery_bootstrap_script_exists() -> None:
@@ -39,3 +44,39 @@ def test_strategy_discovery_bootstrap_script_is_preinstall_entrypoint() -> None:
     )
 
     assert "Bootstrap an Abel strategy discovery workspace" in result.stdout
+    assert "--edge-source" not in result.stdout
+    assert "--edge-spec" not in result.stdout
+
+
+def test_strategy_discovery_dependencies_constrain_edge_major_version() -> None:
+    pyproject = Path(__file__).resolve().parents[1] / "skills" / "abel-invest" / "pyproject.toml"
+    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+
+    assert "abel-edge>=0.8.0,<1.0.0" in data["project"]["dependencies"]
+
+
+def test_strategy_discovery_bootstrap_lets_pyproject_install_dependencies() -> None:
+    script = Path(__file__).resolve().parents[1] / "skills" / "abel-invest" / "scripts" / "bootstrap_workspace.py"
+    source = script.read_text(encoding="utf-8")
+
+    assert "git+https://github.com/Abel-ai-causality/Abel-edge.git@main" not in source
+    assert "pip\", \"install\", \"PyYAML" not in source
+    assert "--no-deps" not in source
+
+
+def test_strategy_discovery_cli_hides_edge_install_overrides() -> None:
+    parser = build_parser()
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "workspace",
+                "bootstrap",
+                "--path",
+                "abel-invest-workspace",
+                "--edge-source",
+                "../Abel-edge",
+            ]
+        )
+    with pytest.raises(SystemExit):
+        parser.parse_args(["env", "init", "--edge-spec", "abel-edge==0.8.0"])

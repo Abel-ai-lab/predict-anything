@@ -52,16 +52,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Local Abel strategy discovery source tree used for installation",
     )
     workspace_bootstrap.add_argument(
-        "--edge-spec",
-        default=None,
-        help="Pip-installable Abel-edge target (defaults to the workspace GitHub main spec)",
-    )
-    workspace_bootstrap.add_argument(
-        "--edge-source",
-        default=None,
-        help="Optional local Abel-edge source tree override for development",
-    )
-    workspace_bootstrap.add_argument(
         "--runtime-python",
         default=None,
         help="Use an existing interpreter instead of creating the workspace venv",
@@ -112,16 +102,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--alpha-source",
         default=None,
         help="Local Abel strategy discovery source tree used for installation",
-    )
-    env_init.add_argument(
-        "--edge-spec",
-        default=None,
-        help="Pip-installable Abel-edge target (defaults to the workspace GitHub main spec)",
-    )
-    env_init.add_argument(
-        "--edge-source",
-        default=None,
-        help="Optional local Abel-edge source tree override for development",
     )
     env_init.add_argument(
         "--runtime-python",
