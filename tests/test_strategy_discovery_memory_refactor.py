@@ -1139,6 +1139,150 @@ def test_export_selected_strategy_artifact_skips_without_pass(
     }
 
 
+def test_post_strategy_artifact_upload_sends_multipart_request(tmp_path: Path) -> None:
+    artifact_path = tmp_path / "artifact.zip"
+    artifact_path.write_bytes(b"zip-bytes")
+    calls = []
+
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'{"data": {"artifactUploadId": "upload_1", "admissionStatus": "queued"}}'
+
+    def fake_opener(request, timeout):
+        calls.append((request, timeout))
+        return _Response()
+
+    result = ni.post_strategy_artifact_upload(
+        base_url="https://router.example/",
+        api_key="secret-key",
+        hosted_session_id="sess_1",
+        manifest={"schema": "abel-invest.strategy-artifact/v1"},
+        artifact_path=artifact_path,
+        source_upload_id="upload_narrative",
+        client_request_id="client_1",
+        opener=fake_opener,
+    )
+
+    request, timeout = calls[0]
+    body = request.data
+    assert result["data"]["artifactUploadId"] == "upload_1"
+    assert request.full_url == (
+        "https://router.example/web/skill-dashboard/sessions/sess_1/strategy-artifacts"
+    )
+    assert request.get_header("Api-key") == "secret-key"
+    assert request.get_header("Content-type").startswith("multipart/form-data; boundary=")
+    assert b'name="manifest"' in body
+    assert b'name="artifact"; filename="artifact.zip"' in body
+    assert b"name=\"sourceUploadId\"" in body
+    assert b"name=\"clientRequestId\"" in body
+    assert timeout == 60
+
+
+def test_upload_strategy_artifact_for_session_returns_upload_summary(
+    tmp_path: Path,
+) -> None:
+    session = ni.init_session_dir("TSLA", "tsla-v1", tmp_path / "research")
+    branch = ni.init_branch_dir(session, "momentum_lead")
+    _write_strategy_artifact_inputs(branch)
+    _write_strategy_result_row(
+        session,
+        branch,
+        round_id="round-006",
+        verdict="PASS",
+        sharpe=0.967,
+        lo_adj=1.056,
+        max_dd=-0.1278,
+    )
+    _write_metric_input(branch, round_id="round-006")
+
+    def fake_runner(command, cwd=None, capture_output=None, text=None, env=None):
+        if "-c" in command:
+            trade_log_path = Path(command[-1])
+            trade_log_path.write_text(
+                "date,asset_return,pnl,position,cum_return,source\n"
+                "2020-01-01,0,0,0,0,backfill\n",
+                encoding="utf-8",
+            )
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=json.dumps({"tradeLogPath": str(trade_log_path)}),
+                stderr="",
+            )
+        if "export-artifact" in command:
+            artifact_path = Path(command[command.index("--output-zip") + 1])
+            artifact_path.write_bytes(b"artifact zip")
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=json.dumps(
+                    {
+                        "artifactSha256": "abc123",
+                        "artifactBytes": artifact_path.stat().st_size,
+                        "fileCount": 8,
+                    }
+                ),
+                stderr="",
+            )
+        raise AssertionError(f"unexpected command: {command}")
+
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return (
+                b'{"data": {"artifactUploadId": "upload_1", "status": "uploaded", '
+                b'"admissionStatus": "queued", "strategyId": null}}'
+            )
+
+    result = ni.upload_strategy_artifact_for_session(
+        local_session=session,
+        narrative_result={"data": {"sessionId": "sess_1", "uploadId": "narrative_1"}},
+        base_url="https://router.example",
+        api_key="secret-key",
+        output_dir=tmp_path / "exported-artifact",
+        python_bin="python-test",
+        opener=lambda request, timeout: _Response(),
+        runner=fake_runner,
+    )
+
+    assert result["artifactUploadFailed"] is False
+    assert result["artifactUploadId"] == "upload_1"
+    assert result["admissionStatus"] == "queued"
+    assert result["selectedBranchId"] == "momentum_lead"
+
+
+def test_render_strategy_artifact_upload_result_lines() -> None:
+    rendered = ni.render_skill_dashboard_session_upload_result(
+        {
+            "data": {
+                "sessionId": "sess_1",
+                "openUrl": "https://app.example/sess_1",
+            }
+        },
+        artifact_result={
+            "artifactUploadId": "upload_1",
+            "admissionStatus": "queued",
+            "selectedBranchId": "momentum_lead",
+            "selectedRoundId": "round-006",
+        },
+    )
+
+    assert "Online session view: [Open sess_1](https://app.example/sess_1)" in rendered
+    assert "Strategy artifact uploaded: upload_1" in rendered
+    assert "admission=queued" in rendered
+
+
 def test_render_skill_dashboard_session_upload_result_returns_markdown_link() -> None:
     rendered = ni.render_skill_dashboard_session_upload_result(
         {

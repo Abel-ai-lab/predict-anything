@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import subprocess
 from datetime import datetime
 from pathlib import Path
+import uuid
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -47,6 +50,7 @@ from abel_invest.narrative_core.state import (
     load_discovery,
     read_round_note,
 )
+from abel_invest.narrative_core.strategy_artifacts import export_selected_strategy_artifact
 from abel_invest.workspace_core.workspace import find_workspace_root
 
 
@@ -238,6 +242,63 @@ def post_skill_dashboard_session(
     return json.loads(raw)
 
 
+def post_strategy_artifact_upload(
+    *,
+    base_url: str,
+    api_key: str,
+    hosted_session_id: str,
+    manifest: dict,
+    artifact_path: Path,
+    source_upload_id: str = "",
+    client_request_id: str = "",
+    opener=urlopen,
+    timeout: int = 60,
+) -> dict:
+    normalized_base_url = str(base_url or "").strip().rstrip("/")
+    if not normalized_base_url:
+        raise RuntimeError("Missing Abel router base URL")
+    normalized_api_key = str(api_key or "").strip()
+    if not normalized_api_key:
+        raise RuntimeError("Missing Abel API key")
+    session_id = str(hosted_session_id or "").strip()
+    if not session_id:
+        raise RuntimeError("Missing hosted session id for strategy artifact upload")
+    artifact_path = Path(artifact_path)
+    if not artifact_path.is_file():
+        raise RuntimeError(f"Strategy artifact zip not found: {artifact_path}")
+
+    fields = {
+        "manifest": json.dumps(manifest, indent=2, sort_keys=True),
+    }
+    if source_upload_id:
+        fields["sourceUploadId"] = source_upload_id
+    if client_request_id:
+        fields["clientRequestId"] = client_request_id
+    body, content_type = build_multipart_form_data(
+        fields=fields,
+        files={
+            "artifact": {
+                "filename": artifact_path.name,
+                "content_type": "application/zip",
+                "content": artifact_path.read_bytes(),
+            }
+        },
+    )
+    request = Request(
+        f"{normalized_base_url}/web/skill-dashboard/sessions/{session_id}/strategy-artifacts",
+        data=body,
+        headers={"Content-Type": content_type, "api-key": normalized_api_key},
+        method="POST",
+    )
+    try:
+        with opener(request, timeout=timeout) as response:
+            raw = response.read().decode("utf-8")
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Strategy artifact upload failed: HTTP {exc.code}: {detail}") from exc
+    return json.loads(raw)
+
+
 def upload_skill_dashboard_bundle(args: argparse.Namespace) -> int:
     branch = resolve_workspace_arg_path(args.branch).resolve()
     bundle = build_skill_dashboard_bundle(branch)
@@ -272,17 +333,181 @@ def upload_skill_dashboard_session(args: argparse.Namespace) -> int:
     base_url = resolve_skill_dashboard_base_url()
     api_key = resolve_skill_dashboard_api_key(args.api_key, workspace_root=workspace_root)
     result = post_skill_dashboard_session(base_url=base_url, api_key=api_key, bundle=bundle)
-    print(render_skill_dashboard_session_upload_result(result))
+    artifact_result = None
+    if not getattr(args, "skip_strategy_artifact", False):
+        artifact_result = upload_strategy_artifact_for_session(
+            local_session=session,
+            narrative_result=result,
+            base_url=base_url,
+            api_key=api_key,
+            output_dir=Path(args.artifact_output_dir)
+            if getattr(args, "artifact_output_dir", None)
+            else None,
+            python_bin=getattr(args, "python_bin", None),
+        )
+    print(render_skill_dashboard_session_upload_result(result, artifact_result=artifact_result))
     return 0
 
 
-def render_skill_dashboard_session_upload_result(result: dict) -> str:
+def upload_strategy_artifact_for_session(
+    *,
+    local_session: Path,
+    narrative_result: dict,
+    base_url: str,
+    api_key: str,
+    output_dir: Path | None = None,
+    python_bin: str | None = None,
+    opener=urlopen,
+    runner=None,
+) -> dict:
+    data = narrative_result.get("data") if isinstance(narrative_result.get("data"), dict) else {}
+    hosted_session_id = str(data.get("sessionId") or data.get("id") or "").strip()
+    source_upload_id = str(data.get("uploadId") or data.get("sourceUploadId") or "").strip()
+    if not hosted_session_id:
+        return {
+            "artifactExported": False,
+            "artifactUploadSkipped": True,
+            "skipReason": "hosted_session_id_missing",
+        }
+    export_result = export_selected_strategy_artifact(
+        local_session,
+        output_dir=output_dir,
+        python_bin=python_bin,
+        runner=runner or subprocess.run,
+    )
+    if export_result.get("artifactUploadSkipped"):
+        return export_result
+    try:
+        manifest_path = Path(str(export_result.get("manifestPath") or ""))
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        upload_result = post_strategy_artifact_upload(
+            base_url=base_url,
+            api_key=api_key,
+            hosted_session_id=hosted_session_id,
+            manifest=manifest,
+            artifact_path=Path(str(export_result.get("artifactPath") or "")),
+            source_upload_id=source_upload_id,
+            client_request_id=strategy_artifact_client_request_id(manifest),
+            opener=opener,
+        )
+    except Exception as exc:
+        return {
+            **export_result,
+            "artifactUploadFailed": True,
+            "artifactUploadError": str(exc),
+        }
+    upload_data = (
+        upload_result.get("data")
+        if isinstance(upload_result.get("data"), dict)
+        else upload_result
+    )
+    return {
+        **export_result,
+        "artifactUploadFailed": False,
+        "artifactUploadResponse": upload_result,
+        "artifactUploadId": upload_data.get("artifactUploadId", ""),
+        "status": upload_data.get("status", ""),
+        "admissionStatus": upload_data.get("admissionStatus", ""),
+        "strategyId": upload_data.get("strategyId"),
+        "openUrl": upload_data.get("openUrl", ""),
+    }
+
+
+def render_skill_dashboard_session_upload_result(
+    result: dict,
+    *,
+    artifact_result: dict | None = None,
+) -> str:
     data = result.get("data") if isinstance(result.get("data"), dict) else {}
     session_id = str(data.get("sessionId") or data.get("id") or "session").strip()
     open_url = str(data.get("openUrl") or data.get("url") or "").strip()
+    artifact_lines = render_strategy_artifact_upload_lines(artifact_result)
     if open_url:
-        return f"Online session view: [Open {session_id}]({open_url})"
+        line = f"Online session view: [Open {session_id}]({open_url})"
+        return "\n".join([line] + artifact_lines) if artifact_lines else line
+    if artifact_lines:
+        return (
+            json.dumps(result, indent=2, ensure_ascii=False)
+            + "\n"
+            + "\n".join(artifact_lines)
+        )
     return json.dumps(result, indent=2, ensure_ascii=False)
+
+
+def render_strategy_artifact_upload_lines(artifact_result: dict | None) -> list[str]:
+    if not artifact_result:
+        return []
+    if artifact_result.get("artifactUploadSkipped"):
+        return [f"Strategy artifact skipped: {artifact_result.get('skipReason', 'unknown')}"]
+    if artifact_result.get("artifactUploadFailed"):
+        return [f"Strategy artifact upload failed: {artifact_result.get('artifactUploadError', '')}"]
+    upload_id = str(artifact_result.get("artifactUploadId") or "").strip()
+    admission = str(artifact_result.get("admissionStatus") or "").strip()
+    branch_id = str(artifact_result.get("selectedBranchId") or "").strip()
+    round_id = str(artifact_result.get("selectedRoundId") or "").strip()
+    summary = "Strategy artifact uploaded"
+    if upload_id:
+        summary += f": {upload_id}"
+    details = []
+    if admission:
+        details.append(f"admission={admission}")
+    if branch_id and round_id:
+        details.append(f"selected={branch_id}/{round_id}")
+    if details:
+        summary += f" ({', '.join(details)})"
+    return [summary]
+
+
+def strategy_artifact_client_request_id(manifest: dict) -> str:
+    source = manifest.get("source") if isinstance(manifest.get("source"), dict) else {}
+    parts = [
+        str(source.get("sourceSessionId") or "").strip(),
+        str(source.get("branchId") or "").strip(),
+        str(source.get("roundId") or "").strip(),
+        hashlib.sha256(json.dumps(manifest, sort_keys=True).encode("utf-8")).hexdigest()[
+            :16
+        ],
+    ]
+    return ":".join(part or "unknown" for part in parts)
+
+
+def build_multipart_form_data(
+    *,
+    fields: dict[str, str],
+    files: dict[str, dict[str, object]],
+) -> tuple[bytes, str]:
+    boundary = f"----abel-invest-{uuid.uuid4().hex}"
+    chunks: list[bytes] = []
+    for name, value in fields.items():
+        chunks.extend(
+            [
+                f"--{boundary}\r\n".encode("utf-8"),
+                f'Content-Disposition: form-data; name="{name}"\r\n'.encode("utf-8"),
+                b"Content-Type: text/plain; charset=utf-8\r\n\r\n",
+                str(value).encode("utf-8"),
+                b"\r\n",
+            ]
+        )
+    for name, file_info in files.items():
+        filename = str(file_info.get("filename") or name)
+        content_type = str(file_info.get("content_type") or "application/octet-stream")
+        content = file_info.get("content") or b""
+        if isinstance(content, str):
+            content = content.encode("utf-8")
+        chunks.extend(
+            [
+                f"--{boundary}\r\n".encode("utf-8"),
+                (
+                    f'Content-Disposition: form-data; name="{name}"; '
+                    f'filename="{filename}"\r\n'
+                ).encode("utf-8"),
+                f"Content-Type: {content_type}\r\n\r\n".encode("utf-8"),
+                bytes(content),
+                b"\r\n",
+            ]
+        )
+    chunks.append(f"--{boundary}--\r\n".encode("utf-8"))
+    return b"".join(chunks), f"multipart/form-data; boundary={boundary}"
 
 
 def resolve_skill_dashboard_base_url(value: str | None = None) -> str:
