@@ -9,6 +9,10 @@ from pathlib import Path
 
 from abel_invest.narrative_core.contracts.constants import EVENTS_HEADER, RESULTS_HEADER
 from abel_invest.narrative_core.io import _now, append_tsv_row
+from abel_invest.narrative_core.runtime.dsr_accounting import (
+    append_dsr_accounting_record,
+    build_dsr_accounting_facts,
+)
 from abel_invest.narrative_core.rendering.renderers import render_round_note
 from abel_invest.narrative_core.rendering.session_rendering import render_session
 
@@ -38,6 +42,15 @@ def record_workflow_blocker_round(
         runtime_stage=runtime_stage,
     )
     result_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    dsr_accounting = build_dsr_accounting_facts(
+        session=session,
+        branch_id=branch.name,
+        round_id=round_id,
+        run_type="round",
+        context_path=context_path,
+        result_path=result_path,
+        result=result,
+    )
     report_path.write_text(
         "# Workflow Blocker\n\n"
         f"- failure_signature: `{failure_signature}`\n"
@@ -87,6 +100,7 @@ def record_workflow_blocker_round(
             result_path=str(result_path.relative_to(session)),
             report_path=str(report_path.relative_to(session)),
             handoff_path=str(handoff_path.relative_to(session)),
+            dsr_accounting=dsr_accounting,
         ),
         encoding="utf-8",
     )
@@ -130,6 +144,7 @@ def record_workflow_blocker_round(
             "artifact_path": str(result_path.relative_to(session)),
         },
     )
+    append_dsr_accounting_record(session, dsr_accounting)
     render_session(session)
 
 

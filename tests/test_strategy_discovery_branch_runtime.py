@@ -166,6 +166,9 @@ def _edge_result(
     verdict: str = "PASS",
     sharpe: float = 1.2,
     metric_failures: list[dict] | None = None,
+    k: int = 1,
+    current_round_trials: int = 1,
+    prior_effective_trials: int = 0,
 ) -> dict:
     return {
         "verdict": verdict,
@@ -173,7 +176,7 @@ def _edge_result(
         "failures": [item.get("message", "") for item in (metric_failures or []) if item.get("message")],
         "warnings": [],
         "profile": "equity_daily",
-        "K": 1,
+        "K": k,
         "metrics": {
             "sharpe": sharpe,
             "lo_adjusted": 1.5,
@@ -181,6 +184,25 @@ def _edge_result(
             "omega": 1.3,
             "total_return": 0.22,
             "max_dd": -0.08,
+            "dsr_trials_used": k,
+        },
+        "K_detail": {
+            "source": "alpha_context",
+            "engine_ast_k": 1,
+            "tickers": [],
+            "lags": [],
+            "n_tickers": 0,
+            "n_lags": 0,
+            "declared_dsr_trials": {
+                "count": k,
+                "source": "abel-invest.session/v1",
+                "method": "session_effective_exploration_trials_v1",
+                "scope": "ticker_session_requested_window",
+                "components": {
+                    "prior_effective_trials": prior_effective_trials,
+                    "current_round_trials": current_round_trials,
+                },
+            },
         },
         "requested_window": {"start": "2020-01-01", "end": None},
         "effective_window": {"start": "2020-01-01", "end": "2020-12-31"},
@@ -223,6 +245,12 @@ def _edge_result(
             },
         },
     }
+
+
+def _read_jsonl(path: Path) -> list[dict]:
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
 def _record_synthetic_round(
@@ -797,6 +825,16 @@ def test_run_branch_round_records_network_failure_as_workflow_blocker(tmp_path, 
     )
 
     assert result == 1
+    dsr_rows = _read_jsonl(session / "dsr_trials.jsonl")
+    assert len(dsr_rows) == 1
+    assert dsr_rows[0]["run_type"] == "round"
+    assert dsr_rows[0]["runtime_stage"] == "data_access"
+    assert dsr_rows[0]["counted_for_future_dsr"] is False
+    assert dsr_rows[0]["alpha_declared_count"] == 1
+    assert dsr_rows[0]["edge_k"] is None
+    assert dsr_rows[0]["edge_dsr_trials_used"] is None
+    assert dsr_rows[0]["edge_k_source"] == "not_available"
+
     ledger = json.loads((session / ni.EVIDENCE_LEDGER_FILENAME).read_text(encoding="utf-8"))
     row = ledger["rows"][-1]
     assert row["evidence_label"] == "workflow_blocker"
@@ -860,6 +898,336 @@ def test_starter_scaffold_round_is_diagnostic_only_not_candidate(tmp_path, monke
     row = ledger["rows"][-1]
     assert row["engine_scaffold_status"] == "starter_scaffold"
     assert row["evidence_label"] == "diagnostic_only"
+
+
+def test_run_branch_round_records_dsr_k_accounting(tmp_path, monkeypatch) -> None:
+    session = ni.init_session_dir("TSLA", "tsla-dsr-k-audit", tmp_path / "research")
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
+    ni.write_readiness(session, _sample_readiness())
+    branch = ni.init_branch_dir(session, "graph-v1")
+    _write_runtime_files(branch)
+    spec = ni.load_branch_spec(branch)
+    spec.update(
+        {
+            "hypothesis": "AAPL driver strength leads TSLA next-day risk appetite.",
+            "evidence_intent": "candidate",
+            "input_claim": "graph_supported",
+            "mechanism_family": "driver_momentum",
+            "invalidation_condition": "No AAPL reads or negative holdout IC.",
+            "selected_inputs": ["AAPL"],
+        }
+    )
+    ni.write_branch_spec(branch, spec)
+
+    def fake_subprocess_run(command, cwd=None, capture_output=None, text=None, env=None):
+        result_path = Path(command[command.index("--output-json") + 1])
+        report_path = Path(command[command.index("--output-md") + 1])
+        handoff_path = Path(command[command.index("--output-handoff") + 1])
+        result_path.write_text(
+            json.dumps(
+                _edge_result(
+                    traced_inputs=["AAPL"],
+                    k=4,
+                    current_round_trials=4,
+                )
+            ),
+            encoding="utf-8",
+        )
+        report_path.write_text("# validation\n", encoding="utf-8")
+        handoff_path.write_text(json.dumps({"ok": True}), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(ni.subprocess, "run", fake_subprocess_run)
+
+    result = ni.run_branch_round(
+        Namespace(
+            branch=str(branch),
+            mode="explore",
+            description="parameter sweep selected output",
+            input_note="",
+            hypothesis="AAPL driver strength leads TSLA next-day risk appetite.",
+            expected_signal="",
+            trigger="test",
+            change_summary="test",
+            changed_dimension=["thresholds"],
+            selection_trials=4,
+            time_spent_min="1",
+            summary="",
+            next_step="",
+            action=[],
+            python_bin=None,
+        )
+    )
+
+    assert result == 0
+    dsr_rows = _read_jsonl(session / "dsr_trials.jsonl")
+    assert len(dsr_rows) == 1
+    dsr_row = dsr_rows[0]
+    assert dsr_row["event"] == "edge_dsr_accounting_recorded"
+    assert dsr_row["run_type"] == "round"
+    assert dsr_row["branch_id"] == "graph-v1"
+    assert dsr_row["round_id"] == "round-001"
+    assert dsr_row["verdict"] == "PASS"
+    assert dsr_row["runtime_stage"] == "validation"
+    assert dsr_row["counted_for_future_dsr"] is True
+    assert dsr_row["alpha_declared_count"] == 4
+    assert dsr_row["alpha_current_round_trials"] == 4
+    assert dsr_row["alpha_prior_effective_trials"] == 0
+    assert dsr_row["edge_k"] == 4
+    assert dsr_row["edge_dsr_trials_used"] == 4
+    assert dsr_row["edge_k_source"] == "alpha_context"
+    assert dsr_row["engine_ast_k"] == 1
+
+    round_note = (branch / "rounds" / "round-001.md").read_text(encoding="utf-8")
+    assert "- K: `4`" in round_note
+    assert "- dsr_trials_used: `4`" in round_note
+    assert "- K_source: `alpha_context`" in round_note
+    assert "- current_round_trials: `4`" in round_note
+
+    ledger = json.loads((session / ni.EVIDENCE_LEDGER_FILENAME).read_text(encoding="utf-8"))
+    accounting = ledger["rows"][-1]["dsr_accounting"]
+    assert accounting["edge_k"] == 4
+    assert accounting["alpha_current_round_trials"] == 4
+    assert accounting["counted_for_future_dsr"] is True
+
+
+def test_run_branch_round_audits_edge_k_before_alpha_decision(tmp_path, monkeypatch) -> None:
+    session = ni.init_session_dir("TSLA", "tsla-dsr-decision-audit", tmp_path / "research")
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
+    ni.write_readiness(session, _sample_readiness())
+    branch = ni.init_branch_dir(session, "graph-v1")
+    _write_runtime_files(branch)
+    ni.write_branch_spec(branch, _complete_candidate_spec(branch))
+
+    def fake_subprocess_run(command, cwd=None, capture_output=None, text=None, env=None):
+        result_path = Path(command[command.index("--output-json") + 1])
+        report_path = Path(command[command.index("--output-md") + 1])
+        handoff_path = Path(command[command.index("--output-handoff") + 1])
+        result_path.write_text(
+            json.dumps(_edge_result(traced_inputs=["AAPL"], k=5, current_round_trials=5)),
+            encoding="utf-8",
+        )
+        report_path.write_text("# validation\n", encoding="utf-8")
+        handoff_path.write_text(json.dumps({"ok": True}), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    def fail_decision(rows, result, *, session=None):
+        raise RuntimeError("decision failed after edge result")
+
+    monkeypatch.setattr(ni.subprocess, "run", fake_subprocess_run)
+    monkeypatch.setitem(ni.run_branch_round.__globals__, "alpha_decision", fail_decision)
+
+    try:
+        ni.run_branch_round(
+            Namespace(
+                branch=str(branch),
+                mode="explore",
+                description="decision failure after edge result",
+                input_note="",
+                hypothesis="AAPL driver strength leads TSLA next-day risk appetite.",
+                expected_signal="",
+                trigger="test",
+                change_summary="test",
+                changed_dimension=["thresholds"],
+                selection_trials=5,
+                time_spent_min="1",
+                summary="",
+                next_step="",
+                action=[],
+                python_bin=None,
+            )
+        )
+    except RuntimeError as exc:
+        assert str(exc) == "decision failed after edge result"
+    else:
+        raise AssertionError("expected alpha_decision failure")
+
+    dsr_rows = _read_jsonl(session / "dsr_trials.jsonl")
+    assert len(dsr_rows) == 1
+    assert dsr_rows[0]["alpha_declared_count"] == 5
+    assert dsr_rows[0]["edge_k"] == 5
+
+
+def test_debug_branch_records_dsr_k_accounting_without_future_count(tmp_path, monkeypatch) -> None:
+    session = ni.init_session_dir("TSLA", "tsla-dsr-debug-audit", tmp_path / "research")
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
+    ni.write_readiness(session, _sample_readiness())
+    branch = ni.init_branch_dir(session, "graph-v1")
+    _write_runtime_files(branch)
+    spec = ni.load_branch_spec(branch)
+    spec.update(
+        {
+            "hypothesis": "AAPL driver strength leads TSLA next-day risk appetite.",
+            "evidence_intent": "candidate",
+            "input_claim": "graph_supported",
+            "mechanism_family": "driver_momentum",
+            "invalidation_condition": "No AAPL reads or negative holdout IC.",
+            "selected_inputs": ["AAPL"],
+        }
+    )
+    ni.write_branch_spec(branch, spec)
+
+    def fake_subprocess_run(command, cwd=None, capture_output=None, text=None, env=None):
+        result_path = Path(command[command.index("--output-json") + 1])
+        result_path.write_text(
+            json.dumps(_edge_result(traced_inputs=["AAPL"], k=1)),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(ni.subprocess, "run", fake_subprocess_run)
+
+    result = ni.debug_branch_run(Namespace(branch=str(branch), python_bin=None))
+
+    assert result == 0
+    dsr_rows = _read_jsonl(session / "dsr_trials.jsonl")
+    assert len(dsr_rows) == 1
+    dsr_row = dsr_rows[0]
+    assert dsr_row["run_type"] == "debug"
+    assert dsr_row["round_id"] == "debug"
+    assert dsr_row["verdict"] == "PASS"
+    assert dsr_row["runtime_stage"] == "validation"
+    assert dsr_row["counted_for_future_dsr"] is False
+    assert dsr_row["alpha_declared_count"] == 1
+    assert dsr_row["edge_k"] == 1
+
+
+def test_failed_validation_round_counts_for_future_dsr_accounting(tmp_path, monkeypatch) -> None:
+    session = ni.init_session_dir("TSLA", "tsla-dsr-fail-audit", tmp_path / "research")
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
+    ni.write_readiness(session, _sample_readiness())
+    branch = ni.init_branch_dir(session, "graph-v1")
+    _write_runtime_files(branch)
+    spec = ni.load_branch_spec(branch)
+    spec.update(
+        {
+            "hypothesis": "AAPL driver strength leads TSLA next-day risk appetite.",
+            "evidence_intent": "candidate",
+            "input_claim": "graph_supported",
+            "mechanism_family": "driver_momentum",
+            "invalidation_condition": "No AAPL reads or negative holdout IC.",
+            "selected_inputs": ["AAPL"],
+        }
+    )
+    ni.write_branch_spec(branch, spec)
+
+    def fake_subprocess_run(command, cwd=None, capture_output=None, text=None, env=None):
+        result_path = Path(command[command.index("--output-json") + 1])
+        report_path = Path(command[command.index("--output-md") + 1])
+        handoff_path = Path(command[command.index("--output-handoff") + 1])
+        result_path.write_text(
+            json.dumps(
+                _edge_result(
+                    traced_inputs=["AAPL"],
+                    verdict="FAIL",
+                    k=2,
+                    current_round_trials=2,
+                )
+            ),
+            encoding="utf-8",
+        )
+        report_path.write_text("# validation\n", encoding="utf-8")
+        handoff_path.write_text(json.dumps({"ok": True}), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(ni.subprocess, "run", fake_subprocess_run)
+
+    result = ni.run_branch_round(
+        Namespace(
+            branch=str(branch),
+            mode="explore",
+            description="failed parameter sweep output",
+            input_note="",
+            hypothesis="AAPL driver strength leads TSLA next-day risk appetite.",
+            expected_signal="",
+            trigger="test",
+            change_summary="test",
+            changed_dimension=["thresholds"],
+            selection_trials=2,
+            time_spent_min="1",
+            summary="",
+            next_step="",
+            action=[],
+            python_bin=None,
+        )
+    )
+
+    assert result == 0
+    dsr_row = _read_jsonl(session / "dsr_trials.jsonl")[0]
+    assert dsr_row["verdict"] == "FAIL"
+    assert dsr_row["runtime_stage"] == "validation"
+    assert dsr_row["counted_for_future_dsr"] is True
+    assert dsr_row["alpha_declared_count"] == 2
+    assert dsr_row["edge_k"] == 2
+
+
+def test_semantic_error_round_records_dsr_k_accounting_without_future_count(tmp_path, monkeypatch) -> None:
+    session = ni.init_session_dir("TSLA", "tsla-dsr-semantic-audit", tmp_path / "research")
+    ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
+    ni.write_readiness(session, _sample_readiness())
+    branch = ni.init_branch_dir(session, "graph-v1")
+    _write_runtime_files(branch)
+    spec = ni.load_branch_spec(branch)
+    spec.update(
+        {
+            "hypothesis": "AAPL driver strength leads TSLA next-day risk appetite.",
+            "evidence_intent": "candidate",
+            "input_claim": "graph_supported",
+            "mechanism_family": "driver_momentum",
+            "invalidation_condition": "No AAPL reads or negative holdout IC.",
+            "selected_inputs": ["AAPL"],
+        }
+    )
+    ni.write_branch_spec(branch, spec)
+
+    def fake_subprocess_run(command, cwd=None, capture_output=None, text=None, env=None):
+        result_path = Path(command[command.index("--output-json") + 1])
+        report_path = Path(command[command.index("--output-md") + 1])
+        handoff_path = Path(command[command.index("--output-handoff") + 1])
+        payload = _edge_result(
+            traced_inputs=["AAPL"],
+            verdict="ERROR",
+            k=3,
+            current_round_trials=3,
+        )
+        payload["diagnostics"]["runtime_stage"] = "semantic_preflight"
+        payload["runtime_facts"]["runtime_stage"] = "semantic_preflight"
+        payload["runtime_facts"]["semantic_verdict"] = "ERROR"
+        payload["semantic"]["verdict"] = "ERROR"
+        result_path.write_text(json.dumps(payload), encoding="utf-8")
+        report_path.write_text("# validation\n", encoding="utf-8")
+        handoff_path.write_text(json.dumps({"ok": True}), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(ni.subprocess, "run", fake_subprocess_run)
+
+    result = ni.run_branch_round(
+        Namespace(
+            branch=str(branch),
+            mode="explore",
+            description="semantic blocker selected output",
+            input_note="",
+            hypothesis="AAPL driver strength leads TSLA next-day risk appetite.",
+            expected_signal="",
+            trigger="test",
+            change_summary="test",
+            changed_dimension=["implementation"],
+            selection_trials=3,
+            time_spent_min="1",
+            summary="",
+            next_step="",
+            action=[],
+            python_bin=None,
+        )
+    )
+
+    assert result == 0
+    dsr_row = _read_jsonl(session / "dsr_trials.jsonl")[0]
+    assert dsr_row["verdict"] == "ERROR"
+    assert dsr_row["runtime_stage"] == "semantic_preflight"
+    assert dsr_row["counted_for_future_dsr"] is False
+    assert dsr_row["alpha_declared_count"] == 3
+    assert dsr_row["edge_k"] == 3
 
 
 def test_frontier_reports_coverage_without_route_recommendation(tmp_path) -> None:
@@ -1035,7 +1403,6 @@ def test_agent_context_reads_evidence_linked_research_journal(tmp_path) -> None:
             "mechanism_family": "driver_momentum",
             "invalidation_condition": "AAPL reads disappear or validation fails repeatedly.",
             "requested_start": "2020-01-01",
-            "selected_inputs": ["AAPL"],
             "selected_inputs": ["AAPL"],
         }
     )
@@ -1263,7 +1630,6 @@ def test_distinct_driver_sets_are_factual_not_checkpoint_reasons(tmp_path) -> No
             "complexity_class": "interaction",
             "invalidation_condition": "MSFT reads disappear or validation fails repeatedly.",
             "requested_start": "2020-01-01",
-            "selected_inputs": ["MSFT"],
             "selected_inputs": ["MSFT"],
         }
     )

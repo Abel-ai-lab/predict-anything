@@ -262,6 +262,33 @@ def render_agent_context_evidence_rows(rows: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _round_dsr_accounting(result: dict, accounting: object) -> dict[str, object]:
+    if isinstance(accounting, dict):
+        return accounting
+    metrics = result.get("metrics") if isinstance(result.get("metrics"), dict) else {}
+    k_detail = result.get("K_detail") if isinstance(result.get("K_detail"), dict) else {}
+    declared = (
+        k_detail.get("declared_dsr_trials")
+        if isinstance(k_detail.get("declared_dsr_trials"), dict)
+        else {}
+    )
+    components = declared.get("components") if isinstance(declared.get("components"), dict) else {}
+    return {
+        "edge_k": result.get("K"),
+        "edge_dsr_trials_used": metrics.get("dsr_trials_used"),
+        "edge_k_source": k_detail.get("source"),
+        "alpha_declared_count": declared.get("count"),
+        "alpha_current_round_trials": components.get("current_round_trials"),
+        "alpha_prior_effective_trials": components.get("prior_effective_trials"),
+    }
+
+
+def _render_dsr_value(value: object) -> str:
+    if value is None or value == "":
+        return "unknown"
+    return str(value)
+
+
 def render_round_note(**kwargs) -> str:
     result = kwargs["result"]
     metrics = result.get("metrics", {})
@@ -272,6 +299,7 @@ def render_round_note(**kwargs) -> str:
     actions = kwargs.get("actions") or ["Executed raw abel-edge evaluation"]
     action_lines = "\n".join(f"1. {action}" for action in actions)
     changed_dimensions = ordered_unique_strings(kwargs.get("changed_dimensions") or [])
+    dsr_accounting = _round_dsr_accounting(result, kwargs.get("dsr_accounting"))
     return f"""# {kwargs["round_id"]}
 
 ## Basic Info
@@ -306,6 +334,11 @@ def render_round_note(**kwargs) -> str:
 ## Exploration Facts
 
 - changed_dimensions: `{", ".join(changed_dimensions) or "none"}`
+- K: `{_render_dsr_value(dsr_accounting.get("edge_k"))}`
+- dsr_trials_used: `{_render_dsr_value(dsr_accounting.get("edge_dsr_trials_used"))}`
+- K_source: `{_render_dsr_value(dsr_accounting.get("edge_k_source"))}`
+- current_round_trials: `{_render_dsr_value(dsr_accounting.get("alpha_current_round_trials"))}`
+- prior_effective_trials: `{_render_dsr_value(dsr_accounting.get("alpha_prior_effective_trials"))}`
 
 ## Key Results
 

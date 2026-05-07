@@ -89,6 +89,12 @@ prior PASS/FAIL rounds contribute their recorded trial count, and the current
 round defaults to `1`. If one submitted strategy was selected from a parameter,
 threshold, filter, sizing, or window sweep, pass `--selection-trials N` so DSR
 reflects the Alpha search width instead of only the final `engine.py` shape.
+Each edge result also appends a session-level `dsr_trials.jsonl` audit row.
+Recorded PASS/FAIL validation rounds count toward future DSR; debug runs,
+semantic errors, and workflow blockers are recorded for audit but do not increase
+future DSR count. Round notes and `evidence_ledger.json` expose the same K
+accounting facts for review. Workflow blockers preserve Alpha's declared count
+but use `edge_k_source=not_available` because no Edge K was returned.
 
 ## Evidence Reading
 
