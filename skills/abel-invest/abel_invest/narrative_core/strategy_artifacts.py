@@ -879,9 +879,11 @@ def _runtime_env(path: Path) -> dict[str, str] | None:
 def _infer_metric_input_path(result_path: Path) -> Path:
     name = result_path.name
     if name.endswith("-edge-result.json"):
-        return result_path.with_name(
-            name.removesuffix("-edge-result.json") + "-metric-input.csv"
-        )
+        prefix = name.removesuffix("-edge-result.json")
+        frame_path = result_path.with_name(prefix + "-edge-frame.csv")
+        if frame_path.is_file():
+            return frame_path
+        return result_path.with_name(prefix + "-metric-input.csv")
     return result_path.with_name(result_path.stem + "-metric-input.csv")
 
 

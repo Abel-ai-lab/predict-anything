@@ -355,8 +355,8 @@ def run_branch_round(args: argparse.Namespace) -> int:
     )
     result_path = branch / "outputs" / f"{round_id}-edge-result.json"
     report_path = branch / "outputs" / f"{round_id}-edge-validation.md"
+    frame_path = branch / "outputs" / f"{round_id}-edge-frame.csv"
     handoff_path = branch / "outputs" / f"{round_id}-edge-handoff.json"
-    metric_input_path = branch / "outputs" / f"{round_id}-metric-input.csv"
     context_path = branch / "outputs" / f"{round_id}-alpha-context.json"
     context_path.write_text(
         json.dumps(
@@ -400,7 +400,7 @@ def run_branch_round(args: argparse.Namespace) -> int:
         "--output-md",
         str(report_path),
         "--output-csv",
-        str(metric_input_path),
+        str(frame_path),
         "--output-handoff",
         str(handoff_path),
         "--start",
@@ -559,8 +559,8 @@ def run_branch_round(args: argparse.Namespace) -> int:
     print(f"Edge result: {result_path.relative_to(session)}")
     print(f"Edge validation: {report_path.relative_to(session)}")
     print(f"Edge handoff: {handoff_path.relative_to(session)}")
-    if metric_input_path.exists():
-        print(f"Metric input: {metric_input_path.relative_to(session)}")
+    if frame_path.exists():
+        print(f"Edge frame: {frame_path.relative_to(session)}")
     semantic = result.get("semantic") or {}
     if isinstance(semantic, dict) and semantic:
         render_section(
