@@ -55,6 +55,13 @@ SELECTION_MODE_EXPLICIT_BRANCH_ROUND = "explicit_branch_round"
 SELECTION_SCOPE_SESSION = "session"
 SELECTION_SCOPE_BRANCH = "branch"
 SELECTION_METRIC_ORDER = ("sharpe", "lo_adjusted", "max_dd")
+SELECTION_RULE_AUTO_BEST_PASS = (
+    "sharpe_desc_lo_adjusted_desc_max_dd_desc_latest_v1"
+)
+SELECTION_REASON_AUTO_BEST_PASS = (
+    "highest Sharpe, then highest Lo-adjusted Sharpe, then least severe max drawdown; "
+    "ties use latest recorded round"
+)
 DEFAULT_PROMOTIONS_DIRNAME = "promotions"
 RUNTIME_STATE_SCHEMA = "abel-invest.runtime-state/v1"
 DENYLISTED_STRATEGY_PARTS = {
@@ -123,6 +130,7 @@ class StrategyArtifactCandidate:
     row: dict[str, str]
     edge_result: dict[str, Any]
     selection_rank: int
+    session_round_index: int = 0
     selection_mode: str = SELECTION_MODE_AUTO_BEST_PASS
     selection_scope: str = SELECTION_SCOPE_SESSION
 
@@ -156,6 +164,7 @@ def select_best_pass_strategy(session: Path) -> StrategySelectionResult:
 
     session = resolve_workspace_arg_path(session).resolve()
     rows = _iter_session_result_rows(session)
+    session_round_indexes = _session_round_indexes(session)
     pass_rows = [
         item for item in rows if _clean(item[1].get("verdict")).upper() == "PASS"
     ]
@@ -169,7 +178,18 @@ def select_best_pass_strategy(session: Path) -> StrategySelectionResult:
 
     candidates: list[StrategyArtifactCandidate] = []
     for branch, row in pass_rows:
-        candidate = _candidate_from_row(session=session, branch=branch, row=row)
+        branch_id = _clean(row.get("branch_id")) or branch.name
+        round_id = _clean(row.get("round_id"))
+        if _clean(row.get("decision")).lower() != "keep":
+            continue
+        if session_round_indexes and (branch_id, round_id) not in session_round_indexes:
+            continue
+        candidate = _candidate_from_row(
+            session=session,
+            branch=branch,
+            row=row,
+            session_round_index=session_round_indexes.get((branch_id, round_id), 0),
+        )
         if candidate is not None:
             candidates.append(candidate)
 
@@ -183,7 +203,12 @@ def select_best_pass_strategy(session: Path) -> StrategySelectionResult:
 
     ranked = sorted(
         candidates,
-        key=lambda item: (item.sharpe, item.lo_adjusted, item.max_dd),
+        key=lambda item: (
+            item.sharpe,
+            item.lo_adjusted,
+            item.max_dd,
+            item.session_round_index,
+        ),
         reverse=True,
     )
     selected = _with_rank(ranked[0], selection_rank=1)
@@ -245,6 +270,7 @@ def select_branch_promotion_candidate(
             row=row,
             selection_mode=SELECTION_MODE_EXPLICIT_BRANCH_ROUND,
             selection_scope=SELECTION_SCOPE_BRANCH,
+            session_round_index=0,
         )
         if candidate is not None:
             candidates.append(candidate)
@@ -626,6 +652,17 @@ def _iter_session_result_rows(session: Path) -> list[tuple[Path, dict[str, str]]
     return rows
 
 
+def _session_round_indexes(session: Path) -> dict[tuple[str, str], int]:
+    order: dict[tuple[str, str], int] = {}
+    for row in read_tsv_rows(session / "events.tsv"):
+        if _clean(row.get("event")) != "round_recorded":
+            continue
+        key = (_clean(row.get("branch_id")), _clean(row.get("round_id")))
+        if key[0] and key[1] and key not in order:
+            order[key] = len(order) + 1
+    return order
+
+
 def _session_from_branch(branch: Path) -> Path:
     if branch.parent.name != "branches":
         raise RuntimeError(f"branch path must be under a branches directory: {branch}")
@@ -642,6 +679,7 @@ def _candidate_from_row(
     row: dict[str, str],
     selection_mode: str = SELECTION_MODE_AUTO_BEST_PASS,
     selection_scope: str = SELECTION_SCOPE_SESSION,
+    session_round_index: int = 0,
 ) -> StrategyArtifactCandidate | None:
     result_path = _resolve_session_relative_path(session, row.get("result_path"))
     if result_path is None or not result_path.is_file():
@@ -689,6 +727,7 @@ def _candidate_from_row(
         row=dict(row),
         edge_result=edge_result,
         selection_rank=0,
+        session_round_index=session_round_index,
         selection_mode=selection_mode,
         selection_scope=selection_scope,
     )

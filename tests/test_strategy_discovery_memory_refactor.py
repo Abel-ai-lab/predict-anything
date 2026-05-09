@@ -704,6 +704,13 @@ def test_build_skill_dashboard_session_bundle_selects_primary_strategy_from_resu
         result_path.write_text(
             json.dumps(
                 {
+                    "verdict": "PASS",
+                    "metrics": {
+                        "sharpe": float(sharpe),
+                        "lo_adjusted": float(lo_adj),
+                        "max_dd": -0.1,
+                        "total_return": float(pnl) / 100.0,
+                    },
                     "decision_preview": [
                         {"date": "2026-05-04", "target_close": 16.13},
                         {"date": "2026-05-05", "target_close": 17.06},
@@ -765,12 +772,12 @@ def test_build_skill_dashboard_session_bundle_selects_primary_strategy_from_resu
     )
 
     primary = bundle["payload"]["primaryStrategy"]
-    assert primary["branchId"] == "graph-v3"
+    assert primary["branchId"] == "graph-v1"
     assert primary["roundId"] == "round-001"
-    assert primary["selectionRule"] == "score_desc_total_return_desc_lo_adjusted_desc_sharpe_desc_latest_v1"
-    assert primary["metrics"]["score"] == "9/9"
-    assert primary["metrics"]["totalReturn"] == 0.55
-    assert primary["metrics"]["loAdjusted"] == 1.3
+    assert primary["selectionRule"] == "sharpe_desc_lo_adjusted_desc_max_dd_desc_latest_v1"
+    assert primary["metrics"]["score"] == "8/9"
+    assert primary["metrics"]["totalReturn"] == 0.9
+    assert primary["metrics"]["loAdjusted"] == 1.8
     assert primary["latestDecision"] == {
         "tradingDate": "2026-05-05",
         "previousPosition": 0.75,
@@ -804,6 +811,26 @@ def test_primary_strategy_selector_uses_only_recorded_kept_pass_rounds(tmp_path:
     ]
     for branch, round_id, decision, verdict, score, pnl, recorded in rows:
         result_ref = f"branches/{branch.name}/outputs/{round_id}-edge-result.json"
+        result_path = session / result_ref
+        result_path.parent.mkdir(parents=True, exist_ok=True)
+        result_path.write_text(
+            json.dumps(
+                {
+                    "verdict": verdict,
+                    "metrics": {
+                        "sharpe": 1.0,
+                        "lo_adjusted": 1.0,
+                        "max_dd": -0.1,
+                        "total_return": float(pnl) / 100.0,
+                    },
+                    "effective_window": {
+                        "start": "2020-01-01",
+                        "end": "2020-12-31",
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
         ni.append_tsv_row(
             branch / "results.tsv",
             ni.RESULTS_HEADER,
@@ -967,7 +994,7 @@ def test_select_best_pass_strategy_sorts_session_pass_rounds(tmp_path: Path) -> 
 
     assert result.skip_reason == ""
     assert result.pass_round_count == 3
-    assert result.eligible_count == 3
+    assert result.eligible_count == 2
     assert result.selected_branch_id == "momentum_lead"
     assert result.selected_round_id == "round-006"
     assert result.selected is not None
@@ -977,6 +1004,48 @@ def test_select_best_pass_strategy_sorts_session_pass_rounds(tmp_path: Path) -> 
         "lo_adjusted": 1.056,
         "max_dd": -0.1278,
     }
+
+
+def test_select_best_pass_strategy_uses_latest_round_as_final_tiebreaker(
+    tmp_path: Path,
+) -> None:
+    session = ni.init_session_dir("MSFT", "msft-v1", tmp_path / "research")
+    branch_a = ni.init_branch_dir(session, "earlier")
+    branch_b = ni.init_branch_dir(session, "later")
+    for branch, round_id in [(branch_a, "round-001"), (branch_b, "round-001")]:
+        _write_strategy_result_row(
+            session,
+            branch,
+            round_id=round_id,
+            verdict="PASS",
+            sharpe=1.25,
+            lo_adj=1.1,
+            max_dd=-0.1,
+        )
+    for branch in [branch_a, branch_b]:
+        ni.append_tsv_row(
+            session / "events.tsv",
+            ni.EVENTS_HEADER,
+            {
+                "timestamp": "2026-04-24T01:20:00+00:00",
+                "event": "round_recorded",
+                "branch_id": branch.name,
+                "round_id": "round-001",
+                "mode": "explore",
+                "verdict": "PASS",
+                "decision": "keep",
+                "description": branch.name,
+                "artifact_path": (
+                    f"branches/{branch.name}/outputs/round-001-edge-result.json"
+                ),
+            },
+        )
+
+    result = ni.select_best_pass_strategy(session)
+
+    assert result.selected_branch_id == "later"
+    assert result.selected is not None
+    assert result.selected.session_round_index == 2
 
 
 def test_select_best_pass_strategy_returns_skip_when_no_pass(tmp_path: Path) -> None:
@@ -2351,6 +2420,7 @@ def test_visualize_session_uploads_strategy_artifact_with_flag(
     output = capsys.readouterr().out
     assert "Strategy artifact uploaded: upload_1" in output
     assert "admission=queued" in output
+    assert "router admission continues asynchronously" in output
 
 
 def test_visualize_session_aborts_before_upload_when_agent_refactor_fails(
@@ -2426,6 +2496,7 @@ def test_render_strategy_artifact_upload_result_lines() -> None:
     assert "Online session view: [Open sess_1](https://app.example/sess_1)" in rendered
     assert "Strategy artifact uploaded: upload_1" in rendered
     assert "admission=queued" in rendered
+    assert "router admission continues asynchronously" in rendered
 
 
 def test_render_skill_dashboard_session_upload_result_returns_markdown_link() -> None:

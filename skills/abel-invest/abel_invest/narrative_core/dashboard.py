@@ -520,7 +520,10 @@ def render_strategy_artifact_upload_lines(artifact_result: dict | None) -> list[
         summary += f": {upload_id}"
     details = []
     if admission:
-        details.append(f"admission={admission}")
+        admission_detail = f"admission={admission}"
+        if admission == "queued":
+            admission_detail += "; router admission continues asynchronously"
+        details.append(admission_detail)
     if branch_id and round_id:
         details.append(f"selected={branch_id}/{round_id}")
     if details:
