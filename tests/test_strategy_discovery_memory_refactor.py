@@ -199,6 +199,41 @@ def _fake_evaluate_command(command) -> subprocess.CompletedProcess | None:
     return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
 
+def _fake_artifact_export_runner(command, cwd=None, capture_output=None, text=None, env=None):
+    evaluated = _fake_evaluate_command(command)
+    if evaluated is not None:
+        return evaluated
+    if "-c" in command:
+        trade_log_path = Path(command[-1])
+        trade_log_path.write_text(
+            "date,asset_return,pnl,position,cum_return,source\n"
+            "2020-01-01,0,0,0,0,backfill\n",
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=json.dumps({"tradeLogPath": str(trade_log_path)}),
+            stderr="",
+        )
+    if "export-artifact" in command:
+        artifact_path = Path(command[command.index("--output-zip") + 1])
+        artifact_path.write_bytes(b"artifact zip")
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=json.dumps(
+                {
+                    "artifactSha256": "abc123",
+                    "artifactBytes": artifact_path.stat().st_size,
+                    "fileCount": 10,
+                }
+            ),
+            stderr="",
+        )
+    raise AssertionError(f"unexpected command: {command}")
+
+
 def test_render_writes_agent_context_with_journal_view(tmp_path: Path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-v1", tmp_path / "research")
     branch = ni.init_branch_dir(session, "graph-v1")
@@ -1537,6 +1572,134 @@ def test_export_selected_strategy_artifact_state_path_adapter(
     )
     export_command = next(command for command in commands_seen if "export-artifact" in command)
     assert "--extra-source-map" in export_command
+
+
+def test_export_selected_strategy_artifact_requires_state_intent_self_check_for_runtime_state(
+    tmp_path: Path,
+) -> None:
+    session = ni.init_session_dir("TSLA", "tsla-v1", tmp_path / "research")
+    branch = ni.init_branch_dir(session, "runtime_state_without_intent")
+    _write_strategy_artifact_inputs(branch)
+    runtime_state = branch / ".abel-runtime" / "state" / "model" / "latest.json"
+    runtime_state.parent.mkdir(parents=True)
+    runtime_state.write_text(json.dumps({"model": "latest"}), encoding="utf-8")
+    _write_strategy_result_row(
+        session,
+        branch,
+        round_id="round-006",
+        verdict="PASS",
+        sharpe=0.967,
+        lo_adj=1.056,
+        max_dd=-0.1278,
+    )
+    _write_metric_input(branch, round_id="round-006")
+    output_dir = tmp_path / "exported-artifact"
+
+    result = ni.export_selected_strategy_artifact(
+        session,
+        output_dir=output_dir,
+        python_bin="python-test",
+        runner=_fake_artifact_export_runner,
+    )
+
+    assert result["artifactUploadSkipped"] is True
+    assert result["skipReason"] == "needs_agent_refactor"
+    report = result["promotionReport"]
+    assert report["mode"] == "needs_agent_refactor"
+    assert "state intent self-check required" in report["reason"]
+    request = json.loads(Path(report["requestPath"]).read_text(encoding="utf-8"))
+    assert request["kind"] == "state_intent_self_check"
+    assert request["scope"] == "state_intent_classification"
+    assert request["signals"][0]["kind"] == "runtime_state_file"
+    assert request["signals"][0]["suggestedStateIntentPath"] == "model/latest.json"
+    assert request["statelessStateIntentTemplate"]["entries"] == []
+
+
+def test_export_selected_strategy_artifact_requires_state_intent_self_check_for_ad_hoc_paths(
+    tmp_path: Path,
+) -> None:
+    session = ni.init_session_dir("TSLA", "tsla-v1", tmp_path / "research")
+    branch = ni.init_branch_dir(session, "ad_hoc_model_registry")
+    _write_strategy_artifact_inputs(branch)
+    (branch / "engine.py").write_text(
+        "from pathlib import Path\n"
+        "from abel_edge.engine.base import StrategyEngine\n"
+        "class BranchEngine(StrategyEngine):\n"
+        "    def compute_decisions(self, ctx):\n"
+        "        registry = Path('models') / 'AAPL' / 'registry.json'\n"
+        "        return ctx.decisions(1)\n",
+        encoding="utf-8",
+    )
+    _write_strategy_result_row(
+        session,
+        branch,
+        round_id="round-006",
+        verdict="PASS",
+        sharpe=0.967,
+        lo_adj=1.056,
+        max_dd=-0.1278,
+    )
+    _write_metric_input(branch, round_id="round-006")
+
+    result = ni.export_selected_strategy_artifact(
+        session,
+        output_dir=tmp_path / "exported-artifact",
+        python_bin="python-test",
+        runner=_fake_artifact_export_runner,
+    )
+
+    assert result["artifactUploadSkipped"] is True
+    request = json.loads(
+        Path(result["promotionReport"]["requestPath"]).read_text(encoding="utf-8")
+    )
+    assert request["kind"] == "state_intent_self_check"
+    assert any(signal["kind"] == "source_state_reference" for signal in request["signals"])
+
+
+def test_export_selected_strategy_artifact_allows_explicit_stateless_self_check(
+    tmp_path: Path,
+) -> None:
+    session = ni.init_session_dir("TSLA", "tsla-v1", tmp_path / "research")
+    branch = ni.init_branch_dir(session, "stateless_after_self_check")
+    _write_strategy_artifact_inputs(branch)
+    runtime_state = branch / ".abel-runtime" / "state" / "model" / "debug.json"
+    runtime_state.parent.mkdir(parents=True)
+    runtime_state.write_text(json.dumps({"debug": True}), encoding="utf-8")
+    (branch / "state_intent.json").write_text(
+        json.dumps(
+            {
+                "schema": "abel-invest.state-intent/v1",
+                "selfCheck": {
+                    "status": "no_durable_state",
+                    "summary": "debug state is not required for paper startup",
+                },
+                "entries": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    _write_strategy_result_row(
+        session,
+        branch,
+        round_id="round-006",
+        verdict="PASS",
+        sharpe=0.967,
+        lo_adj=1.056,
+        max_dd=-0.1278,
+    )
+    _write_metric_input(branch, round_id="round-006")
+
+    result = ni.export_selected_strategy_artifact(
+        session,
+        output_dir=tmp_path / "exported-artifact",
+        python_bin="python-test",
+        runner=_fake_artifact_export_runner,
+    )
+
+    assert result["artifactExported"] is True
+    manifest = json.loads(Path(result["manifestPath"]).read_text(encoding="utf-8"))
+    assert manifest["promotion"]["mode"] == "zero_change"
+    assert manifest["stateIntent"]["selfCheck"]["status"] == "no_durable_state"
 
 
 def test_export_selected_strategy_artifact_normalizes_relative_python_bin(

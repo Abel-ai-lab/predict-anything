@@ -24,6 +24,56 @@ PROMOTION_GATE_FILENAME = "promotion-gate.json"
 PROMOTION_PATCH_FILENAME = "promotion.patch"
 PROMOTION_REFACTOR_REPORT_FILENAME = "refactor-report.json"
 PROMOTION_REFACTOR_REQUEST_FILENAME = "refactor-request.json"
+STATE_SELF_CHECK_FILE_SUFFIXES = {
+    ".joblib",
+    ".npy",
+    ".npz",
+    ".onnx",
+    ".pkl",
+    ".pickle",
+    ".pt",
+    ".pth",
+    ".safetensors",
+}
+STATE_SELF_CHECK_DIRECTORY_PARTS = {
+    "cache",
+    "caches",
+    "checkpoint",
+    "checkpoints",
+    "model",
+    "models",
+    "registry",
+    "registries",
+    "scaler",
+    "scalers",
+    "state",
+    "states",
+}
+STATE_SELF_CHECK_DIRECTORY_SUFFIXES = STATE_SELF_CHECK_FILE_SUFFIXES | {
+    ".json",
+    ".yaml",
+    ".yml",
+}
+STATE_SELF_CHECK_SOURCE_KEYWORDS = (
+    "cache",
+    "checkpoint",
+    "joblib",
+    "model",
+    "pickle",
+    "registry",
+    "scaler",
+    "state",
+)
+STATE_SELF_CHECK_SOURCE_PATH_PARTS = {
+    "checkpoint",
+    "checkpoints",
+    "model",
+    "models",
+    "registry",
+    "registries",
+    "scaler",
+    "scalers",
+}
 
 
 @dataclass(frozen=True)
@@ -67,6 +117,26 @@ def prepare_promotion(
     verify_promotion: Callable[..., dict[str, Any]] | None = None,
 ) -> PromotionResult:
     state_intent_payload = _load_state_intent_payload(candidate.branch)
+    promoted_dir = destination / "promoted"
+    promoted_dir.mkdir(parents=True, exist_ok=True)
+    if state_intent_payload is None:
+        self_check_signals = _state_intent_self_check_signals(
+            candidate.branch,
+            strategy_source_path=candidate.strategy_source_path,
+            is_denylisted_source=is_denylisted_source,
+        )
+        if self_check_signals:
+            request_path = _write_state_intent_self_check_request(
+                promoted_dir,
+                branch=candidate.branch,
+                source_path=candidate.strategy_source_path,
+                signals=self_check_signals,
+            )
+            raise PromotionNeedsAgentRefactor(
+                "state intent self-check required before promotion; "
+                f"{len(self_check_signals)} durable state signal(s) found; "
+                f"request written to {request_path}"
+            )
     state_entries = tuple(
         _state_intent_entries(
             candidate.branch,
@@ -74,8 +144,6 @@ def prepare_promotion(
             is_denylisted_source=is_denylisted_source,
         )
     )
-    promoted_dir = destination / "promoted"
-    promoted_dir.mkdir(parents=True, exist_ok=True)
     strategy_source_path = candidate.strategy_source_path
     patch_path = None
     refactor_report_path = None
@@ -335,6 +403,156 @@ def _state_intent_source_path(branch: Path, *, relative: str, role: str) -> Path
     return branch / relative
 
 
+def _state_intent_self_check_signals(
+    branch: Path,
+    *,
+    strategy_source_path: Path,
+    is_denylisted_source: Callable[[Path], bool],
+) -> list[dict[str, str]]:
+    signals: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    runtime_state_dir = branch / LOCAL_RUNTIME_STATE_DIR
+    if runtime_state_dir.is_dir():
+        for path in sorted(runtime_state_dir.rglob("*")):
+            if path.is_file():
+                runtime_relative = path.relative_to(runtime_state_dir).as_posix()
+                _append_self_check_signal(
+                    signals,
+                    seen,
+                    kind="runtime_state_file",
+                    value=(LOCAL_RUNTIME_STATE_DIR / runtime_relative).as_posix(),
+                    reason="file already exists under .abel-runtime/state",
+                    suggested_path=runtime_relative,
+                )
+
+    for path in sorted(branch.rglob("*")):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(branch)
+        if _skip_state_self_check_file(relative):
+            continue
+        if is_denylisted_source(relative):
+            continue
+        lower_parts = {part.lower() for part in relative.parts}
+        suffix = relative.suffix.lower()
+        if suffix in STATE_SELF_CHECK_FILE_SUFFIXES:
+            _append_self_check_signal(
+                signals,
+                seen,
+                kind="state_like_file",
+                value=relative.as_posix(),
+                reason=f"state-like file suffix {suffix}",
+                suggested_path=relative.as_posix(),
+            )
+        elif (
+            lower_parts & STATE_SELF_CHECK_DIRECTORY_PARTS
+            and suffix in STATE_SELF_CHECK_DIRECTORY_SUFFIXES
+        ):
+            _append_self_check_signal(
+                signals,
+                seen,
+                kind="state_like_branch_file",
+                value=relative.as_posix(),
+                reason="file is under a model/checkpoint/cache/state directory",
+                suggested_path=relative.as_posix(),
+            )
+
+    if strategy_source_path.is_file():
+        source = strategy_source_path.read_text(encoding="utf-8")
+        for literal in _source_string_literals(source):
+            signal = _source_state_reference_signal(literal)
+            if signal is None:
+                continue
+            _append_self_check_signal(
+                signals,
+                seen,
+                kind="source_state_reference",
+                value=literal,
+                reason=signal,
+                suggested_path="",
+            )
+    return signals
+
+
+def _skip_state_self_check_file(relative: Path) -> bool:
+    if any(
+        part
+        in {
+            ".git",
+            ".mypy_cache",
+            ".pytest_cache",
+            ".ruff_cache",
+            "__pycache__",
+            "inputs",
+            "outputs",
+            "promotions",
+            "rounds",
+        }
+        for part in relative.parts
+    ):
+        return True
+    return relative.name in {
+        "branch.yaml",
+        "branch_state.json",
+        "engine.py",
+        "results.tsv",
+        STATE_INTENT_FILENAME,
+    }
+
+
+def _append_self_check_signal(
+    signals: list[dict[str, str]],
+    seen: set[tuple[str, str]],
+    *,
+    kind: str,
+    value: str,
+    reason: str,
+    suggested_path: str,
+) -> None:
+    key = (kind, value)
+    if key in seen:
+        return
+    seen.add(key)
+    payload = {"kind": kind, "value": value, "reason": reason}
+    if suggested_path:
+        payload["suggestedStateIntentPath"] = suggested_path
+    signals.append(payload)
+
+
+def _source_string_literals(source: str) -> list[str]:
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+    literals: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            text = node.value.strip()
+            if text:
+                literals.append(text)
+    return literals
+
+
+def _source_state_reference_signal(value: str) -> str | None:
+    text = value.replace("\\", "/").strip()
+    if not text:
+        return None
+    path = Path(text)
+    parts = {part.lower() for part in path.parts}
+    suffix = path.suffix.lower()
+    if suffix in STATE_SELF_CHECK_FILE_SUFFIXES:
+        return f"source string references state-like file suffix {suffix}"
+    if parts & STATE_SELF_CHECK_SOURCE_PATH_PARTS:
+        return "source string references model/checkpoint/registry/scaler path"
+    lowered = text.lower()
+    if any(keyword in lowered for keyword in STATE_SELF_CHECK_SOURCE_KEYWORDS) and (
+        "/" in text or "." in path.name
+    ):
+        return "source string looks like a durable state path"
+    return None
+
+
 def _validate_state_intent_relative_path(
     value: Any,
     *,
@@ -524,6 +742,66 @@ def _write_agent_refactor_request(
                     "Use requiredReportTemplate exactly, replacing the placeholder "
                     "values. The report replacements must describe the actual "
                     "state path normalizations made by the agent."
+                ),
+            },
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    return request_path
+
+
+def _write_state_intent_self_check_request(
+    promoted_dir: Path,
+    *,
+    branch: Path,
+    source_path: Path,
+    signals: list[dict[str, str]],
+) -> Path:
+    request_path = promoted_dir / PROMOTION_REFACTOR_REQUEST_FILENAME
+    state_intent_path = branch / STATE_INTENT_FILENAME
+    request_path.write_text(
+        json.dumps(
+            {
+                "schema": "abel-invest.agent-refactor-request/v1",
+                "kind": "state_intent_self_check",
+                "sourcePath": str(source_path),
+                "stateIntentPath": str(state_intent_path),
+                "scope": "state_intent_classification",
+                "signals": signals,
+                "requiredStateIntentTemplate": {
+                    "schema": STATE_INTENT_SCHEMA,
+                    "selfCheck": {
+                        "status": "durable_state_classified",
+                        "summary": "<brief summary of files reviewed>",
+                    },
+                    "entries": [
+                        {
+                            "path": "<relative path used by strategy>",
+                            "role": "initial_state",
+                            "mutableInPaper": True,
+                            "requiredForSignal": True,
+                            "producedBy": "agent_state_intent_self_check",
+                        }
+                    ],
+                },
+                "statelessStateIntentTemplate": {
+                    "schema": STATE_INTENT_SCHEMA,
+                    "selfCheck": {
+                        "status": "no_durable_state",
+                        "summary": "<why the detected signals are not required durable state>",
+                    },
+                    "entries": [],
+                },
+                "instructions": (
+                    "Before publishing, review the selected branch source, nearby "
+                    "model/checkpoint/cache files, and runtime evidence. If any "
+                    f"durable state is required for paper startup, write {state_intent_path} "
+                    "using requiredStateIntentTemplate and classify every required file. "
+                    "If the strategy is stateless or the detected files are not durable "
+                    "paper startup state, write the statelessStateIntentTemplate with a "
+                    "specific summary. Then rerun the same publish or promote command."
                 ),
             },
             indent=2,

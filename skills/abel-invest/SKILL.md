@@ -102,9 +102,15 @@ Always start by resolving workspace state before strategy work.
     `visualize-session` when the user asks for a session view without strategy
     artifact upload.
     If that command reports `needs_agent_refactor`, read the emitted
-    `refactor-request.json`, edit only the promoted copy named there, write
-    `refactor-report.json`, and rerun the same command. Do not start a separate
-    agent process or ask the user to trigger a second publish attempt.
+    `refactor-request.json` and handle it in this same skill loop. If `kind`
+    is `state_intent_self_check`, inspect the selected branch source and nearby
+    model/checkpoint/cache files, then write `state_intent.json`: either
+    classify every durable state file required for paper startup, or explicitly
+    write an empty `entries` list with a `selfCheck` summary explaining why the
+    detected files are not durable paper state. If `kind` is `agent_assisted`,
+    edit only the promoted copy named there, write `refactor-report.json`, and
+    rerun the same command. Do not start a separate agent process or ask the
+    user to trigger a second publish attempt.
 17. The default Abel router base URL is `https://api.abel.ai/router/`.
     `abel-auth` owns API key setup. Do not ask the user or agent to provide a
     router URL unless they are intentionally testing another router.
