@@ -81,36 +81,41 @@ Always start by resolving workspace state before strategy work.
    `graph_frontier.json`. Expand graph breadth only when a frontier question
    remains after reading current evidence; do not expand just because a small
    number of branches failed.
-11. Do not treat branch count as proof of breadth. Graph-node concentration,
+11. Graph breadth should not outrun mechanism depth. Before expanding to a
+    more distant frontier, ask whether the current graph neighborhood still has
+    an unresolved sign, lag, regime, interaction, control, or risk-shaping
+    question. If yes, prefer one mechanism-deepening branch over distant graph
+    expansion.
+12. Do not treat branch count as proof of breadth. Graph-node concentration,
    strategy-variant coverage, and local refinement pressure are separate facts.
-12. Do not call parameter, sizing, threshold, filter, or window tweaks broad
+13. Do not call parameter, sizing, threshold, filter, or window tweaks broad
     exploration.
-13. Standard discovery chooses branches from graph context, mechanism
+14. Standard discovery chooses branches from graph context, mechanism
     reasoning, recorded evidence, or explicit control/ablation purpose before
     metric search. Do not run local parameter, threshold, window, filter,
     sizing, driver, or asset sweeps to choose a branch candidate unless the user
     explicitly requests optimization.
-14. Treat `--selection-trials` as DSR audit and penalty accounting, not as
+15. Treat `--selection-trials` as DSR audit and penalty accounting, not as
     permission to use brute-force candidate selection in standard discovery.
-15. Treat user metric targets such as Sharpe thresholds as success criteria, not
+16. Treat user metric targets such as Sharpe thresholds as success criteria, not
     as optimization permission. Report evidence honestly or ask for explicit
     optimization rather than widening local search just to satisfy a target.
-16. CAP graph nodes are causal priors, not trading directions. They do not
+17. CAP graph nodes are causal priors, not trading directions. They do not
     provide sign, lag, or monotone strength; deeper nodes are weaker or more
     indirect priors unless recorded evidence or domain context justifies them.
-17. Abel Ask or narrative context may generate mechanism hypotheses, supplement
+18. Abel Ask or narrative context may generate mechanism hypotheses, supplement
     drivers, or graph expansion questions, but it is scout context, not
     validation evidence.
-18. Every recorded round requires an agent-written `research_journal.md` entry
+19. Every recorded round requires an agent-written `research_journal.md` entry
     with the round ledger reference before the next recorded round.
-19. Treat input realization as an evidence fact: a graph-supported declaration
+20. Treat input realization as an evidence fact: a graph-supported declaration
     only becomes graph-supported evidence when runtime reads the prepared graph
     inputs. When graph-node reads are inferred from asset reads, preserve that
     source as a fact rather than overstating edge-native field-level proof.
-20. Create new sessions only after workspace context resolves. Do not use
+21. Create new sessions only after workspace context resolves. Do not use
     `--root` unless intentionally creating a legacy/offline session, and then
     pass `--allow-outside-workspace`.
-21. Do not create or refresh an online session view automatically. When the
+22. Do not create or refresh an online session view automatically. When the
     strategy context is mature enough to be useful to review visually, ask the
     user whether to visualize the session. This can be after a strong candidate
     PASS, after several informative candidate rounds, before promotion, or

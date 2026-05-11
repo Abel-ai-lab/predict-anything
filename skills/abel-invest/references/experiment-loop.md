@@ -66,13 +66,16 @@ Each round should answer a mechanism question, not just consume compute.
 4. Choose a graph/mechanism hypothesis before metric search. Be able to state
    why the branch exists, why its constants are mechanism defaults or simple
    priors, and what evidence would invalidate it.
-5. Declare the branch hypothesis in `branch.yaml`.
-6. Run `prepare-branch` before trusting branch inputs.
-7. Run `debug-branch` before recording evidence.
-8. Run `run-branch` only when declaration and debug facts are ready enough for
+5. Before widening graph breadth, ask whether the current graph neighborhood
+   still has an unresolved sign, lag, regime, interaction, control, or
+   risk-shaping question. If yes, answer that mechanism-depth question first.
+6. Declare the branch hypothesis in `branch.yaml`.
+7. Run `prepare-branch` before trusting branch inputs.
+8. Run `debug-branch` before recording evidence.
+9. Run `run-branch` only when declaration and debug facts are ready enough for
    the evidence label you want.
-9. Re-read `evidence_ledger.json` and `frontier.md`.
-10. Update `research_journal.md` for the recorded round before starting another
+10. Re-read `evidence_ledger.json` and `frontier.md`.
+11. Update `research_journal.md` for the recorded round before starting another
    recorded round. Cite the round ledger ref and capture what changed, what
    happened, what was learned, and what that implies next.
 
@@ -166,6 +169,9 @@ the default URL in the skill code if this endpoint changes.
 - parameter tuning comes last
 - multiple branches on one graph input set can still be graph-breadth narrow
 - local refinement is useful only while it is still learning something
+- mechanism depth should usually precede distant graph expansion when the
+  current neighborhood still has a sign, lag, regime, interaction, control, or
+  risk-shaping question
 - graph expansion needs a frontier question and enough current-frontier evidence
   to justify widening the node universe
 - narrative scout can narrow a mechanism question, but Edge evidence decides

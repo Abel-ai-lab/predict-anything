@@ -83,6 +83,12 @@ outside the current frontier. Weak reasons include "the last branch failed",
 "graph breadth is always good", or "a local metric scan found one attractive
 node, so expand around it until the result improves".
 
+Before expanding to a more distant frontier, check mechanism depth in the
+current neighborhood. If evidence still leaves a concrete sign, lag, regime,
+interaction, control, or risk-shaping question, prefer one branch that answers
+that question over wider graph expansion. Complexity is allowed when it adds
+mechanism information; it is not allowed as metric-pressure tuning.
+
 ## Narrative Scout
 
 Abel Ask and narrative context can improve exploration efficiency by generating

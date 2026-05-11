@@ -94,6 +94,12 @@ question unresolved, not just because a branch failed. Target-only controls are
 useful contrast evidence, but they do not cover graph-supported candidate input
 breadth when live graph candidates exist.
 
+Graph breadth should not outrun mechanism depth. Before moving to a more
+distant frontier, ask whether the current graph neighborhood still has an
+unresolved sign, lag, regime, interaction, control, or risk-shaping question. A
+deeper mechanism branch is appropriate when the added complexity answers that
+question instead of tuning toward a metric target.
+
 CAP graph nodes are causal priors. They do not provide trading sign, lag, or
 guaranteed strength; deeper nodes are weaker or more indirect priors unless
 recorded evidence or domain context justifies them.
@@ -153,6 +159,8 @@ Before writing strategy logic, be able to state:
 - the graph node, frontier question, recorded evidence, narrative scout, or
   control purpose that motivates the branch
 - the mechanism being tested
+- whether this is graph-breadth expansion or mechanism-depth work, and why that
+  is the right next learning step
 - why chosen constants are mechanism defaults or simple priors, not
   backtest-selected values
 - what evidence would invalidate the branch

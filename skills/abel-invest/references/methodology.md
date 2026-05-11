@@ -34,6 +34,12 @@ the graph when a frontier question remains after reading current evidence. Do
 not expand just because a few branches failed or because a local metric scan
 found one attractive node.
 
+Graph breadth should not outrun mechanism depth. Before widening to a more
+distant frontier, ask whether the current graph neighborhood still has an
+unresolved sign, lag, regime, interaction, control, or risk-shaping question. A
+mechanism-deepening branch is preferable when it can answer one of those
+questions without becoming parameter search.
+
 **Mechanism-led discovery beats metric-led search.**
 Standard discovery chooses a branch from graph context, mechanism reasoning,
 recorded evidence, or a control/ablation purpose before metric search. Local
@@ -80,12 +86,14 @@ The branch-default path is:
 2. start or resume a graph-first session
 3. read ledger, frontier, and journal facts
 4. use narrative scout only when it helps form a mechanism or frontier question
-5. expand `graph_frontier.json` only when current evidence leaves a frontier
+5. deepen the current mechanism when unresolved sign, lag, regime, interaction,
+   control, or risk-shaping questions remain
+6. expand `graph_frontier.json` only when current evidence leaves a frontier
    question unresolved
-6. declare branch hypothesis and selected graph inputs
-7. prepare branch inputs
-8. write `compute_decisions(self, ctx)`
-9. run semantic preflight
-10. record evidence
-11. inspect ledger/frontier facts
-12. update the research journal before deep local refinement
+7. declare branch hypothesis and selected graph inputs
+8. prepare branch inputs
+9. write `compute_decisions(self, ctx)`
+10. run semantic preflight
+11. record evidence
+12. inspect ledger/frontier facts
+13. update the research journal before deep local refinement
