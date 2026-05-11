@@ -88,11 +88,15 @@ complexity class, or expansion probe. Local refinement means parameter, sizing,
 threshold, filter, window, or implementation work inside the same family.
 
 The default priority is graph breadth first, strategy variants second, and
-parameters last. If the known node pool is too narrow, use
-`abel-invest frontier expand` to widen `graph_frontier.json` before spending
-many rounds on local strategy variants. Target-only controls are useful contrast
-evidence, but they do not cover graph-supported candidate input breadth when
-live graph candidates exist.
+parameters last. Graph breadth still needs a frontier question: expand
+`graph_frontier.json` when current evidence leaves a causal motif or anchor
+question unresolved, not just because a branch failed. Target-only controls are
+useful contrast evidence, but they do not cover graph-supported candidate input
+breadth when live graph candidates exist.
+
+CAP graph nodes are causal priors. They do not provide trading sign, lag, or
+guaranteed strength; deeper nodes are weaker or more indirect priors unless
+recorded evidence or domain context justifies them.
 
 ## Journal And Research Reflection
 
@@ -102,6 +106,10 @@ is the agent-owned research state.
 Use the journal for:
 
 - hypotheses and observations
+- branch basis before strategy code when the choice could affect evidence
+  interpretation
+- any performance-like scout or sweep that influenced branch choice
+- Abel Ask or narrative scout context, including when it was off-target or weak
 - failed neighborhoods
 - open questions
 - reasons to continue, pivot, add contrast evidence, or stop
@@ -138,6 +146,22 @@ inputs over frontier-side inference. `data_manifest.json` and
 `dependencies.json` include selected graph node facts alongside the ticker feeds
 used by the current runtime.
 
+## Branch Self-Check
+
+Before writing strategy logic, be able to state:
+
+- the graph node, frontier question, recorded evidence, narrative scout, or
+  control purpose that motivates the branch
+- the mechanism being tested
+- why chosen constants are mechanism defaults or simple priors, not
+  backtest-selected values
+- what evidence would invalidate the branch
+
+If a branch was chosen because it ranked best in a local metric scan, it is not
+a clean standard-discovery candidate. Declare the search width with
+`--selection-trials`, journal the scout influence, and return to
+graph/mechanism-led branch selection for the next standard round.
+
 ## What To Do
 
 1. State the branch thesis in `branch.yaml`.
@@ -160,6 +184,7 @@ used by the current runtime.
 - branch count is not exploration breadth if every branch is the same family and
   input claim
 - weird low-attention parents are not automatically noise
+- narrative scout can inspire a mechanism, but it is not evidence truth
 - semantic failure is a signal about visibility or timing assumptions
 - metric failure is evidence about the mechanism, not a prompt to hack metrics
 - stop honestly when recent rounds are no longer improving and no high-quality

@@ -25,9 +25,29 @@ reduces blind search and is more likely to survive regime change. Correlation
 signals can still be useful, but they enter as supplements or controls unless
 the branch declares and validates a stronger claim.
 
-Graph-first means widening the graph frontier when the known node pool is too
-narrow. It does not mean repeatedly choosing more tickers from a fixed branch
-candidate list.
+CAP graph nodes are causal priors, not trading instructions. They do not provide
+the trading sign, lag, or a monotone strength map; deeper nodes are weaker or
+more indirect priors unless recorded evidence or domain context justifies them.
+
+Graph-first means using the graph to form input and mechanism hypotheses. Expand
+the graph when a frontier question remains after reading current evidence. Do
+not expand just because a few branches failed or because a local metric scan
+found one attractive node.
+
+**Mechanism-led discovery beats metric-led search.**
+Standard discovery chooses a branch from graph context, mechanism reasoning,
+recorded evidence, or a control/ablation purpose before metric search. Local
+parameter, threshold, window, filter, sizing, driver, or asset sweeps are
+optimization behavior unless the user explicitly requests them.
+
+`--selection-trials` audits accidental or explicitly requested search width. It
+does not make brute-force candidate selection part of standard discovery.
+
+**Narrative scout is context, not evidence.**
+Abel Ask and narrative context can generate mechanism hypotheses, supplement
+driver ideas, and graph expansion questions. Treat them as domain-context scout
+work: stronger than free association, weaker than CAP graph facts, and never a
+substitute for Edge validation.
 
 **Evidence labels are not strategy advice.**
 Candidate/control/diagnostic/blocker labels say what kind of research evidence a
@@ -58,11 +78,14 @@ The branch-default path is:
 
 1. resolve workspace and doctor readiness
 2. start or resume a graph-first session
-3. expand `graph_frontier.json` when graph breadth is still thin
-4. declare branch hypothesis and selected graph inputs
-5. prepare branch inputs
-6. write `compute_decisions(self, ctx)`
-7. run semantic preflight
-8. record evidence
-9. inspect ledger/frontier facts
-10. update the research journal before deep local refinement
+3. read ledger, frontier, and journal facts
+4. use narrative scout only when it helps form a mechanism or frontier question
+5. expand `graph_frontier.json` only when current evidence leaves a frontier
+   question unresolved
+6. declare branch hypothesis and selected graph inputs
+7. prepare branch inputs
+8. write `compute_decisions(self, ctx)`
+9. run semantic preflight
+10. record evidence
+11. inspect ledger/frontier facts
+12. update the research journal before deep local refinement
