@@ -28,6 +28,8 @@ def _candidate_result_payload() -> dict:
             "position_hit_rate": 0.58,
             "omega": 1.5,
             "total_return": 0.42,
+            "annual_return": 0.42,
+            "calmar": 3.28,
             "dsr": 0.44,
             "loss_years": 1,
             "max_dd": -0.08,
@@ -75,6 +77,9 @@ def _write_strategy_result_row(
     sharpe: float,
     lo_adj: float,
     max_dd: float,
+    score: str = "9/9",
+    calmar: float = 3.28,
+    annual_return: float = 0.42,
     decision: str = "keep",
 ) -> None:
     result_path = branch / "outputs" / f"{round_id}-edge-result.json"
@@ -85,6 +90,9 @@ def _write_strategy_result_row(
     payload["metrics"]["sharpe"] = sharpe
     payload["metrics"]["lo_adjusted"] = lo_adj
     payload["metrics"]["max_dd"] = max_dd
+    payload["metrics"]["calmar"] = calmar
+    payload["metrics"]["annual_return"] = annual_return
+    payload["score"] = score
     result_path.parent.mkdir(parents=True, exist_ok=True)
     result_path.write_text(json.dumps(payload), encoding="utf-8")
     report_path.write_text("# validation\n", encoding="utf-8")
@@ -105,7 +113,7 @@ def _write_strategy_result_row(
             "max_dd": f"{max_dd:.4f}",
             "pnl": "42.0",
             "K": "1",
-            "score": "9/9",
+            "score": score,
             "verdict": verdict,
             "mode": "explore",
             "description": f"{branch.name} {round_id}",
@@ -729,7 +737,9 @@ def test_post_skill_dashboard_session_sends_to_session_endpoint() -> None:
     assert timeout == 60
 
 
-def test_select_best_pass_strategy_sorts_session_pass_rounds(tmp_path: Path) -> None:
+def test_select_best_pass_strategy_sorts_validation_rounds_by_pass_rate_first(
+    tmp_path: Path,
+) -> None:
     session = ni.init_session_dir("MSFT", "msft-v1", tmp_path / "research")
     branch_a = ni.init_branch_dir(session, "driver_explore")
     branch_b = ni.init_branch_dir(session, "momentum_lead")
@@ -742,6 +752,8 @@ def test_select_best_pass_strategy_sorts_session_pass_rounds(tmp_path: Path) -> 
         sharpe=0.674,
         lo_adj=0.695,
         max_dd=-0.1440,
+        score="9/13",
+        calmar=5.0,
     )
     _write_strategy_result_row(
         session,
@@ -751,6 +763,8 @@ def test_select_best_pass_strategy_sorts_session_pass_rounds(tmp_path: Path) -> 
         sharpe=0.967,
         lo_adj=1.056,
         max_dd=-0.1278,
+        score="10/13",
+        calmar=1.0,
     )
     _write_strategy_result_row(
         session,
@@ -760,6 +774,8 @@ def test_select_best_pass_strategy_sorts_session_pass_rounds(tmp_path: Path) -> 
         sharpe=0.945,
         lo_adj=1.041,
         max_dd=-0.1340,
+        score="13/13",
+        calmar=9.0,
         decision="discard",
     )
     _write_strategy_result_row(
@@ -767,45 +783,58 @@ def test_select_best_pass_strategy_sorts_session_pass_rounds(tmp_path: Path) -> 
         branch_c,
         round_id="round-002",
         verdict="FAIL",
-        sharpe=0.808,
+        sharpe=0.508,
         lo_adj=0.866,
         max_dd=-0.1805,
-        decision="discard",
+        score="11/13",
+        calmar=0.5,
     )
 
     result = ni.select_best_pass_strategy(session)
 
     assert result.skip_reason == ""
-    assert result.pass_round_count == 3
-    assert result.eligible_count == 2
-    assert result.selected_branch_id == "momentum_lead"
-    assert result.selected_round_id == "round-006"
+    assert result.validation_round_count == 4
+    assert result.pass_round_count == 4
+    assert result.eligible_count == 3
+    assert result.selected_branch_id == "regime_switch"
+    assert result.selected_round_id == "round-002"
     assert result.selected is not None
     assert result.selected.selection_rank == 1
     assert result.selected.selection_metric_values == {
-        "sharpe": 0.967,
-        "lo_adjusted": 1.056,
-        "max_dd": -0.1278,
+        "pass_rate": 11 / 13,
+        "sharpe": 0.508,
+        "calmar": 0.5,
+        "max_dd": -0.1805,
     }
 
 
-def test_select_best_pass_strategy_uses_latest_round_as_final_tiebreaker(
+def test_select_best_pass_strategy_sorts_by_sharpe_calmar_max_dd_then_latest(
     tmp_path: Path,
 ) -> None:
     session = ni.init_session_dir("MSFT", "msft-v1", tmp_path / "research")
-    branch_a = ni.init_branch_dir(session, "earlier")
-    branch_b = ni.init_branch_dir(session, "later")
-    for branch, round_id in [(branch_a, "round-001"), (branch_b, "round-001")]:
+    lower_sharpe = ni.init_branch_dir(session, "lower_sharpe")
+    higher_calmar = ni.init_branch_dir(session, "higher_calmar")
+    lower_calmar = ni.init_branch_dir(session, "lower_calmar")
+    better_drawdown = ni.init_branch_dir(session, "better_drawdown")
+    later = ni.init_branch_dir(session, "later")
+    for branch, sharpe, calmar, max_dd in [
+        (lower_sharpe, 1.1, 9.0, -0.05),
+        (higher_calmar, 1.2, 3.1, -0.12),
+        (lower_calmar, 1.2, 2.9, -0.03),
+        (better_drawdown, 1.2, 3.1, -0.08),
+        (later, 1.2, 3.1, -0.08),
+    ]:
         _write_strategy_result_row(
             session,
             branch,
-            round_id=round_id,
+            round_id="round-001",
             verdict="PASS",
-            sharpe=1.25,
-            lo_adj=1.1,
-            max_dd=-0.1,
+            sharpe=sharpe,
+            lo_adj=1.0,
+            max_dd=max_dd,
+            score="9/13",
+            calmar=calmar,
         )
-    for branch in [branch_a, branch_b]:
         ni.append_tsv_row(
             session / "events.tsv",
             ni.EVENTS_HEADER,
@@ -828,32 +857,33 @@ def test_select_best_pass_strategy_uses_latest_round_as_final_tiebreaker(
 
     assert result.selected_branch_id == "later"
     assert result.selected is not None
-    assert result.selected.session_round_index == 2
+    assert result.selected.session_round_index == 5
 
 
-def test_select_best_pass_strategy_returns_skip_when_no_pass(tmp_path: Path) -> None:
+def test_select_best_pass_strategy_returns_skip_when_no_validation(tmp_path: Path) -> None:
     session = ni.init_session_dir("MSFT", "msft-v1", tmp_path / "research")
     branch = ni.init_branch_dir(session, "regime_switch")
     _write_strategy_result_row(
         session,
         branch,
         round_id="round-001",
-        verdict="FAIL",
+        verdict="ERROR",
         sharpe=0.685,
         lo_adj=0.831,
         max_dd=-0.1654,
-        decision="discard",
     )
 
     result = ni.select_best_pass_strategy(session)
 
     assert result.selected is None
-    assert result.skip_reason == "no_pass_strategy"
+    assert result.skip_reason == "no_validation_strategy"
     assert result.pass_round_count == 0
     assert result.eligible_count == 0
 
 
-def test_select_best_pass_strategy_skips_unhostable_pass_rounds(tmp_path: Path) -> None:
+def test_select_best_pass_strategy_skips_unhostable_validation_rounds(
+    tmp_path: Path,
+) -> None:
     session = ni.init_session_dir("MSFT", "msft-v1", tmp_path / "research")
     branch = ni.init_branch_dir(session, "momentum_lead")
     ni.append_tsv_row(
@@ -873,7 +903,7 @@ def test_select_best_pass_strategy_skips_unhostable_pass_rounds(tmp_path: Path) 
             "pnl": "42.0",
             "K": "1",
             "score": "9/9",
-            "verdict": "PASS",
+            "verdict": "FAIL",
             "mode": "explore",
             "description": "missing result",
             "result_path": "branches/momentum_lead/outputs/missing-edge-result.json",
@@ -885,7 +915,7 @@ def test_select_best_pass_strategy_skips_unhostable_pass_rounds(tmp_path: Path) 
     result = ni.select_best_pass_strategy(session)
 
     assert result.selected is None
-    assert result.skip_reason == "no_hostable_pass_strategy"
+    assert result.skip_reason == "no_hostable_validation_strategy"
     assert result.pass_round_count == 1
     assert result.eligible_count == 0
 
@@ -930,12 +960,13 @@ def test_build_strategy_artifact_manifest_uses_router_contract_fields(
         "ticker": "TSLA",
         "branchId": "momentum_lead",
         "roundId": "round-006",
-        "selectionMode": "auto_best_pass_by_metric_order",
+        "selectionMode": "auto_best_validation_by_pass_rate",
         "selectionScope": "session",
-        "selectionMetricOrder": ["sharpe", "lo_adjusted", "max_dd"],
+        "selectionMetricOrder": ["pass_rate", "sharpe", "calmar", "max_dd"],
         "selectionMetricValues": {
+            "pass_rate": 1.0,
             "sharpe": 0.967,
-            "lo_adjusted": 1.056,
+            "calmar": 3.28,
             "max_dd": -0.1278,
         },
         "selectionRank": 1,
@@ -993,6 +1024,8 @@ def test_build_strategy_artifact_manifest_uses_router_contract_fields(
             "loAdjusted": 1.056,
             "maxDrawdown": -0.1278,
             "totalReturn": 0.42,
+            "calmar": 3.28,
+            "annualReturn": 0.42,
             "score": "9/9",
             "positionIc": 0.03,
             "positionIcStability": 0.61,
@@ -1119,7 +1152,7 @@ def test_export_selected_strategy_artifact_writes_local_bundle(
         "runtime/data_manifest.json",
         "edge/promotion-gate.json",
     ]
-    assert manifest["source"]["selectionMode"] == "auto_best_pass_by_metric_order"
+    assert manifest["source"]["selectionMode"] == "auto_best_validation_by_pass_rate"
     assert manifest["source"]["selectionScope"] == "session"
     assert manifest["promotion"]["mode"] == "zero_change"
 
@@ -2091,7 +2124,7 @@ def test_export_selected_strategy_artifact_regenerates_missing_metric_input(
     assert (output_dir / "metric-input.csv").exists()
 
 
-def test_export_selected_strategy_artifact_skips_without_pass(
+def test_export_selected_strategy_artifact_skips_without_validation(
     tmp_path: Path,
 ) -> None:
     session = ni.init_session_dir("TSLA", "tsla-v1", tmp_path / "research")
@@ -2100,7 +2133,7 @@ def test_export_selected_strategy_artifact_skips_without_pass(
         session,
         branch,
         round_id="round-001",
-        verdict="FAIL",
+        verdict="ERROR",
         sharpe=0.1,
         lo_adj=0.2,
         max_dd=-0.3,
@@ -2119,7 +2152,7 @@ def test_export_selected_strategy_artifact_skips_without_pass(
     assert result == {
         "artifactExported": False,
         "artifactUploadSkipped": True,
-        "skipReason": "no_pass_strategy",
+        "skipReason": "no_validation_strategy",
         "selectedBranchId": None,
         "selectedRoundId": None,
     }

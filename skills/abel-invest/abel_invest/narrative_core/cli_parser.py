@@ -304,7 +304,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--with-strategy-artifact",
         action="store_true",
         help=(
-            "Prepare the session's best PASS strategy artifact, then upload "
+            "Prepare the session's best ranked hostable strategy artifact, then upload "
             "narrative and artifact."
         ),
     )
@@ -321,7 +321,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     export_strategy_artifact = sub.add_parser(
         "export-strategy-artifact",
-        help="Export the best PASS strategy artifact for a session without uploading it",
+        help="Export the best ranked hostable strategy artifact for a session without uploading it",
     )
     export_strategy_artifact.add_argument("--session", required=True)
     export_strategy_artifact.add_argument(
@@ -343,7 +343,7 @@ def build_parser() -> argparse.ArgumentParser:
     promote_strategy.add_argument(
         "--round",
         default=None,
-        help="Promotion source round. Required when the branch has multiple PASS rounds.",
+        help="Promotion source round. Required when the branch has multiple validation rounds.",
     )
     promote_strategy.add_argument(
         "--output-dir",

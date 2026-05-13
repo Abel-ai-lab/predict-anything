@@ -51,17 +51,17 @@ STRATEGY_ARTIFACT_ENTRYPOINT = "strategy/strategy.py"
 STRATEGY_ARTIFACT_CLASS_NAME = "BranchEngine"
 STRATEGY_ARTIFACT_PAPER_MODE = "paper_signal"
 STRATEGY_ARTIFACT_WORKSPACE_KIND = "abel-invest"
-SELECTION_MODE_AUTO_BEST_PASS = "auto_best_pass_by_metric_order"
+SELECTION_MODE_AUTO_BEST_PASS = "auto_best_validation_by_pass_rate"
 SELECTION_MODE_EXPLICIT_BRANCH_ROUND = "explicit_branch_round"
 SELECTION_SCOPE_SESSION = "session"
 SELECTION_SCOPE_BRANCH = "branch"
-SELECTION_METRIC_ORDER = ("sharpe", "lo_adjusted", "max_dd")
+SELECTION_METRIC_ORDER = ("pass_rate", "sharpe", "calmar", "max_dd")
 SELECTION_RULE_AUTO_BEST_PASS = (
-    "sharpe_desc_lo_adjusted_desc_max_dd_desc_latest_v1"
+    "pass_rate_desc_sharpe_desc_calmar_desc_max_dd_desc_latest_v1"
 )
 SELECTION_REASON_AUTO_BEST_PASS = (
-    "highest Sharpe, then highest Lo-adjusted Sharpe, then least severe max drawdown; "
-    "ties use latest recorded round"
+    "highest validation pass rate, then highest Sharpe, then highest Calmar, "
+    "then least severe max drawdown; ties use latest recorded round"
 )
 DEFAULT_PROMOTIONS_DIRNAME = "promotions"
 RUNTIME_STATE_SCHEMA = "abel-invest.runtime-state/v1"
@@ -125,8 +125,10 @@ class StrategyArtifactCandidate:
     mode: str
     description: str
     score: str
+    pass_rate: float
     sharpe: float
     lo_adjusted: float
+    calmar: float
     max_dd: float
     row: dict[str, str]
     edge_result: dict[str, Any]
@@ -138,8 +140,9 @@ class StrategyArtifactCandidate:
     @property
     def selection_metric_values(self) -> dict[str, float]:
         return {
+            "pass_rate": self.pass_rate,
             "sharpe": self.sharpe,
-            "lo_adjusted": self.lo_adjusted,
+            "calmar": self.calmar,
             "max_dd": self.max_dd,
         }
 
@@ -152,6 +155,10 @@ class StrategySelectionResult:
     eligible_count: int
 
     @property
+    def validation_round_count(self) -> int:
+        return self.pass_round_count
+
+    @property
     def selected_branch_id(self) -> str | None:
         return self.selected.branch_id if self.selected is not None else None
 
@@ -161,24 +168,24 @@ class StrategySelectionResult:
 
 
 def select_best_pass_strategy(session: Path) -> StrategySelectionResult:
-    """Select the best hostable PASS strategy in one Abel Invest session."""
+    """Select the best ranked hostable validation strategy in one Abel Invest session."""
 
     session = resolve_workspace_arg_path(session).resolve()
     rows = _iter_session_result_rows(session)
     session_round_indexes = _session_round_indexes(session)
-    pass_rows = [
-        item for item in rows if _clean(item[1].get("verdict")).upper() == "PASS"
+    validation_rows = [
+        item for item in rows if _is_validation_verdict(item[1].get("verdict"))
     ]
-    if not pass_rows:
+    if not validation_rows:
         return StrategySelectionResult(
             selected=None,
-            skip_reason="no_pass_strategy",
+            skip_reason="no_validation_strategy",
             pass_round_count=0,
             eligible_count=0,
         )
 
     candidates: list[StrategyArtifactCandidate] = []
-    for branch, row in pass_rows:
+    for branch, row in validation_rows:
         branch_id = _clean(row.get("branch_id")) or branch.name
         round_id = _clean(row.get("round_id"))
         if _clean(row.get("decision")).lower() != "keep":
@@ -197,16 +204,17 @@ def select_best_pass_strategy(session: Path) -> StrategySelectionResult:
     if not candidates:
         return StrategySelectionResult(
             selected=None,
-            skip_reason="no_hostable_pass_strategy",
-            pass_round_count=len(pass_rows),
+            skip_reason="no_hostable_validation_strategy",
+            pass_round_count=len(validation_rows),
             eligible_count=0,
         )
 
     ranked = sorted(
         candidates,
         key=lambda item: (
+            item.pass_rate,
             item.sharpe,
-            item.lo_adjusted,
+            item.calmar,
             item.max_dd,
             item.session_round_index,
         ),
@@ -216,7 +224,7 @@ def select_best_pass_strategy(session: Path) -> StrategySelectionResult:
     return StrategySelectionResult(
         selected=selected,
         skip_reason="",
-        pass_round_count=len(pass_rows),
+        pass_round_count=len(validation_rows),
         eligible_count=len(candidates),
     )
 
@@ -231,27 +239,27 @@ def select_branch_promotion_candidate(
     branch = resolve_workspace_arg_path(branch).resolve()
     session = _session_from_branch(branch)
     rows = [(branch, row) for row in read_tsv_rows(branch / "results.tsv")]
-    pass_rows = [
-        item for item in rows if _clean(item[1].get("verdict")).upper() == "PASS"
+    validation_rows = [
+        item for item in rows if _is_validation_verdict(item[1].get("verdict"))
     ]
     if round_id:
         matched = [
-            item for item in pass_rows if _clean(item[1].get("round_id")) == round_id
+            item for item in validation_rows if _clean(item[1].get("round_id")) == round_id
         ]
         if not matched:
             return StrategySelectionResult(
                 selected=None,
-                skip_reason="branch_round_not_pass",
-                pass_round_count=len(pass_rows),
+                skip_reason="branch_round_not_validation",
+                pass_round_count=len(validation_rows),
                 eligible_count=0,
             )
         target_rows = matched
     else:
-        target_rows = pass_rows
+        target_rows = validation_rows
         if not target_rows:
             return StrategySelectionResult(
                 selected=None,
-                skip_reason="no_pass_round_in_branch",
+                skip_reason="no_validation_round_in_branch",
                 pass_round_count=0,
                 eligible_count=0,
             )
@@ -280,14 +288,14 @@ def select_branch_promotion_candidate(
         return StrategySelectionResult(
             selected=None,
             skip_reason="no_hostable_branch_round",
-            pass_round_count=len(pass_rows),
+            pass_round_count=len(validation_rows),
             eligible_count=0,
         )
     selected = _with_rank(candidates[0], selection_rank=1)
     return StrategySelectionResult(
         selected=selected,
         skip_reason="",
-        pass_round_count=len(pass_rows),
+        pass_round_count=len(validation_rows),
         eligible_count=len(candidates),
     )
 
@@ -301,7 +309,7 @@ def build_strategy_artifact_manifest(
     abel_edge_version: str | None = None,
     abel_invest_version: str | None = None,
 ) -> dict[str, Any]:
-    """Build the router upload manifest for one selected PASS strategy."""
+    """Build the router upload manifest for one selected validation strategy."""
 
     branch_spec = load_branch_spec(candidate.branch)
     runtime_profile = _load_json_object(runtime_profile_path(candidate.branch))
@@ -684,14 +692,22 @@ def _candidate_from_row(
     edge_result = _load_json_object(result_path)
     if not edge_result:
         return None
-    if _clean(edge_result.get("verdict")).upper() != "PASS":
+    if not _is_validation_verdict(edge_result.get("verdict")):
         return None
 
     metrics = edge_result.get("metrics") if isinstance(edge_result.get("metrics"), dict) else {}
+    pass_rate = _score_pass_rate(_clean(row.get("score")) or _clean(edge_result.get("score")))
     sharpe = _metric(row, metrics, row_key="sharpe", result_key="sharpe")
     lo_adjusted = _metric(row, metrics, row_key="lo_adj", result_key="lo_adjusted")
+    calmar = _to_float(metrics.get("calmar"))
     max_dd = _metric(row, metrics, row_key="max_dd", result_key="max_dd")
-    if sharpe is None or lo_adjusted is None or max_dd is None:
+    if (
+        pass_rate is None
+        or sharpe is None
+        or lo_adjusted is None
+        or calmar is None
+        or max_dd is None
+    ):
         return None
 
     report_path = _existing_optional_path(session, row.get("report_path"))
@@ -713,8 +729,10 @@ def _candidate_from_row(
         mode=_clean(row.get("mode")),
         description=_clean(row.get("description")),
         score=_clean(row.get("score")),
+        pass_rate=pass_rate,
         sharpe=sharpe,
         lo_adjusted=lo_adjusted,
+        calmar=calmar,
         max_dd=max_dd,
         row=dict(row),
         edge_result=edge_result,
@@ -792,7 +810,7 @@ def _ensure_metric_input_for_artifact(
         metric_input_path=metric_input_path,
         runner=runner,
     )
-    if _clean(result.get("verdict")).upper() != "PASS" or not metric_input_path.is_file():
+    if not _is_validation_verdict(result.get("verdict")) or not metric_input_path.is_file():
         return None
     return replace(
         candidate,
@@ -1230,7 +1248,12 @@ def _manifest_backtest_metrics(
             metrics.get("total_return"),
             field_name="metrics.total_return",
         ),
+        "calmar": _required_float(
+            metrics.get("calmar"),
+            field_name="metrics.calmar",
+        ),
     }
+    _set_optional_float(payload, "annualReturn", _to_float(metrics.get("annual_return")))
     score = _clean(candidate.score) or _clean(candidate.edge_result.get("score"))
     if score:
         payload["score"] = score
@@ -1366,6 +1389,22 @@ def _metric(
     if row_value is not None:
         return row_value
     return _to_float(metrics.get(result_key))
+
+
+def _is_validation_verdict(value: Any) -> bool:
+    return _clean(value).upper() in {"PASS", "FAIL"}
+
+
+def _score_pass_rate(value: Any) -> float | None:
+    text = _clean(value)
+    if "/" not in text:
+        return None
+    passed, total = text.split("/", 1)
+    passed_value = _to_float(passed)
+    total_value = _to_float(total)
+    if passed_value is None or total_value is None or total_value <= 0:
+        return None
+    return passed_value / total_value
 
 
 def _to_float(value: Any) -> float | None:
