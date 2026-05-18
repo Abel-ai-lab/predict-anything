@@ -49,5 +49,5 @@ def _next_step_for_error(message: str) -> str:
     if "auth" in lowered or "api key" in lowered:
         return "Use `abel-auth`, then rerun the failed Abel Invest command."
     if "journal" in lowered:
-        return "Update research_journal.md with the missing ledger references, then rerun."
+        return "Update exploration_path.md with the missing ledger references, then rerun."
     return "Fix the reported issue, then rerun the command."

@@ -50,7 +50,6 @@ from abel_invest.narrative_core.strategy_artifact_upload import (
     upload_strategy_artifact_for_session,
 )
 from abel_invest.narrative_core.strategy_artifacts import export_selected_strategy_artifact
-from abel_invest.narrative_core.upload_transport import build_multipart_form_data
 from abel_invest.workspace_core.edge_runtime import resolve_runtime_auth_env_file
 from abel_invest.workspace_core.workspace import find_workspace_root
 
@@ -101,7 +100,7 @@ def post_skill_dashboard_session(
     if not normalized_api_key:
         raise RuntimeError("Missing Abel API key")
     del session_root
-    body = json.dumps(_session_upload_bundle(bundle), ensure_ascii=False).encode("utf-8")
+    body = json.dumps(bundle, ensure_ascii=False).encode("utf-8")
     content_type = "application/json"
     request = Request(
         f"{normalized_base_url}/web/skill-dashboard/sessions",
@@ -116,33 +115,6 @@ def post_skill_dashboard_session(
         detail = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"Skill dashboard session upload failed: HTTP {exc.code}: {detail}") from exc
     return json.loads(raw)
-
-
-def _primary_strategy_trade_log_path(bundle: dict, *, session_root: Path | None = None) -> Path | None:
-    payload = bundle.get("payload") if isinstance(bundle.get("payload"), dict) else {}
-    primary_strategy = (
-        payload.get("primaryStrategy") if isinstance(payload.get("primaryStrategy"), dict) else {}
-    )
-    trade_log = (
-        primary_strategy.get("backtestTradeLog")
-        if isinstance(primary_strategy.get("backtestTradeLog"), dict)
-        else {}
-    )
-    trade_log_ref = str(trade_log.get("tradeLogRef") or "").strip()
-    if not trade_log_ref:
-        return None
-    root = session_root.resolve() if session_root is not None else Path.cwd()
-    return root / trade_log_ref
-
-
-def _session_upload_bundle(bundle: dict) -> dict:
-    upload_bundle = dict(bundle)
-    payload = upload_bundle.get("payload")
-    if isinstance(payload, dict):
-        upload_payload = dict(payload)
-        upload_payload.pop("primaryStrategy", None)
-        upload_bundle["payload"] = upload_payload
-    return upload_bundle
 
 
 def upload_skill_dashboard_session(args: argparse.Namespace) -> int:

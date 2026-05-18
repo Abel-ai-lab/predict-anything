@@ -25,7 +25,7 @@ def test_dashboard_payload_requires_timezone_aware_iso() -> None:
         require_timezone_aware_iso("2026-05-01T00:00:00", field_name="endAt")
 
 
-def test_dashboard_payload_session_bundle_keeps_primary_strategy_null_without_pass(
+def test_dashboard_payload_session_bundle_omits_primary_strategy(
     tmp_path: Path,
 ) -> None:
     session = ni.init_session_dir("TSLA", "tsla-no-pass-dashboard", tmp_path / "research")
@@ -76,7 +76,7 @@ def test_dashboard_payload_session_bundle_keeps_primary_strategy_null_without_pa
         uploaded_at=(datetime.now(timezone.utc) + timedelta(days=1)).isoformat(),
     )
 
-    assert bundle["payload"]["primaryStrategy"] is None
+    assert "primaryStrategy" not in bundle["payload"]
     assert bundle["payload"]["session"]["id"] == "tsla-no-pass-dashboard"
     assert bundle["payload"]["rounds"][0]["branchId"] == "graph-fail"
 

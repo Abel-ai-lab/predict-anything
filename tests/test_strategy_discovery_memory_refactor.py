@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 import strategy_discovery_api as ni
 from abel_invest.narrative_core import promotion as promotion_helpers
-from abel_invest.narrative_core.dashboard_adapters.primary_strategy_selector import position_action
 
 
 def _candidate_result_payload() -> dict:
@@ -730,19 +729,12 @@ def test_build_skill_dashboard_session_bundle_aggregates_branches_and_rounds(tmp
     ]
 
 
-def test_build_skill_dashboard_session_bundle_selects_primary_strategy_from_results_tsv(
+def test_build_skill_dashboard_session_bundle_omits_primary_strategy_and_trade_log(
     tmp_path: Path,
 ) -> None:
-    session = ni.init_session_dir("TSLA", "tsla-primary-dashboard", tmp_path / "research")
-    branch_a = ni.init_branch_dir(session, "graph-v1")
-    branch_b = ni.init_branch_dir(session, "graph-v2")
-    branch_c = ni.init_branch_dir(session, "graph-v3")
-    for branch, round_id, score, pnl, lo_adj, sharpe in [
-        (branch_a, "round-001", "8/9", "90.0", "1.8", "1.4"),
-        (branch_b, "round-001", "9/9", "40.0", "1.2", "1.1"),
-        (branch_b, "round-002", "9/9", "55.0", "1.1", "1.0"),
-        (branch_c, "round-001", "9/9", "55.0", "1.3", "0.9"),
-    ]:
+    session = ni.init_session_dir("TSLA", "tsla-dashboard", tmp_path / "research")
+    branch = ni.init_branch_dir(session, "graph-v1")
+    for round_id in ["round-001", "round-002"]:
         result_ref = f"branches/{branch.name}/outputs/{round_id}-edge-result.json"
         report_ref = f"branches/{branch.name}/outputs/{round_id}-edge-validation.md"
         result_path = session / result_ref
@@ -779,14 +771,14 @@ def test_build_skill_dashboard_session_bundle_selects_primary_strategy_from_resu
                 "branch_id": branch.name,
                 "round_id": round_id,
                 "decision": "keep",
-                "lo_adj": lo_adj,
+                "lo_adj": "1.300",
                 "ic": "0.0500",
                 "omega": "1.700",
-                "sharpe": sharpe,
+                "sharpe": "1.400",
                 "max_dd": "-0.1000",
-                "pnl": pnl,
+                "pnl": "55.0",
                 "K": "3",
-                "score": score,
+                "score": "9/9",
                 "verdict": "PASS",
                 "mode": "explore",
                 "description": f"{branch.name} {round_id}",
@@ -816,108 +808,8 @@ def test_build_skill_dashboard_session_bundle_selects_primary_strategy_from_resu
         uploaded_at=(datetime.now(timezone.utc) + timedelta(days=1)).isoformat(),
     )
 
-    primary = bundle["payload"]["primaryStrategy"]
-    assert primary["branchId"] == "graph-v3"
-    assert primary["roundId"] == "round-001"
-    assert primary["selectionRule"] == "score_desc_total_return_desc_lo_adjusted_desc_sharpe_desc_latest_v1"
-    assert primary["metrics"]["score"] == "9/9"
-    assert primary["metrics"]["totalReturn"] == 0.55
-    assert primary["metrics"]["loAdjusted"] == 1.3
-    assert primary["metrics"]["positionIcStability"] == 0.6
-    assert primary["metrics"]["dsr"] == 0.99
-    assert primary["metrics"]["lossYears"] == 1
-    assert primary["latestDecision"] == {
-        "tradingDate": "2026-05-05",
-        "previousPosition": 0.75,
-        "currentPosition": 0.3,
-        "position": 0.3,
-        "nextPosition": 0.6,
-        "delta": -0.15,
-        "action": "reduce",
-        "close": 17.06,
-        "source": "abel_invest_edge_frame_csv",
-    }
-    assert primary["backtestTradeLog"] == {
-        "source": "abel_invest_trade_log_csv",
-        "tradeLogRef": "branches/graph-v3/outputs/round-001-trade-log.csv",
-    }
-    trade_log_path = session / primary["backtestTradeLog"]["tradeLogRef"]
-    assert trade_log_path.read_text(encoding="utf-8").splitlines() == [
-        "date,asset_return,pnl,position,source,decision_time,effective_time,next_position,gross_pnl,turnover,execution_cost,cum_return",
-        "2026-05-04,,0.01,0.75,backfill,,,0.30,,,,0.010000000000000009",
-        "2026-05-05,,0.02,0.30,backfill,,,0.60,,,,0.030200000000000005",
-    ]
-
-
-def test_primary_strategy_position_action_maps_previous_to_next_position() -> None:
-    assert position_action(0, 0.3) == "buy/open_long"
-    assert position_action(0.3, 0) == "sell/close"
-    assert position_action(0.3, 0.6) == "increase"
-    assert position_action(0.75, 0.6) == "reduce"
-    assert position_action(0.3, 0.3) == "hold"
-
-
-def test_primary_strategy_selector_uses_only_recorded_kept_pass_rounds(tmp_path: Path) -> None:
-    session = ni.init_session_dir("TSLA", "tsla-primary-filter-dashboard", tmp_path / "research")
-    kept_branch = ni.init_branch_dir(session, "kept-branch")
-    discarded_branch = ni.init_branch_dir(session, "discarded-branch")
-    unrecorded_branch = ni.init_branch_dir(session, "unrecorded-branch")
-    rows = [
-        (kept_branch, "round-001", "keep", "PASS", "9/9", "20.0", True),
-        (discarded_branch, "round-001", "discard", "PASS", "9/9", "90.0", True),
-        (unrecorded_branch, "round-001", "keep", "PASS", "9/9", "95.0", False),
-    ]
-    for branch, round_id, decision, verdict, score, pnl, recorded in rows:
-        result_ref = f"branches/{branch.name}/outputs/{round_id}-edge-result.json"
-        ni.append_tsv_row(
-            branch / "results.tsv",
-            ni.RESULTS_HEADER,
-            {
-                "exp_id": session.name,
-                "ticker": "TSLA",
-                "branch_id": branch.name,
-                "round_id": round_id,
-                "decision": decision,
-                "lo_adj": "1.000",
-                "ic": "0.0100",
-                "omega": "1.100",
-                "sharpe": "1.000",
-                "max_dd": "-0.1000",
-                "pnl": pnl,
-                "K": "3",
-                "score": score,
-                "verdict": verdict,
-                "mode": "explore",
-                "description": f"{branch.name} {round_id}",
-                "result_path": result_ref,
-                "report_path": f"branches/{branch.name}/outputs/{round_id}-edge-validation.md",
-                "handoff_path": f"branches/{branch.name}/outputs/{round_id}-edge-handoff.json",
-            },
-        )
-        if recorded:
-            ni.append_tsv_row(
-                session / "events.tsv",
-                ni.EVENTS_HEADER,
-                {
-                    "timestamp": "2026-04-24T01:20:00+00:00",
-                    "event": "round_recorded",
-                    "branch_id": branch.name,
-                    "round_id": round_id,
-                    "mode": "explore",
-                    "verdict": verdict,
-                    "decision": decision,
-                    "description": f"{branch.name} {round_id}",
-                    "artifact_path": result_ref,
-                },
-            )
-
-    bundle = ni.build_skill_dashboard_session_bundle(
-        session,
-        uploaded_at=(datetime.now(timezone.utc) + timedelta(days=1)).isoformat(),
-    )
-
-    assert bundle["payload"]["primaryStrategy"]["branchId"] == "kept-branch"
-    assert bundle["payload"]["primaryStrategy"]["metrics"]["totalReturn"] == 0.2
+    assert "primaryStrategy" not in bundle["payload"]
+    assert not list(session.glob("branches/*/outputs/*-trade-log.csv"))
 
 
 def test_post_skill_dashboard_bundle_sends_api_key_header() -> None:
@@ -982,56 +874,6 @@ def test_post_skill_dashboard_session_sends_to_session_endpoint() -> None:
     assert request.get_header("Api-key") == "secret-key"
     assert request.get_header("Content-type") == "application/json"
     assert timeout == 60
-
-
-def test_post_skill_dashboard_session_sends_json_when_trade_log_exists(tmp_path: Path) -> None:
-    calls = []
-    trade_log = tmp_path / "branches" / "b1" / "outputs" / "round-001-trade-log.csv"
-    trade_log.parent.mkdir(parents=True)
-    trade_log.write_text("date,pnl,cum_return\n2026-05-05,0.1,0.1\n", encoding="utf-8")
-
-    class _Response:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-        def read(self):
-            return b'{"code": 200, "data": {"sessionId": "s1"}}'
-
-    def fake_opener(request, timeout):
-        calls.append((request, timeout))
-        return _Response()
-
-    result = ni.post_skill_dashboard_session(
-        base_url="https://router.example",
-        api_key="secret-key",
-        bundle={
-            "sessionId": "s1",
-            "payload": {
-                "session": {},
-                "branches": [],
-                "rounds": [],
-                "primaryStrategy": {
-                    "backtestTradeLog": {
-                        "tradeLogRef": "branches/b1/outputs/round-001-trade-log.csv"
-                    }
-                },
-            },
-        },
-        session_root=tmp_path,
-        opener=fake_opener,
-    )
-
-    request, _timeout = calls[0]
-    body = request.data
-    assert result["data"]["sessionId"] == "s1"
-    assert request.get_header("Content-type") == "application/json"
-    uploaded = json.loads(body.decode("utf-8"))
-    assert uploaded["sessionId"] == "s1"
-    assert "primaryStrategy" not in uploaded["payload"]
-    assert b"date,pnl,cum_return" not in body
 
 
 def test_select_best_pass_strategy_sorts_validation_rounds_by_pass_rate_first(

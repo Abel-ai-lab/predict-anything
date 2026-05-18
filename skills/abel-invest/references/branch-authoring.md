@@ -214,7 +214,7 @@ Before writing strategy logic, be able to state:
 
 If a branch was chosen because it ranked best in a local metric scan, it is not
 a clean standard-discovery candidate. Declare the search width with
-`--selection-trials`, journal the scout influence, and return to
+`--selection-trials`, record the scout influence in `exploration_path.md`, and return to
 graph/mechanism-led branch selection for the next standard round.
 
 ## What To Do

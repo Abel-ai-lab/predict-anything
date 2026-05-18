@@ -261,8 +261,9 @@ abel-invest doctor
 
 Sessions belong under this workspace's `research/` directory unless you
 intentionally use `--root` with `--allow-outside-workspace` for offline or legacy
-work. After each recorded round, update `research_journal.md` with the new ledger
-reference before running another recorded round.
+work. After each recorded round, update `exploration_path.md` with the chosen
+path, why, Edge feedback, and ledger reference before running another recorded
+round.
 """
 
 
@@ -280,7 +281,7 @@ Report to the user:
 - the next action you will run or the one blocker that needs user input
 
 Do not treat `branch.yaml` as evidence. Prepare and debug branch inputs before a
-recorded round, and update `research_journal.md` after every recorded round.
+recorded round, and update `exploration_path.md` after every recorded round.
 """
 
 

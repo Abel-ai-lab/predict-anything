@@ -61,8 +61,8 @@ substitute for Edge validation.
 Use one narrative scout pass when the next research decision is ambiguous
 between mechanism-deepening, graph expansion, or stopping. This is most useful
 when graph nodes are hard to interpret, the current neighborhood lacks a clear
-industry or supply-demand mechanism, or the journal cannot state what sign,
-lag, regime, interaction, control, or risk-shaping question remains. If Abel Ask
+industry or supply-demand mechanism, or `exploration_path.md` cannot state what
+sign, lag, regime, interaction, control, or risk-shaping question remains. If Abel Ask
 is unavailable, off-target, or weak, record that plainly and continue with the
 best graph/frontier evidence; do not launder narrative text into validation
 evidence.

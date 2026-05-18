@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 
 from abel_invest.narrative_core.contracts.branch_spec import has_explicit_hypothesis
 from abel_invest.narrative_core.contracts.constants import (
@@ -42,7 +41,6 @@ from abel_invest.narrative_core.state import (
 
 
 def handle_init_session(args: argparse.Namespace) -> int:
-    mode = resolve_session_mode(getattr(args, "mode", None))
     session = init_session_dir(
         args.ticker,
         args.exp_id,
@@ -53,13 +51,11 @@ def handle_init_session(args: argparse.Namespace) -> int:
         discover=args.discover,
         discover_limit=args.discover_limit,
         backtest_start=args.backtest_start,
-        mode=mode,
     )
     discovery = load_discovery(session)
     readiness = load_readiness(session)
     print(f"Created Abel strategy discovery session at {session}")
     print(f"  ticker: {discovery.get('ticker', args.ticker.upper())}")
-    print(f"  mode: {mode}")
     print(f"  graph_frontier: {session / GRAPH_FRONTIER_FILENAME}")
     print(f"  exploration_path: {session / EXPLORATION_PATH_FILENAME}")
     print(f"  events: {session / 'events.tsv'}")
@@ -85,12 +81,6 @@ def handle_init_session(args: argparse.Namespace) -> int:
     for line in render_breadth_first_start_lines(session):
         print(f"  {line}")
     return 0
-
-
-def resolve_session_mode(raw_mode: str | None) -> str:
-    mode = str(raw_mode or os.environ.get("ABEL_EXPERIMENT_MODE") or "standard").strip().lower()
-    return "grandma" if mode == "grandma" else "standard"
-
 
 def handle_set_backtest_start(args: argparse.Namespace) -> int:
     session = resolve_workspace_arg_path(args.session)

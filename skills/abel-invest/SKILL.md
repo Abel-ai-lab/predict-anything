@@ -1,6 +1,6 @@
 ---
 name: abel-invest
-version: 3.5.3
+version: 3.5.2
 description: >
   Use when the user wants Abel strategy discovery, candidate screening,
   graph-grounded trading research, or continuing/preparing/debugging an Abel
@@ -48,8 +48,6 @@ Always start by resolving workspace state before strategy work.
   read `references/workspace-bootstrap.md`.
 - New session, normal round loop, or resuming a session:
   read `references/experiment-loop.md`.
-- Grandma mode, simple-return screening, or conservative no-leverage exploration:
-  read `references/grandma-mode.md`.
 - Live graph discovery, graph frontier expansion, or graph-first reasoning:
   read `references/discovery-protocol.md`.
 - Creating or revising `branch.yaml`, reviewing evidence labels,
@@ -141,10 +139,6 @@ Research discipline:
   When graph-node reads are inferred from asset reads, preserve that source as a
   fact rather than overstating edge-native field-level proof.
 - The framework defines evidence validity. The agent owns the strategy thinking.
-- In grandma mode, prefer simple target-only or low-complexity branches, keep
-  executed exposure unlevered, and judge candidates by simple return plus
-  `pnl_to_maxdd` evidence from the `grandma_daily` profile.
-
 Visualization and promotion:
 
 - Do not create or refresh an online session view automatically.

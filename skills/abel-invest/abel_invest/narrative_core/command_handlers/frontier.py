@@ -63,7 +63,7 @@ def handle_frontier_command(args: argparse.Namespace) -> int:
         print("")
         print("From here:")
         print(f"  review graph_frontier.json under {session}")
-        print(f"  update research_journal.md if this expansion changes the next branch choice")
+        print(f"  update exploration_path.md if this expansion changes the next branch choice")
         print(f"  create or revise branch.yaml only after naming the frontier question this expansion answered")
         return 0
     raise RuntimeError(f"Unknown frontier command: {args.frontier_command}")

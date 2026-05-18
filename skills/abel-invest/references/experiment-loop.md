@@ -137,7 +137,7 @@ accounting facts for review. Workflow blockers preserve Alpha's declared count
 but use `edge_k_source=not_available` because no Edge K was returned.
 
 If performance scouting happened during standard discovery, declare the
-effective search width, journal what happened, treat the result as
+effective search width, record what happened in `exploration_path.md`, treat the result as
 scout-informed or optimization-informed rather than clean standard-discovery
 evidence, and return to graph/mechanism-led branch selection.
 
@@ -221,5 +221,5 @@ the default URL in the skill code if this endpoint changes.
   points, but Edge evidence decides
   whether the branch worked
 
-If repeated variants fail in the same neighborhood, use the frontier and journal
-to make that concentration explicit before continuing.
+If repeated variants fail in the same neighborhood, use the frontier and
+`exploration_path.md` to make that concentration explicit before continuing.

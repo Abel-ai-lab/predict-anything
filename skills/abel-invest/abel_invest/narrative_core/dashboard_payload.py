@@ -18,9 +18,6 @@ from abel_invest.narrative_core.contracts.constants import (
     EXPLORATION_PATH_FILENAME,
     FRONTIER_JSON_FILENAME,
 )
-from abel_invest.narrative_core.dashboard_adapters.primary_strategy_selector import (
-    select_primary_strategy,
-)
 from abel_invest.narrative_core.evidence.evidence import (
     build_evidence_ledger,
     load_json_object,
@@ -156,13 +153,7 @@ def build_skill_dashboard_session_bundle(
         skill_dashboard_branch_payload(branch, discovery=discovery, ledger=ledger)
         for branch in branches
     ]
-    round_order = session_round_order(events)
     rounds = indexed_skill_dashboard_rounds(branches, events, ledger)
-    primary_strategy = select_primary_strategy(
-        session=session,
-        branches=branches,
-        session_round_indexes=round_order,
-    )
     return {
         "sessionId": session.name,
         "startAt": start_at,
@@ -178,7 +169,6 @@ def build_skill_dashboard_session_bundle(
             },
             "branches": branch_payloads,
             "rounds": rounds,
-            "primaryStrategy": primary_strategy,
             "explorationMap": build_skill_dashboard_exploration_map(
                 discovery=discovery,
                 branches=branch_payloads,
