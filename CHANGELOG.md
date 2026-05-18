@@ -4,6 +4,20 @@ All notable changes to `causal-abel` will be documented in this file.
 
 This project follows a repo-level release log so agents can summarize user-visible changes across GitHub and ClawHub-facing revisions.
 
+## [1.4.1] - 2026-05-18
+
+### Added
+
+- Added Abel Invest grandma-mode routing guidance, branch defaults, and tests for conservative `grandma_daily` screening.
+
+### Changed
+
+- Removed the Abel Edge `<0.9.0` upper bound from Abel Invest while keeping the `>=0.8.5` minimum.
+
+### Fixed
+
+- Preserved existing grandma-mode session state when `init-session` is rerun without an explicit `--mode`.
+
 ## [1.4.0] - 2026-05-18
 
 ### Added
