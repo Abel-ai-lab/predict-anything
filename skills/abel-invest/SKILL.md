@@ -68,6 +68,9 @@ Always start by resolving workspace state before strategy work.
 - A hard Sharpe / MaxDD / PnL target is set:
   read `references/guarded-optimization.md` (self-contained gauntlet-gated
   optimization). Core path — not optional — when a performance bar is set.
+- Always-on temperament; tempted to hand-design first, or about to write
+  "exhausted / ceiling / no edge":
+  read `references/scaling-discipline.md`. Core path — not optional.
 
 ## Operating Rules
 
@@ -177,3 +180,13 @@ Always start by resolving workspace state before strategy work.
     router URL unless they are intentionally testing another router.
 27. The framework defines evidence validity. The agent owns the strategy
     thinking.
+28. Data-driven entry is mandatory, not advice: the first recorded candidate
+    round is a machine feature factory over the multi-hop frontier fed to a
+    heterogeneous diversity-gated ensemble. Hand-designed single-mechanism
+    rounds are diagnostics, never the baseline. See
+    `references/scaling-discipline.md`.
+29. Exhaustion is ledger-proven, never asserted. Do not write
+    "exhausted / ceiling / no untested mechanism" unless the ledger shows,
+    K-accounted: machine factory, >=1 unsupervised denoise, heterogeneous
+    ensemble, and multi-hop frontier. A green per-candidate gauntlet does not
+    certify search exhaustiveness. See `references/scaling-discipline.md`.
