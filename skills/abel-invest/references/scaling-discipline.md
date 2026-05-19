@@ -61,6 +61,11 @@ abelian / external skill.
   less to protect K" — it is: run the mandatory data-driven entry, account K
   per-round honestly, and let the gauntlet reject weak Sharpe. Force the loop;
   trust the gate.
+- **Final-K revalidation before any reported optimum.** K only grows; early
+  survivors were gated at a smaller mid-campaign K and stored-metric ranking
+  (`select_best_pass_strategy`) does NOT re-deflate them. The chosen argmax
+  survivor is provisional until re-replayed and re-gated at the FINAL total
+  campaign K. Never report a candidate validated only at a stale smaller K.
 - **Autoresearch is NOT round-limited.** There is no round cap, round budget,
   or "stop after N rounds / 1-2 tries". Keep iterating data-driven mechanisms
   for as long as untested high-quality directions remain. The ONLY stops are:

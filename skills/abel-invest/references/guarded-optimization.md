@@ -47,8 +47,17 @@ Fail any → disqualified regardless of objective value.
    variant into a later round's per-round `--selection-trials` (else true
    search width is undercounted). Honest-K cuts both ways: never double-count
    (cumulative), never drop (preflight ERRORs).
-6. Select `argmax(single objective)` over PASS survivors.
-7. Journal: search width, K, gauntlet outcomes, selected optimum.
+6. Select `argmax(single objective)` over PASS survivors — PROVISIONAL only.
+7. **Final-K revalidation (mandatory before reporting an optimum).** Early
+   survivors were DSR-validated at a smaller mid-campaign K; the framework
+   never retro-deflates prior rows, and `select_best_pass_strategy` ranks
+   stored metrics WITHOUT recomputing the gate. So re-replay the argmax
+   survivor at the FINAL total campaign K and re-run the full gauntlet. If it
+   no longer clears DSR/the gate at final K, it is NOT the optimum — drop it
+   and revalidate the next survivor. Never report a campaign optimum that was
+   only validated at a stale (smaller) K.
+8. Journal: search width, K, gauntlet outcomes, the final-K revalidation, the
+   selected optimum.
 
 ## K rule
 
@@ -62,10 +71,12 @@ are under-counting this round AND passing a campaign-cumulative value.
 
 ## Honest outcomes
 
-- A gauntlet-surviving optimum meets the target → report it.
-- None clears the gauntlet after a genuine K-accounted causal-bounded
-  search → report that null honestly. Not "didn't try"; never an un-gated
-  high metric relabeled as success.
+- A survivor that clears the gauntlet **at the FINAL total campaign K**
+  (step 7 revalidation) meets the target → report it. A PASS validated only
+  at a smaller mid-campaign K is NOT a valid optimum.
+- None clears the gauntlet at final K after a genuine K-accounted causal-
+  bounded search → report that null honestly. Not "didn't try"; never an
+  un-gated high metric relabeled as success.
 
 ## Anti-patterns
 
@@ -74,4 +85,6 @@ are under-counting this round AND passing a campaign-cumulative value.
 - Under-counting `--selection-trials`.
 - Mismatched or multi-objective-diluted scorer.
 - Declining the search when a hard target was set.
+- Reporting an argmax survivor without final-K revalidation (stored PASS
+  metrics are not re-deflated at the larger final K — step 7 is mandatory).
 - Any external-skill dependency.
