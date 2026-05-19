@@ -186,12 +186,16 @@ Always start by resolving workspace state before strategy work.
 27. The framework defines evidence validity. The agent owns the strategy
     thinking.
 28. Data-driven entry is mandatory, not advice: the first recorded candidate
-    round is a machine feature factory over the multi-hop frontier fed to a
-    heterogeneous diversity-gated ensemble. Hand-designed single-mechanism
-    rounds are diagnostics, never the baseline. See
+    round is a machine feature factory over the FULL directly-discovered
+    depth-1 frontier (parents + blanket + children — already a multi-node
+    causal set), fed to a heterogeneous diversity-gated ensemble. Do NOT
+    require 2-hop on the first round (depth-2 needs an evidence-gated
+    `frontier expand` per `references/discovery-protocol.md`). Hand-designed
+    single-mechanism rounds are diagnostics, never the baseline. See
     `references/scaling-discipline.md`.
 29. Exhaustion is ledger-proven, never asserted. Do not write
     "exhausted / ceiling / no untested mechanism" unless the ledger shows,
     K-accounted: machine factory, >=1 unsupervised denoise, heterogeneous
-    ensemble, and multi-hop frontier. A green per-candidate gauntlet does not
-    certify search exhaustiveness. See `references/scaling-discipline.md`.
+    ensemble, and the full discovered frontier (>=3 nodes; 2-hop only if it
+    was evidence-expanded). A green per-candidate gauntlet does not certify
+    search exhaustiveness. See `references/scaling-discipline.md`.

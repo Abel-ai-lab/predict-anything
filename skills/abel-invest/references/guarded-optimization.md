@@ -36,9 +36,11 @@ Fail any → disqualified regardless of objective value.
 3. Seed configs from `data-driven-construction.md` (feature factory +
    ensemble) and `proven-patterns.md`.
 4. Per config: `init-branch` → `prepare-branch` →
-   `run-branch --selection-trials <THIS config/round's search width only —
-   NOT a running total; the framework accumulates campaign K from prior
-   rounds itself (see K rule)>`.
+   `abel-invest run-branch --branch <branch-path> -d "<change description>"
+   --selection-trials <N>` where **`--branch` and `-d/--description` are
+   REQUIRED** (CLI errors at arg-parse without them, recording nothing) and
+   `N` = THIS config/round's search width ONLY — NOT a running total; the
+   framework accumulates campaign K from prior rounds itself (see K rule).
 5. Discard non-gauntlet-PASS candidates. A gauntlet-EVALUATED FAIL (verdict
    PASS/FAIL) is auto-counted by the framework in future K. But a config
    disqualified BEFORE Edge validation (semantic-preflight / workflow-blocker
