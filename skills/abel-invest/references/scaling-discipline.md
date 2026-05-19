@@ -27,12 +27,18 @@ abelian / external skill.
 
 ## Honest-K is the scaling law's governor
 
-- `--selection-trials` is the running campaign total of EVERY variant: each
-  model family, HPO trial, denoise variant, feature-set. Monotone, never
-  resets.
-- DSR deflates as K grows. Therefore: on a real edge the breakthrough lands
-  in **1-2 rounds**; if many rounds are needed, the edge is absent and more
-  search is **negative-EV** (K rises faster than Sharpe). State this up front.
+- `--selection-trials` = THIS round's search width ONLY (model families ×
+  HPO trials × denoise variants × feature-sets tried *in this round*). The
+  framework accumulates the campaign total itself
+  (`build_dsr_trials_context`: `K = Σ prior rounds' current_round_trials +
+  this round`). Passing a running/cumulative total DOUBLE-COUNTS prior rounds
+  and corrupts DSR — the cardinal K error. Per-round width, never cumulative.
+- DSR deflates as the framework-accumulated campaign K grows. Therefore: on a
+  real edge the breakthrough lands in **1-2 rounds**; if many rounds are
+  needed, the edge is absent and more search is **negative-EV** (K rises
+  faster than Sharpe). State this up front. (Caveat: this dynamic is only
+  trustworthy with correct per-round K accounting — a cumulative-pass bug
+  inflates K and can falsely manufacture the "self-defeat" signal.)
 - Strong edge → scaling holds (force the loop hard). Weak/absent edge →
   scaling self-defeats (the gate correctly refuses to manufacture alpha).
   Do not mistake "more compute" for "more alpha".

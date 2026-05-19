@@ -43,8 +43,13 @@ Fail any → disqualified regardless of objective value.
 
 ## K rule
 
-`--selection-trials N` = running total of EVERY variant tried, not the winner.
-Mandatory for any search width. Under-counting K is the cardinal violation.
+`--selection-trials N` = THIS round's search width only (every variant tried
+*this round*, not the winner). The framework accumulates the campaign total
+itself (`build_dsr_trials_context`: campaign K = Σ each prior round's
+recorded `current_round_trials` + this round). Pass the per-round count, NEVER
+a running/cumulative total — passing a cumulative total double-counts prior
+rounds and corrupts DSR. Mandatory for any search width; the cardinal errors
+are under-counting this round AND passing a campaign-cumulative value.
 
 ## Honest outcomes
 
