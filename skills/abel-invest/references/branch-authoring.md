@@ -122,24 +122,10 @@ Broad exploration means a new input hypothesis, mechanism family, model family,
 complexity class, or expansion probe. Local refinement means parameter, sizing,
 threshold, filter, window, or implementation work inside the same family.
 
-The default priority is graph breadth first, strategy variants second, and
-parameters last. Graph breadth still needs a frontier question: expand
-`graph_frontier.json` when current evidence leaves a causal motif or anchor
-question unresolved, not just because a branch failed. Target-only controls are
-useful contrast evidence, but they do not cover graph-supported candidate input
-breadth when live graph candidates exist.
-
-Graph breadth should not outrun mechanism depth. Before moving to a more
-distant frontier, ask whether the current graph neighborhood still has an
-unresolved sign, lag, regime, interaction, control, or risk-shaping question. A
-deeper mechanism branch is appropriate when the added complexity answers that
-question instead of tuning toward a metric target.
-
-CAP graph nodes are model-supported causal priors. Trust that they carry
-target-relevant information, but do not infer disclosed weight, exact lag,
-signed effect, or tradable direction from the role alone. Parent and child roles
-disclose causal-flow orientation; Abel Invest's `blanket` role is a
-Markov-blanket discovery bucket, not a fixed causal-flow direction.
+`discovery-protocol.md` owns graph priority, CAP role interpretation, and
+frontier expansion rules. Branch authoring applies that protocol by making the
+round shape explicit and preserving whether the change is broad exploration or
+local refinement.
 
 ## Exploration Path
 

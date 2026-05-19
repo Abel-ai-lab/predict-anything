@@ -13,6 +13,9 @@ search next?
 
 It does not define the branch runtime by itself. Frontier expansion widens the
 candidate node pool through CAP without pretending to pre-solve the strategy.
+This reference owns CAP role interpretation, frontier expansion, graph priority,
+and narrative scout rules; other references should link here instead of
+restating those details.
 
 Live graph discovery is the normal session opening:
 

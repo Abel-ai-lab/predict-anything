@@ -26,22 +26,10 @@ signals can still be useful, but they enter as supplements or controls unless
 the branch declares and validates a stronger claim.
 
 CAP graph nodes are model-supported causal priors, not trading instructions.
-Trust that they carry target-relevant information, but do not infer disclosed
-weight, exact lag, signed effect, or tradable direction from the role alone.
-Parent and child roles disclose causal-flow orientation; Abel Invest's
-`blanket` role is a Markov-blanket discovery bucket, not a fixed causal-flow
-direction.
-
-Graph-first means using the graph to form input and mechanism hypotheses. Expand
-the graph when a frontier question remains after reading current evidence. Do
-not expand just because a few branches failed or because a local metric scan
-found one attractive node.
-
-Graph breadth should not outrun mechanism depth. Before widening to a more
-distant frontier, ask whether the current graph neighborhood still has an
-unresolved sign, lag, regime, interaction, control, or risk-shaping question. A
-mechanism-deepening branch is preferable when it can answer one of those
-questions without becoming parameter search.
+`discovery-protocol.md` owns CAP role interpretation, frontier expansion, and
+mechanism-depth-before-breadth rules. The methodological point is simpler:
+graph-first means using the graph to form input and mechanism hypotheses, not to
+prescribe a strategy or justify metric-chasing expansion.
 
 **Mechanism seeds; the gauntlet gates; optimization is first-class.**
 Graph and mechanism priors seed candidates. That is what keeps the search
@@ -72,16 +60,8 @@ skill.
 Abel Ask and narrative context can generate mechanism hypotheses, supplement
 driver ideas, and graph expansion questions. Treat them as domain-context scout
 work: stronger than free association, weaker than CAP graph facts, and never a
-substitute for Edge validation.
-
-Use one narrative scout pass when the next research decision is ambiguous
-between mechanism-deepening, graph expansion, or stopping. This is most useful
-when graph nodes are hard to interpret, the current neighborhood lacks a clear
-industry or supply-demand mechanism, or `exploration_path.md` cannot state what
-sign, lag, regime, interaction, control, or risk-shaping question remains. If Abel Ask
-is unavailable, off-target, or weak, record that plainly and continue with the
-best graph/frontier evidence; do not launder narrative text into validation
-evidence.
+substitute for Edge validation. `discovery-protocol.md` owns the scout trigger
+and workflow details.
 
 **Evidence labels are not strategy advice.**
 Candidate/control/diagnostic/blocker labels say what kind of research evidence a

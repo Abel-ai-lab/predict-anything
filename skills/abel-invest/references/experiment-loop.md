@@ -124,25 +124,12 @@ Session `backtest_start` is the default exploration target. When
 prepare/debug/run for the branch.
 
 `run-branch` writes `validation_context.dsr_trials.count` into the Alpha context
-passed to `abel-edge evaluate`. The count is effective exploration trials:
-prior PASS/FAIL rounds contribute their recorded trial count, and the current
-round defaults to `1`. If accidental search width or explicitly requested
-optimization selected one submitted strategy from a parameter, threshold,
-filter, sizing, driver, asset, or window sweep, pass `--selection-trials N` so
-DSR reflects the Alpha search width instead of only the final `engine.py` shape.
-`N` is this round's width only, never a running/cumulative campaign total; the
-framework accumulates prior PASS/FAIL rounds itself. `--selection-trials` is the
-honest K-accounting that makes guarded optimization legitimate: always pass it
-for any search width so DSR deflates by the true number of variants tried.
-Each edge result also appends a session-level `dsr_trials.jsonl` audit row.
-Recorded PASS/FAIL validation rounds count toward future DSR; debug runs,
-semantic errors, and workflow blockers are recorded for audit but do not increase
-future DSR count. Round notes and `evidence_ledger.json` expose the same K
-accounting facts for review. Workflow blockers preserve Alpha's declared count
-but use `edge_k_source=not_available` because no Edge K was returned. If a
-semantic preflight or workflow ERROR represents a real attempted variant, fold it
-into a later recorded round's per-round `--selection-trials`; otherwise it is
-audited but not counted for future DSR.
+passed to `abel-edge evaluate`. The current round defaults to `1`. If a
+performance scout, sweep, or optimization selected one submitted strategy from
+multiple variants, pass `--selection-trials N`, where `N` is this round's width
+only, never a running campaign total. `guarded-optimization.md` owns the full K
+accounting rules, including PASS/FAIL accumulation, preflight/workflow ERROR
+folding, and final-K revalidation.
 
 If performance scouting happened during standard discovery, declare the
 effective search width, record what happened in `exploration_path.md`, treat the result as
@@ -190,13 +177,9 @@ proxy, threshold, model family, or mechanism to try next.
 
 Abel Ask or narrative context can help form mechanism hypotheses, supplement
 driver ideas, and frontier questions. It is scout context, not validation
-evidence. If narrative results are off-target or weak, record that plainly and
-do not launder them into branch evidence.
-
-Use a lightweight narrative scout pass when the agent cannot yet decide whether
-to deepen the current mechanism, expand the graph, or stop. This is not a new
-mandatory gate: skip or stop the scout when Abel Ask auth is unavailable, the
-current evidence already answers the question, or the result drifts off target.
+evidence. `discovery-protocol.md` owns when and how to run narrative scout work;
+record unavailable, weak, off-target, or skipped scout context plainly in
+`exploration_path.md`.
 
 ## Session Visualization
 
@@ -233,19 +216,12 @@ the default URL in the skill code if this endpoint changes.
 
 ## Exploration Discipline
 
-- graph context comes before strategy variants
-- strategy variants come second
-- parameter tuning comes last
-- multiple branches on one graph input set can still be graph-breadth narrow
-- local refinement is useful only while it is still learning something
-- mechanism depth should usually precede distant graph expansion when the
-  current neighborhood still has a sign, lag, regime, interaction, control, or
-  risk-shaping question
-- graph expansion needs a frontier question and enough current-frontier evidence
-  to justify widening the node universe
-- narrative scout should be used at ambiguous deepen/expand/stop decision
-  points, but Edge evidence decides
-  whether the branch worked
+`discovery-protocol.md` owns graph priority, CAP role interpretation, frontier
+expansion, and narrative scout rules. In the round loop, preserve the core shape:
+graph context before strategy variants, strategy variants before parameter
+tuning, and local refinement only while it is still learning something.
+
+Multiple branches on one graph input set can still be graph-breadth narrow.
 
 If repeated variants fail in the same neighborhood, use the frontier and
 `exploration_path.md` to make that concentration explicit before continuing.
