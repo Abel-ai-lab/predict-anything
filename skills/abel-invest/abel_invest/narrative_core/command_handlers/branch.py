@@ -80,7 +80,6 @@ from abel_invest.narrative_core.session_lifecycle import (
     resolve_workspace_arg_path,
 )
 from abel_invest.narrative_core.rendering.session_rendering import (
-    graph_priority_warning_lines,
     path_coverage_missing_rounds,
     path_coverage_warning_lines,
     render_section,
@@ -102,8 +101,8 @@ from abel_invest.narrative_core.state import (
 
 SELECTION_TRIALS_AUDIT_WARNING = (
     "Selection-trials audit: --selection-trials records accidental or explicitly requested "
-    "search width for DSR accounting; it does not make sweep-selected candidates part of "
-    "standard discovery. Record the branch basis and any scout or optimization influence "
+    "search width for DSR accounting; it does not by itself validate raw sweep winners. "
+    "Record the branch basis and any scout or optimization influence "
     f"in {EXPLORATION_PATH_FILENAME} before continuing."
 )
 
@@ -334,7 +333,7 @@ def run_branch_round(args: argparse.Namespace) -> int:
         print(
             "Exploration path entry required before next recorded round: "
             f"missing_path_rounds={', '.join(blocking_missing_path)}. "
-            f"Update {EXPLORATION_PATH_FILENAME} with path, why, Edge feedback, and ledger refs for each missing round.",
+            f"Update {EXPLORATION_PATH_FILENAME} with ledger refs, chosen path, compact reason, Edge feedback, and artifact refs for each missing round.",
             file=sys.stderr,
         )
         return 2
@@ -508,9 +507,9 @@ def run_branch_round(args: argparse.Namespace) -> int:
             emit_missing_hypothesis_warning = should_emit_missing_hypothesis_warning(branch)
     if emit_missing_hypothesis_warning:
         print(
-            "Warning: recording a round without an explicit hypothesis. "
-            "State the causal claim, graph use contract when applicable, expected sign/timing assumption, "
-            "and invalidation condition before the next round.",
+            "Warning: recording a round without explicit candidate metadata. "
+            "Before the next round, make objective, selected inputs, search width, and validation scope clear; "
+            "add graph attribution only when claiming graph-derived contribution.",
             file=sys.stderr,
         )
     decision = alpha_decision(rows, result, session=session)
@@ -610,8 +609,6 @@ def run_branch_round(args: argparse.Namespace) -> int:
             changed_dimensions=getattr(args, "changed_dimension", []),
         )
         render_session(session)
-    for line in graph_priority_warning_lines(session):
-        print(f"Exploration protocol: {line}")
     for line in path_coverage_warning_lines(session):
         print(f"Exploration path required: {line}")
     print(f"Alpha context: {context_path.relative_to(session)}")
@@ -766,6 +763,6 @@ def debug_branch_run(args: argparse.Namespace) -> int:
         print("  inspect the debug output and fix the engine or prepared inputs before recording a round")
         print(f"  abel-invest debug-branch --branch {branch}")
     else:
-        print("  confirm branch.yaml has an explicit hypothesis, mechanism, and invalidation condition")
+        print("  confirm branch.yaml has objective, selected inputs, search width when applicable, and validation scope")
         print(f"  abel-invest run-branch --branch {branch} -d \"<round-description>\"")
     return completed.returncode

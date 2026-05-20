@@ -368,7 +368,7 @@ def build_default_branch_spec(
     grandma_mode = str(session_mode or "").strip().lower() == "grandma"
     if grandma_mode:
         selected_nodes = []
-    graph_first = bool(selected_nodes)
+    graph_enriched = bool(selected_nodes)
     spec = {
         "version": 2,
         "branch_id": branch.name,
@@ -379,7 +379,7 @@ def build_default_branch_spec(
         ),
         "hypothesis": "",
         "evidence_intent": "draft",
-        "input_claim": "graph_supported" if graph_first else "target_only",
+        "input_claim": "graph_supported" if graph_enriched else "target_only",
         "mechanism_family": "unspecified",
         "invalidation_condition": "",
         "model_family": "unspecified",
@@ -634,17 +634,17 @@ def build_context_guide_markdown(
         "- use `ctx.points()` when you need path-sensitive cross-calendar logic",
         "",
         "## Declaration Fields",
-        "- `hypothesis`: concrete claim being tested",
+        "- `hypothesis`: compact candidate claim or search objective",
         "- `evidence_intent`: candidate, control, diagnostic, or draft",
         "- `input_claim`: graph_supported, target_only, supplement, or mixed",
-        "- graph-supported branches should state selected nodes, construction, intended role, unresolved assumption, and falsification scope",
-        "- `mechanism_family`: factual mechanism label",
-        "- `invalidation_condition`: what would weaken the claim",
+        "- graph-attribution claims should state selected nodes, construction, intended role, unresolved assumption, and falsification scope",
+        "- `mechanism_family`: factual mechanism label when known",
+        "- `invalidation_condition`: what would weaken the claim or candidate path",
         "",
         "## Protocol Checklist",
         "1. Inspect `probe_samples.json` and `data_manifest.json`.",
         "2. Edit `engine.py` against `DecisionContext`.",
         "3. Run debug-branch with the workspace command prefix first to read semantic preflight.",
-        "4. Only record a round after the branch expresses a real mechanism.",
+        "4. Record a round after runtime inputs, objective, search width, and validation scope are clear.",
     ]
     return "\n".join(lines) + "\n"

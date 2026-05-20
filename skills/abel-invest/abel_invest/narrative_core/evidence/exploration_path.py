@@ -29,9 +29,9 @@ single human-facing exploration log for session `{session.name}`
 ## How To Use
 
 - Before choosing the next Edge run, read `exploration_path.md`, the latest `edge-result.json`, and the latest `edge-validation.md`.
-- Use the previous chosen path, why it was chosen, and Edge feedback to decide the next branch, mechanism, input set, or control.
+- Use the previous chosen path, compact reason, and Edge feedback to decide the next candidate, search axis, input set, or control.
 - Every recorded round needs one concise entry below with its `ledger:<branch_id>:<round_id>` reference.
-- Keep entries short: chosen path, why, Edge feedback, key result, and artifacts.
+- Keep entries short: ledger ref, chosen path, compact reason, Edge feedback, key result, and artifacts.
 - System-owned evidence facts stay in `{EVIDENCE_LEDGER_FILENAME}` and `{FRONTIER_MARKDOWN_FILENAME}`.
 
 ## Entries
@@ -209,7 +209,7 @@ def render_exploration_path_round(
 - ledger: `ledger:{branch.name}:{round_id}`
 - mode: `{compact_text(mode) or 'unknown'}`; decision: `{compact_text(decision) or 'unknown'}`
 - path: {compact_text(description) or branch.name}
-- why: {reason}
+- compact reason: {reason}
 - Edge feedback: {feedback}
 - key result: Sharpe `{format_metric(metrics.get('sharpe'))}`, Lo `{format_metric(metrics.get('lo_adjusted'))}`, return `{format_percent_metric(metrics.get('total_return'))}`, max drawdown `{format_percent_metric(metrics.get('max_dd'), absolute=True)}`, PositionIC `{format_metric(metrics.get('position_ic'))}`
 - artifacts: `{result_rel}`, `{report_rel}`
@@ -242,7 +242,7 @@ def feedback_next_implication(result: dict[str, Any]) -> str:
     failures = edge_failure_messages(result)
     if failures:
         return "choose the next Edge run to address: " + "; ".join(failures[:2])
-    return "review the latest Edge artifacts before selecting the next branch or mechanism."
+    return "review the latest Edge artifacts before selecting the next candidate or search axis."
 
 
 def format_changed_dimensions(values: list[str]) -> str:

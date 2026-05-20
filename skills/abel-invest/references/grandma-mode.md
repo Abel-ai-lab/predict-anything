@@ -27,7 +27,7 @@ tuning to improve the ratio.
 2. Prefer simple target-only branches unless the user or evidence gives a clear
    reason to use graph inputs.
 3. Keep `model_family=rule_signal` and `complexity_class=simple_signal` unless a
-   real mechanism needs more complexity.
+   clear empirical improvement needs more complexity.
 4. Before running, confirm prepared `inputs/runtime_profile.json` includes
    `validation_profile: grandma_daily` and `inputs/execution_constraints.json`
    includes `position_bounds: [-1.0, 1.0]`.
@@ -37,7 +37,7 @@ tuning to improve the ratio.
 
 - Do not treat grandma mode as permission to brute-force metric targets.
 - Do not promote a levered candidate even if total return looks attractive.
-- Do not require graph-first breadth before a simple target-only candidate can be
+- Do not require graph-enriched breadth before a simple target-only candidate can be
   judged.
 - Do not compare grandma candidates by Sharpe, DSR, Position IC, or Omega as live
   pass/fail gates; those may be diagnostics, while `grandma_daily` owns the

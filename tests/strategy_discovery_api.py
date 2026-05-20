@@ -81,7 +81,7 @@ from abel_invest.narrative_core.session_lifecycle import (
     init_branch_dir,
     init_session_dir,
     refresh_data_readiness,
-    render_breadth_first_start_lines,
+    render_data_led_start_lines,
     write_discovery,
     write_readiness,
 )
@@ -95,7 +95,6 @@ from abel_invest.narrative_core.evidence.graph_frontier import (
 )
 from abel_invest.narrative_core.rendering.session_rendering import (
     check_session,
-    graph_priority_warning_lines,
     path_coverage_warning_lines,
     print_status,
     render_session,

@@ -1,111 +1,122 @@
-# Guarded Optimization (procedure)
+# Guarded Optimization
 
-**When**: a hard performance target (Sharpe / MaxDD / PnL) is set.
+Use this reference when a hard performance target is set, such as Sharpe, Lo,
+MaxDD, PnL, or a constrained risk-return objective.
 
-**Why** — canonical in `methodology.md` ("Mechanism seeds; the gauntlet
-gates; optimization is first-class"). Not restated here. One line: optimize
-*through* the gauntlet; never select on a raw metric outside it; the causal
-frontier bounds K so the search stays DSR-survivable. Keep search width explicit:
-add variants only when their role is declared and their K is counted.
+Optimization is first-class. The failure mode is not search; the failure mode is
+reporting a raw search winner as robust before legality, K accounting, and the
+gauntlet agree.
 
-Self-contained: the agent runs this via abel-invest's own CLI only. No
-autonomous optimizer is shipped; no abelian / external skill.
+Self-contained: the agent runs this via abel-invest's own CLI only. No external
+optimizer skill is required.
 
-## Objective — single, matched
+## Objective
 
-- Objective = ONE risk-adjusted scalar (Sharpe, or Lo-adjusted Sharpe),
-  matched to the strategy goal. Production rule: the objective is primary; a
-  mismatched scorer (accuracy/Brier) was discarded on evidence, Sharpe kept.
-- MaxDD / PnL / LossYrs / Lo / IC / DSR / triangle are **gauntlet gates**,
-  not objective terms. Do not blend a multi-objective profile.
+- Objective = one primary scalar matched to the strategy goal, normally Sharpe
+  or Lo-adjusted Sharpe.
+- MaxDD / PnL / LossYrs / Lo / IC / DSR / triangle are validation gates or
+  diagnostics, not a reason to hide the primary objective.
+- Use target/baseline behavior to measure whether graph-enriched candidates add
+  value beyond target self-history.
 
-## Gate — every candidate, no exception
+## Two-Stage Loop
 
-Eligible only if it clears ALL of:
+### 1. Exploration Screening
 
-1. semantic preflight (legal reads, no look-ahead)
-2. the recorded gate / DSR / triangle profile
-3. leakage audit (feature-time AND discovery-time layers)
-4. walk-forward across all regimes (never a window excluding the adverse one)
+Use a bounded candidate universe and search it empirically.
 
-Fail any → disqualified regardless of objective value.
+Good candidate-universe sources:
 
-## Loop — abel-invest primitives only
+- target-only features as baseline and competitor
+- validated baseline or catalog strategies
+- graph nodes and graph-derived feeds as the default high-value expanded
+  feature universe
+- sector, cross-asset, liquidity, volume, and regime features when justified by
+  user goal or evidence
+- proven patterns and feature factories
 
-1. `init-session` (graph-first).
-2. `frontier` — this IS the search space; never optimize an unbounded universe.
-3. Seed configs from the causal frontier, current evidence, and
-   `proven-patterns.md`. If you intentionally test a broader construction
-   principle from `principles-to-test.md`, state that and K-account the added
-   width. Do not add complexity without K-accounting it.
-4. Per config: `init-branch` → `prepare-branch` →
-   `abel-invest run-branch --branch <branch-path> -d "<change description>"
-   --selection-trials <N>` where **`--branch` and `-d/--description` are
-   REQUIRED** (CLI errors at arg-parse without them, recording nothing) and
-   `N` = THIS config/round's search width ONLY — NOT a running total; the
-   framework accumulates campaign K from prior rounds itself (see K rule).
-5. Discard non-gauntlet-PASS candidates. A gauntlet-EVALUATED FAIL (verdict
-   PASS/FAIL) is auto-counted by the framework in future K. But a config
-   disqualified BEFORE Edge validation (semantic-preflight / workflow-blocker
-   ERROR) is written as ERROR and is NOT in `completed_rows` → the framework
-   will NOT count it. To keep K honest you MUST fold every such preflight/ERROR
-   variant into a later round's per-round `--selection-trials` (else true
-   search width is undercounted). Honest-K cuts both ways: never double-count
-   (cumulative), never drop (preflight ERRORs).
-6. Select `argmax(single objective)` over PASS survivors — PROVISIONAL only.
-7. **Final-K revalidation (mandatory before reporting an optimum) — NON-
-   RECORDED.** Early survivors were DSR-validated at a smaller mid-campaign K;
-   the framework never retro-deflates prior rows and `select_best_pass_strategy`
-   ranks stored metrics WITHOUT recomputing the gate. Recompute the argmax
-   survivor's DSR/gate **analytically at the FINAL total campaign K** from its
-   already-stored round artifacts (its `*-edge-frame.csv` pnl + `abel_edge`
-   `_dsr(pnl, T, K_final)`) — do NOT issue another `run-branch` for the check.
-   A `run-branch` re-run is recorded as a new PASS/FAIL row, so K becomes
-   final+1 and each failed-survivor recheck deflates the next stricter — that
-   corrupts the verdict. If the survivor fails the gate at K_final, it is NOT
-   the optimum — analytically recheck the next survivor (still non-recorded).
-   **K_final = (campaign K implied by recorded PASS/FAIL rounds) + (every
-   preflight/workflow-ERROR-disqualified variant since the last counted round
-   that was never folded into a recorded per-round `--selection-trials`).**
-   `build_dsr_trials_context` counts PASS/FAIL rows only, so terminal ERROR
-   variants after the last counted round (e.g. survivor PASSes, next config
-   ERRORs, search stops) have no later round to absorb them — the analytic
-   recompute MUST add them explicitly or it undercounts and can preserve a
-   survivor that should fail DSR. The revalidation itself records nothing and
-   adds zero *recorded* trials, but its K_final must include those unfolded
-   terminal ERRORs. Never report an optimum validated only at a stale (smaller)
-   K, and never let the revalidation itself create a recorded row.
-   Until Abel Invest exposes a dedicated non-recording command, treat this as a
-   manual analytic check against stored artifacts rather than another CLI run.
-8. Journal: search width, K, gauntlet outcomes, the final-K revalidation, the
-   selected optimum.
+Allowed search moves:
 
-## K rule
+- parameter grids or random search
+- graph-node subset search
+- lag, sign, transformation, ratio, and rolling-window search
+- model-family comparison
+- HPO
+- feature-factory and ensemble screening
+- denoise or compression when temporally legal
 
-`--selection-trials N` = THIS round's search width only (every variant tried
-*this round*, not the winner). The framework accumulates the campaign total
-itself (`build_dsr_trials_context`: campaign K = Σ each prior round's
-recorded `current_round_trials` + this round). Pass the per-round count, NEVER
-a running/cumulative total — passing a cumulative total double-counts prior
-rounds and corrupts DSR. Mandatory for any search width; the cardinal errors
-are under-counting this round AND passing a campaign-cumulative value.
+During screening:
 
-## Honest outcomes
+- do not use future information
+- do not search an unbounded universe unless the user explicitly asks for it
+- record enough detail to reproduce the submitted candidate
+- keep count of effective search width
+- failures are information; they do not need to clear the gauntlet
 
-- A survivor that clears the gauntlet **at the FINAL total campaign K**
-  (step 7 revalidation) meets the target → report it. A PASS validated only
-  at a smaller mid-campaign K is NOT a valid optimum.
-- None clears the gauntlet at final K after a genuine K-accounted causal-
-  bounded search → report that null honestly. Not "didn't try"; never an
-  un-gated high metric relabeled as success.
+### 2. Validation Selection
 
-## Anti-patterns
+Submit selected candidates through Abel Invest / Edge:
 
-- Selecting on a metric outside the gauntlet.
-- Unbounded (non-causal-frontier) universe.
+```bash
+<command_prefix> prepare-branch --branch <branch-path>
+<command_prefix> debug-branch --branch <branch-path>
+<command_prefix> run-branch --branch <branch-path> -d "<candidate description>" --selection-trials <N>
+```
+
+`N` is this round's effective search width only: every variant tried to select
+the submitted candidate for this round, not a cumulative campaign total.
+
+Only report, promote, or visualize as a robust candidate after the selected
+strategy clears the required validation.
+
+## Gate
+
+Final reported candidates must clear the applicable validation profile:
+
+1. semantic preflight and legal reads
+2. recorded gate / DSR / triangle profile
+3. leakage checks
+4. walk-forward or requested-window validation
+5. final-K accounting when the candidate was selected from a broader search
+
+Failing a gate disqualifies the candidate from robust reporting, but it does not
+invalidate the usefulness of the search path.
+
+## K Rule
+
+`--selection-trials N` = this round's search width only. The framework
+accumulates campaign K from recorded rounds. Never pass a running/cumulative
+total, because that double-counts prior rounds.
+
+If preflight or workflow failures occurred during screening and would otherwise
+be invisible to future DSR accounting, fold that width into a later recorded
+round's `--selection-trials` or include it in the final-K analytic check.
+
+## Final-K Revalidation
+
+Before reporting an optimum selected from multiple candidates, ensure the
+survivor still clears the gauntlet at final campaign K. If stored PASS metrics
+were computed at smaller mid-campaign K, analytically recompute the DSR/gate
+against stored artifacts rather than issuing another recorded `run-branch`.
+
+If the survivor fails at final K, check the next survivor. Report the null
+honestly when no survivor clears final-K validation.
+
+## Honest Outcomes
+
+- A survivor that clears validation at final K meets the target -> report it.
+- A raw-metric winner that fails validation -> report it as a failed or
+  near-pass candidate, not success.
+- None clears after a bounded, K-accounted search -> report the null honestly.
+
+## Anti-Patterns
+
+- Reporting a raw search winner as robust.
+- Hiding search width inside one branch.
+- Treating the whole depth-1 frontier as the only legitimate first candidate.
+- Refusing to let a validated target-only candidate compete when it is the
+  strongest strategy found.
 - Under-counting `--selection-trials`.
-- Mismatched or multi-objective-diluted scorer.
-- Declining the search when a hard target was set.
-- Reporting an argmax survivor without final-K revalidation (stored PASS
-  metrics are not re-deflated at the larger final K — step 7 is mandatory).
+- Passing cumulative `--selection-trials`.
+- Adding complexity without accounting for the search width it introduced.
 - Any external-skill dependency.

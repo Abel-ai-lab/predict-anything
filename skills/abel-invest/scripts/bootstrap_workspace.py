@@ -268,8 +268,8 @@ Run `./.venv/bin/abel-invest workspace context --path . --json` and
 `./.venv/bin/abel-invest doctor` before creating a session. Sessions belong
 under this workspace's `research/` directory unless you intentionally use an
 explicit outside-workspace escape hatch. After each recorded round, update
-`exploration_path.md` with the chosen path, why, Edge feedback, and ledger
-reference before running another recorded round.
+`exploration_path.md` with the ledger ref, chosen path, compact reason, Edge
+feedback, and artifact refs before running another recorded round.
 """
 
 
@@ -289,6 +289,8 @@ Report to the user:
 
 Do not treat `branch.yaml` as evidence. Prepare and debug branch inputs before a
 recorded round, and update `exploration_path.md` after every recorded round.
+Graph context is a high-value candidate universe, not a required full-frontier
+first strategy.
 """
 
 

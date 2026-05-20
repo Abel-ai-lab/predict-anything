@@ -1,33 +1,45 @@
-# Principles To Test
+# Empirical Construction Notes
 
-Short staging area for plausible `abel-invest` principles before they become
-canonical skill rules.
+Use this reference when the current candidate search needs broader empirical
+construction rather than another single hand-designed rule.
 
-## Top-1-Kaggler-Style ML
+These notes are not a separate protocol. They describe normal Abel Invest
+candidate generation patterns. Runtime legality, honest search-width accounting,
+and final validation still own what can be reported.
 
-Principle:
-Causal-bounded strategy discovery should consider machine feature factories,
-heterogeneous ensembles, and strong empirical ML practice as serious tools, not
-late-stage extras.
+## Feature-Factory And Ensemble Search
 
-Related impacts:
-- Pushes the agent away from premature single-mechanism conclusions.
-- Encourages broader candidate generation inside the causal frontier.
-- Treats deterministic feature factories over causal-frontier fields, lags,
-  rolling windows, ratios, and differences as a serious candidate-generation
-  option when the current question justifies the added width.
-- Treats weak standalone signals as possible ensemble members rather than
-  automatic kills; ensemble contribution and diversity can matter more than
-  one feature's standalone metric.
-- Raises the need for honest `--selection-trials` accounting.
-- Makes diversity, ensemble contribution, and overfit controls more important.
-- Makes unsupervised denoise, model-family diversity, and HPO part of the search
-  width when used; one plausible denoise priority is unsupervised PCA/ICA/AE
-  before filter-select before supervised PLS, but that ordering is still part of
-  the principle under test.
-- Should not override causal graph boundaries, runtime legality, honest-K, or
-  the Abel gauntlet.
+Causal-bounded strategy discovery should treat machine feature factories,
+heterogeneous ensembles, and strong empirical ML practice as first-class tools.
 
-Status:
-Unproven as a canonical rule. Keep as a principle to test until supported by
-skill evals and realistic `abel-invest` runs.
+Useful search moves include:
+
+- deterministic feature factories over target and graph-derived fields
+- lag, sign, transformation, ratio, difference, and rolling-window generation
+- graph-node subset search instead of mandatory full-frontier baskets
+- weak standalone signals retained as possible ensemble members
+- diversity-aware member selection
+- model-family comparison, including linear, tree, GBDT, and hybrid models
+- unsupervised denoise such as PCA/ICA/autoencoder-style compression when it is
+  temporally legal and width-accounted
+- HPO or parameter search when the submitted candidate records the effective
+  search width
+
+Why this matters:
+
+- the graph supplies a high-value feature universe, but the tradable expression
+  may live in a subset, lag, transformation, regime, or ensemble interaction
+- target-only baselines can be strong, so graph-derived candidates should be
+  judged by their marginal contribution rather than by graph membership alone
+- a single hand-written mechanism can miss weak but durable combined signals
+
+Guardrails:
+
+- do not use information unavailable at decision time
+- do not search an unbounded feature universe unless the user explicitly asks
+  for that scope
+- do not report a raw search winner as robust until it clears the gauntlet
+- record search width through `--selection-trials` or the current candidate
+  search metadata path
+- keep graph role explanations provisional until a candidate has evidence worth
+  explaining

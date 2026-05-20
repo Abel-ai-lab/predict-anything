@@ -24,95 +24,86 @@ Run:
 ```bash
 <command_prefix> init-session --ticker <TICKER> --exp-id <exp-id>
 <command_prefix> frontier status --session research/<ticker>/<exp_id>
-<command_prefix> init-branch --session research/<ticker>/<exp_id> --branch-id <family-a-branch>
-<command_prefix> init-branch --session research/<ticker>/<exp_id> --branch-id <family-b-branch>
 ```
 
-Then make each branch declaration explicit by reading or editing:
+Live graph discovery should run by default when available. Its output is the
+default high-value expanded candidate universe, not a mandatory first branch and
+not a requirement to run the whole depth-1 frontier as one basket.
 
-- `research/<ticker>/<exp_id>/branches/<family-a-branch>/branch.yaml`
-- `research/<ticker>/<exp_id>/branches/<family-b-branch>/branch.yaml`
-- `research/<ticker>/<exp_id>/exploration_path.md` before choosing the next Edge run
-- `research/<ticker>/<exp_id>/branches/<chosen-branch>/engine.py`
+Then choose a candidate path from the user's objective and the data context:
 
-Then prepare, debug, and record the agent-chosen branch round:
+- existing validated baselines or catalog strategies
+- target-only features as baseline and competing candidates
+- graph-derived feeds and causal nodes as the default expanded feature universe
+- available sector, cross-asset, volume, liquidity, and regime features
+- proven empirical patterns and feature-factory ideas
+- user constraints such as Sharpe, drawdown, return, grandma mode, or no leverage
+
+Create one or more branches for selected candidates:
 
 ```bash
-<command_prefix> prepare-branch --branch research/<ticker>/<exp_id>/branches/<chosen-branch>
-<command_prefix> debug-branch --branch research/<ticker>/<exp_id>/branches/<chosen-branch>
-<command_prefix> run-branch --branch research/<ticker>/<exp_id>/branches/<chosen-branch> -d "baseline"
+<command_prefix> init-branch --session research/<ticker>/<exp_id> --branch-id <candidate-branch>
 ```
 
-After the recorded round, keep `research/<ticker>/<exp_id>/exploration_path.md`
-covered with path, why, Edge feedback, and ledger ref before another recorded
-round.
+Then prepare, debug, and record the agent-chosen candidate:
 
-Only after the user asks to publish the paper-ready session, or agrees after a PASS:
+```bash
+<command_prefix> prepare-branch --branch research/<ticker>/<exp_id>/branches/<candidate-branch>
+<command_prefix> debug-branch --branch research/<ticker>/<exp_id>/branches/<candidate-branch>
+<command_prefix> run-branch --branch research/<ticker>/<exp_id>/branches/<candidate-branch> -d "candidate search result"
+```
+
+If the recorded candidate was selected from a local parameter, model, factor, or
+node-subset search, pass `--selection-trials N`, where `N` is this round's
+effective search width only.
+
+After the recorded round, keep `research/<ticker>/<exp_id>/exploration_path.md`
+covered with ledger ref, chosen path, compact reason, Edge feedback, and artifact
+refs before another recorded round.
+
+Only after the user asks to publish the paper-ready session, or agrees after a
+PASS:
 
 ```bash
 <command_prefix> visualize-session --session research/<ticker>/<exp_id> --with-strategy-artifact
 ```
 
-New sessions run live graph discovery by default. Use `--no-discover` only when
-auth, service access, or continuity constraints make live graph discovery
-unavailable.
-
-When current evidence leaves a frontier question unresolved, expand the
-frontier before cutting more strategy variants:
-
-```bash
-<command_prefix> frontier expand --session research/<ticker>/<exp_id> --anchor <NODE_ID> --mode all --limit 20
-```
-
-Frontier expansion changes `graph_frontier.json`; it does not record evidence
-or prescribe a branch. Do not expand only because a small number of branches
-failed or because a metric-selected node looked promising. CAP nodes are
-model-supported causal priors, not trading directions. Trust that they carry
-target-relevant information, but do not infer disclosed weight, exact lag,
-signed effect, or tradable direction from the role alone. Parent and child roles
-disclose causal-flow orientation; Abel Invest's `blanket` role is a
-Markov-blanket discovery bucket, not a fixed causal-flow direction.
-
 ## Research Loop
 
-Each round should answer a mechanism question, not just consume compute.
+Each round should advance the search toward the user objective.
 
 1. Read `agent_context.md` when resuming.
-2. Use `frontier.md` to understand coverage, concentration, input
-   realization, path coverage, and exploration-shape facts.
-3. Use `exploration_path.md` as the single human-facing log of chosen paths,
-   why each path was chosen, Edge feedback, ledger/artifact refs, scout
-   influence, observations, open questions, and pivot/continue reasoning.
-4. Choose a graph/mechanism hypothesis before metric search. Be able to state
-   why the branch exists, why its constants are mechanism defaults or simple
-   priors, and what evidence would invalidate it.
-5. If the next decision is ambiguous between mechanism-deepening, graph
-   expansion, or stopping, run one lightweight narrative scout pass or record in
-   `exploration_path.md` why it is unavailable, off-target, unnecessary, or
-   skipped.
-6. Before widening graph breadth, ask whether the current graph neighborhood
-   still has an unresolved sign, lag, regime, interaction, control, or
-   risk-shaping question. If yes, answer that mechanism-depth question first.
-7. Declare the branch hypothesis in `branch.yaml`.
+2. Use `frontier.md` for factual context: available graph nodes, runtime reads,
+   input realization, search concentration, metric failures, and path coverage.
+3. Use `exploration_path.md` as the concise round log. It protects visualization
+   and replay completeness; entries should stay short.
+4. Generate candidates from the target/baseline context and the graph-enriched
+   candidate universe.
+5. Prefer empirical screening when it can cheaply test parameter choices, model
+   families, lags, signs, transformations, graph-node subsets, or feature
+   factories without leaking future information.
+6. Compare graph-enriched candidates against target/baseline candidates to
+   measure marginal graph contribution instead of assuming it.
+7. Declare enough branch metadata for runtime and audit: objective, input
+   universe, evaluation window, search width, and validation scope. Mechanism
+   and graph-attribution notes can stay lightweight until evidence is strong.
 8. Run `prepare-branch` before trusting branch inputs.
 9. Run `debug-branch` before recording evidence.
 10. Run `run-branch` only when declaration and debug facts are ready enough for
     the evidence label you want.
-11. Re-read `evidence_ledger.json` and `frontier.md`.
-12. Ensure `exploration_path.md` has the recorded round before starting another
-    recorded round. Cite the round ledger ref and capture the path, reason, Edge
-    feedback, what changed, what was learned, and what that implies next.
+11. Re-read `evidence_ledger.json`, `frontier.md`, and the latest Edge result.
+12. Let metric failures choose the next route: refine, re-search, change model
+    family, change graph subset, add target/baseline contrast, or stop.
+13. Ensure `exploration_path.md` has the recorded round before starting another
+    recorded round.
 
-Discovery seeds candidates from graph/mechanism priors. A hard user metric
-target is an optimization request: pursue it as guarded optimization
-(`references/guarded-optimization.md`) — the causal prior bounds the space and
-every candidate must clear the full gauntlet with `--selection-trials`
-accounting the true K. The failure mode is selecting on a raw metric outside
-the gauntlet, not optimization itself.
+Optimization is not a deviation. The failure mode is reporting an unvalidated
+raw winner, not searching. Use honest K/search-width accounting and final
+validation before claiming success.
 
 ## Layer Ownership
 
-- session: graph frontier, expansion provenance, and readiness
+- session: graph frontier, candidate-universe context, expansion provenance, and readiness
 - branch: branch declaration and `compute_decisions(self, ctx)`
 - edge cache: market data reuse
 - prepare step: branch input resolution and runtime contract materialization
@@ -124,17 +115,14 @@ Session `backtest_start` is the default exploration target. When
 prepare/debug/run for the branch.
 
 `run-branch` writes `validation_context.dsr_trials.count` into the Alpha context
-passed to `abel-edge evaluate`. The current round defaults to `1`. If a
-performance scout, sweep, or optimization selected one submitted strategy from
-multiple variants, pass `--selection-trials N`, where `N` is this round's width
-only, never a running campaign total. `guarded-optimization.md` owns the full K
-accounting rules, including PASS/FAIL accumulation, preflight/workflow ERROR
-folding, and final-K revalidation.
+passed to `abel-edge evaluate`. The current round defaults to `1`. If a search
+selected one submitted candidate from multiple variants, pass
+`--selection-trials N`, where `N` is this round's width only, never a running
+campaign total. `guarded-optimization.md` owns the final-K reporting rules.
 
-If performance scouting happened during standard discovery, declare the
-effective search width, record what happened in `exploration_path.md`, treat the result as
-scout-informed or optimization-informed rather than clean standard-discovery
-evidence, and return to graph/mechanism-led branch selection.
+If performance scouting happened before the recorded candidate, declare the
+effective search width and record what happened in `exploration_path.md`. Treat
+the result as search-informed rather than pretending it was one isolated idea.
 
 ## Before Exhaustion Or No-Edge Claims
 
@@ -144,11 +132,14 @@ a ledger conclusion.
 
 Before making that claim, check that the ledger shows:
 
-1. the relevant discovered frontier was used or intentionally ruled out
-2. materially different mechanism classes were tried, not only parameter variants
-3. any intentionally tested principle from `principles-to-test.md` is recorded
-   with its impact on the search
-4. all attempted width is K-accounted, including preflight or workflow ERROR
+1. a bounded candidate universe was actually searched or intentionally ruled out
+2. graph-derived candidates were considered when live graph discovery was
+   available, unless the user chose a simple/conservative lane
+3. target/baseline performance was compared against graph-enriched performance
+   where useful
+4. materially different model families, feature constructions, or search axes
+   were tried, not only one hand-written rule
+5. all attempted width is K-accounted, including preflight or workflow ERROR
    variants that would otherwise be audited but skipped from future DSR
 
 Stop conditions are a gauntlet-PASS candidate at the target or ledger-supported
@@ -159,27 +150,24 @@ exhaustion. Do not stop by round count.
 After each render, treat:
 
 - `evidence_ledger.json` as the evidence record
-- `frontier.md` / `frontier.json` as factual coverage reports
+- `frontier.md` / `frontier.json` as factual search-context reports
 - `agent_context.md` as the compact factual resume surface
 - `exploration_path.md` as the single human-facing exploration log
 
 `path_coverage_complete=false` means at least one recorded round still needs an
-`exploration_path.md` entry with the round ledger ref, chosen path, reason, and
-Edge feedback. It does not mean the system has chosen a route.
+`exploration_path.md` entry with the round ledger ref, selected path, compact
+reason, Edge feedback, and artifact refs.
 
-Input realization separates declaration from runtime behavior: a branch can
+Input realization separates declaration from runtime behavior. A branch can
 declare `input_claim=graph_supported`, but if the strategy does not read
 prepared graph inputs, that round is summarized as a graph input read gap and
-cannot count as candidate causal evidence solely from the declaration.
+should not be used as evidence for graph-derived contribution.
 
 The generated surfaces should show what happened, not tell you which driver,
 proxy, threshold, model family, or mechanism to try next.
 
-Abel Ask or narrative context can help form mechanism hypotheses, supplement
-driver ideas, and frontier questions. It is scout context, not validation
-evidence. `discovery-protocol.md` owns when and how to run narrative scout work;
-record unavailable, weak, off-target, or skipped scout context plainly in
-`exploration_path.md`.
+Abel Ask or narrative context can help form candidate features, graph expansion
+anchors, and interpretation. It is scout context, not validation evidence.
 
 ## Session Visualization
 
@@ -216,12 +204,15 @@ the default URL in the skill code if this endpoint changes.
 
 ## Exploration Discipline
 
-`discovery-protocol.md` owns graph priority, CAP role interpretation, frontier
-expansion, and narrative scout rules. In the round loop, preserve the core shape:
-graph context before strategy variants, strategy variants before parameter
-tuning, and local refinement only while it is still learning something.
+`discovery-protocol.md` owns graph context, CAP role interpretation, frontier
+expansion, and narrative scout facts. In the round loop, preserve the core
+shape:
 
-Multiple branches on one graph input set can still be graph-breadth narrow.
+```text
+user objective -> candidate universe -> empirical screening -> recorded validation -> explanation
+```
 
-If repeated variants fail in the same neighborhood, use the frontier and
-`exploration_path.md` to make that concentration explicit before continuing.
+Multiple branches on one graph input set can still be a narrow search if they do
+not change the useful search axis. Parameter, threshold, model, factor, and node
+subset changes are legitimate search axes when they are intentional and
+K-accounted.

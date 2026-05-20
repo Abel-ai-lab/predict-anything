@@ -12,6 +12,11 @@ These notes are not the primary legality contract.
 
 - Author new branch code against `DecisionContext`.
 - Use `debug-branch` semantic preflight before trusting a recorded round.
+- Use patterns as candidate generators and feature-library ideas. Local data
+  should decide whether a pattern, parameter range, model family, or graph-node
+  subset is useful for the current target.
+- When a pattern inspires a search over parameters, lags, models, or node
+  combinations, record the effective search width for the submitted candidate.
 - Treat the temporal caveats below as pattern-specific implementation notes, not
   as a universal authoring checklist.
 - Do not treat pattern-specific lags, weights, or causal pairs below as

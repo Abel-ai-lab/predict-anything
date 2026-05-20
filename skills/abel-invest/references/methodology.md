@@ -1,108 +1,98 @@
 # Methodology
 
-Use this optional reference when the user asks why the workflow is graph-first,
-why evidence labels are strict, or why the framework refuses to recommend the
-next strategy route.
+Use this optional reference when the user asks why the workflow is data-led,
+why the causal graph still matters, why evidence labels are strict, or why
+validation gates do not replace strategy search.
 
 ## Boundary
 
 The product boundary is:
 
 ```text
-framework = evidence validity and exploration-shape facts
-agent = strategy judgment and research insight
+framework = runtime legality, evidence facts, search-width accounting, validation
+agent = candidate generation, strategy search, and research judgment
 ```
 
 `abel-edge` owns runtime legality and validation metrics.
-`abel-invest` owns branch declarations, evidence labels, frontier
-facts, and the exploration path surface.
+`abel-invest` owns branch declarations, evidence labels, candidate-universe
+facts, search-width accounting, and the exploration path surface.
 
 ## Core Principles
 
-**Causal graph first.**
-Use Abel-discovered causal structure as the default search prior because it
-reduces blind search and is more likely to survive regime change. Correlation
-signals can still be useful, but they enter as supplements or controls unless
-the branch declares and validates a stronger claim.
+**Data-led objective search.**
+The job is to find a high-quality strategy for the user's objective, usually
+high Sharpe, high return, or a constrained risk-return profile. Observed
+results, failure modes, and metric shape should drive the next candidate family.
+Mechanism stories organize and explain the search; they do not admit a strategy.
 
-CAP graph nodes are model-supported causal priors, not trading instructions.
-`discovery-protocol.md` owns CAP role interpretation, frontier expansion, and
-mechanism-depth-before-breadth rules. The methodological point is simpler:
-graph-first means using the graph to form input and mechanism hypotheses, not to
-prescribe a strategy or justify metric-chasing expansion.
+**Graph as default high-value candidate universe.**
+Abel-discovered causal structure is a validated prior and should normally enter
+candidate generation early. It expands the search beyond target-only price and
+volume history. That does not mean the first serious candidate must use the
+entire depth-1 frontier as one basket. The graph supplies a node universe; data
+selects subsets, lags, transformations, model families, and roles such as alpha,
+filter, sizing signal, or regime context.
 
-**Mechanism seeds; the gauntlet gates; optimization is first-class.**
-Graph and mechanism priors seed candidates. That is what keeps the search
-space small enough for DSR to survive at scale: the causal prior is a
-multiple-testing regularizer on the driver-selection axis (a large
-multiplicative factor in K). Optimization toward the objective is then a
-first-class path, not a deviation, provided every candidate clears the full
-gauntlet (semantic, gate/DSR/triangle, leakage, walk-forward) and
-`--selection-trials` accounts the true K. The failure mode to avoid is
-selecting on a raw metric OUTSIDE the gauntlet — not optimization itself.
+**Target-only is baseline and competitor, not second-class evidence.**
+Target-only candidates can be first-class strategies when they survive
+validation. They also establish the benchmark for graph-derived marginal
+contribution. A graph-enriched candidate should earn its place by improving the
+objective or robustness relative to target/baseline behavior, not by graph
+membership alone.
+
+**Search is allowed when honestly accounted.**
+Parameter search, model hyperparameter search, factor construction, graph-node
+subset search, lag/sign search, and feature-factory screening are legitimate
+ways to find strategies. The product should make search width visible and
+K-accounted rather than pushing the agent to hide many experiments inside one
+hand-written strategy.
+
+**Gate validates; it does not throttle exploration.**
+The gauntlet, DSR, leakage checks, walk-forward behavior, and promotion gate
+decide what can be reported as robust. They should not prevent empirical
+screening. A raw-metric winner is not a strategy success until it clears the
+required validation with honest search-width accounting.
 
 **Evidence entry; mechanism is post-hoc.**
-A candidate enters on gauntlet / OOS survival, never on the strength of its
-mechanism story. The mechanism narrative is a post-hoc Insight Card written
-after a candidate survives — it explains, it does not admit. Graph and
-mechanism priors *seed and bound* the search (the causal regularizer); they
-do not gate entry — survival does. This supports systematic construction when
-the search question requires it, but it does not make complexity self-justifying.
-See `references/principles-to-test.md` for non-canonical broader construction
-principles.
-
-`--selection-trials` is the honest K-accounting that makes guarded
-optimization legitimate, not a marker that search is illegitimate. abel-invest
-runs guarded optimization self-contained; it does not hand off to any external
-skill.
-
-**Narrative scout is context, not evidence.**
-Abel Ask and narrative context can generate mechanism hypotheses, supplement
-driver ideas, and graph expansion questions. Treat them as domain-context scout
-work: stronger than free association, weaker than CAP graph facts, and never a
-substitute for Edge validation. `discovery-protocol.md` owns the scout trigger
-and workflow details.
-
-**Evidence labels are not strategy advice.**
-Candidate/control/diagnostic/blocker labels say what kind of research evidence a
-run produced. They do not choose the next driver, model, threshold, or mechanism.
+A candidate enters on validation survival, not on the strength of its mechanism
+story. Mechanism and graph-attribution notes are most useful after a pass or
+meaningful near-pass, when there is evidence worth explaining.
 
 **Runtime legality is non-negotiable.**
 If a strategy reads information it could not have seen at decision time, the
 backtest is invalid. The current authoring contract expresses legal reads
 through `DecisionContext` and semantic preflight.
 
-**Multi-dimensional validation beats single-metric selection.**
+**Multi-dimensional validation beats single-metric reporting.**
 The validation profile can evolve, but the principle is stable: avoid promoting
 strategies from one attractive metric when other evidence says the signal is
-fragile, concentrated, or illegal.
+fragile, concentrated, illegal, or not robust after K accounting.
 
-**Serial compounding beats static grids.**
-Each round should update the agent's understanding. Static parameter grids can
-hide whether the search is learning or just overfitting a neighborhood.
-
-**The exploration path is agent-readable and evidence-linked.**
-`exploration_path.md` preserves the chosen path, why it was chosen, Edge
-feedback, and ledger/artifact references between turns. It is the human-facing
-research log, while evidence truth remains in the ledger and raw artifacts.
+**The exploration path is evidence-linked and concise.**
+`exploration_path.md` preserves each recorded round's selected path, compact
+reason, Edge feedback, and ledger/artifact references. It protects
+visualization and replay completeness. It should not require a heavy mechanism
+essay before the next candidate can run.
 
 ## Current Workflow Consequence
 
 The branch-default path is:
 
 1. resolve workspace and doctor readiness
-2. start or resume a graph-first session
-3. read ledger, frontier, and exploration path facts
-4. use one narrative scout pass when the next decision is ambiguous between
-   mechanism-deepening, graph expansion, or stopping
-5. deepen the current mechanism when unresolved sign, lag, regime, interaction,
-   control, or risk-shaping questions remain
-6. expand `graph_frontier.json` only when current evidence leaves a frontier
-   question unresolved
-7. declare branch hypothesis and selected graph inputs
+2. check existing baselines or strategy catalog entries
+3. start or resume a session; run live graph discovery when available
+4. build a candidate universe from target/baseline features, graph nodes,
+   available cross-assets, proven patterns, and user constraints
+5. generate and screen candidates empirically, including graph-enriched feature
+   factories, ensembles, node subsets, lag/sign searches, model-family
+   comparisons, and simple target baselines
+6. keep search width honest and avoid temporal leakage
+7. declare enough candidate metadata for runtime and audit: objective, inputs,
+   window, search width, and validation scope
 8. prepare branch inputs
-9. write `compute_decisions(self, ctx)`
+9. write `compute_decisions(self, ctx)` against `DecisionContext`
 10. run semantic preflight
-11. record evidence
-12. inspect ledger/frontier facts
-13. keep `exploration_path.md` covered before deep local refinement
+11. record selected candidates through Edge with the right `--selection-trials`
+12. inspect ledger/frontier facts and metric failures
+13. keep `exploration_path.md` covered before the next recorded round
+14. explain mechanism and graph contribution after evidence, not before

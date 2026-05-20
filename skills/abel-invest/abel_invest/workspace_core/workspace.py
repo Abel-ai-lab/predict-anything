@@ -282,8 +282,9 @@ Then run the branch preflight and recorded round:
 ./.venv/bin/abel-invest run-branch --branch research/tsla/tsla-v1/branches/<chosen-branch> -d "baseline"
 ```
 
-After every recorded round, keep `exploration_path.md` covered with path, why,
-Edge feedback, and ledger ref before another recorded round.
+After every recorded round, keep `exploration_path.md` covered with ledger ref,
+chosen path, compact reason, Edge feedback, and artifact refs before another
+recorded round.
 
 Only after asking the user and getting agreement for visual review, run:
 
@@ -296,12 +297,14 @@ Use that path as orientation, not as a rigid script. The important boundary is:
 - `workspace context --json` tells you the owning workspace and `research_root`
 - `branch.yaml` makes the branch inputs explicit
 - `prepare-branch` resolves inputs before you treat any round as evidence
-- the starter `engine.py` is only there to verify branch wiring before a branch-specific mechanism exists
-- new sessions default to graph-first research: use `graph_frontier.json` to
-  choose graph/mechanism questions before strategy variants or parameters; use
-  `frontier expand` only when a frontier question remains
-- every recorded round requires an `exploration_path.md` entry with the chosen
-  path, why, Edge feedback, and round ledger ref before the next recorded round
+- the starter `engine.py` is only there to verify branch wiring before a branch-specific candidate exists
+- new sessions default to data-led search with graph-enriched context: use
+  `graph_frontier.json` as the default high-value expanded candidate universe,
+  not as a full-frontier quota; target-only candidates are baselines and
+  competitors for measuring graph-derived marginal contribution
+- every recorded round requires an `exploration_path.md` entry with ledger ref,
+  chosen path, compact reason, Edge feedback, and artifact refs before the next
+  recorded round
 - every next Edge run should be chosen after reading `exploration_path.md` and
   the latest Edge result; `run-branch` appends a concise entry there
 
@@ -427,19 +430,20 @@ Run `workspace context --path . --json` before creating a session so the
 session lands under this workspace's `research/` directory. Do not pass
 `--root` unless intentionally creating a legacy/offline session outside the
 workspace, and then pass `--allow-outside-workspace`.
-Treat `branch.yaml` as the place where target, start, graph inputs, and overlap
-become explicit. Treat `prepare-branch` as the moment that makes those graph
-inputs real. Treat the generated `engine.py` as a starter path check; once the
-branch path is proven, encode the branch-specific mechanism there. Treat
-session readiness as advisory context; the branch's explicit `requested_start`
-is the runtime start when it is set. Treat this workspace `.venv` as the
-canonical runtime for daily work. Treat branch count as a file-organization
-fact, not as proof of graph breadth. Use `exploration_path.md` as the single
-human-facing exploration log: record each chosen path, why, Edge feedback, and
-ledger ref. Read `exploration_path.md` and the latest Edge result before choosing
-the next Edge run; after Edge feedback, keep the path updated. Check path coverage before starting another round. Check input
-realization before treating a declared graph-supported branch as graph-supported
-evidence. Do not create the online session view automatically; after a
+Treat `branch.yaml` as the place where target, start, selected inputs, objective,
+search width, and validation scope become explicit. Treat `prepare-branch` as
+the moment that makes those inputs real. Treat the generated `engine.py` as a
+starter path check; once the branch path is proven, encode the candidate logic
+there. Treat session readiness as advisory context; the branch's explicit
+`requested_start` is the runtime start when it is set. Treat this workspace
+`.venv` as the canonical runtime for daily work. Treat branch count as a
+file-organization fact, not as proof of search breadth. Use `exploration_path.md`
+as the single human-facing exploration log: record each chosen path, compact
+reason, Edge feedback, and ledger ref. Read `exploration_path.md` and the latest
+Edge result before choosing the next Edge run; after Edge feedback, keep the
+path updated. Check path coverage before starting another round. Check input
+realization before claiming graph-derived contribution. Do not create the online
+session view automatically; after a
 candidate PASS, ask the user first. If the user agrees or explicitly asks to
 publish the paper-ready session, `visualize-session --with-strategy-artifact`
 builds the view from the session folder and uploads the selected strategy

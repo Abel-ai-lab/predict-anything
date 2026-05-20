@@ -29,7 +29,7 @@ from abel_invest.narrative_core.session_lifecycle import (
     command_prefix_for_path,
     init_branch_dir,
     init_session_dir,
-    render_breadth_first_start_lines,
+    render_data_led_start_lines,
     resolve_session_root,
     resolve_workspace_arg_path,
 )
@@ -86,7 +86,7 @@ def handle_init_session(args: argparse.Namespace) -> int:
         print("  frontier_source: pending (live discovery not run)")
     print("")
     print("From here:")
-    for line in render_breadth_first_start_lines(session):
+    for line in render_data_led_start_lines(session):
         print(f"  {line}")
     return 0
 
@@ -196,7 +196,7 @@ def handle_init_branch(args: argparse.Namespace) -> int:
     print("What matters now:")
     print(f"  Read {session / EXPLORATION_PATH_FILENAME} and latest Edge results before choosing this branch's next Edge run.")
     print("  branch.yaml is where target, start, selected inputs, graph use, and overlap become explicit.")
-    print("  The generated engine is only a starter path check; it helps you verify the branch wiring before you encode a branch-specific mechanism.")
+    print("  The generated engine is only a starter path check; it helps you verify the branch wiring before you encode a serious candidate.")
     print("  If you fetch bars, keep `limit=...` explicit and avoid blanket `dropna()` before confirming the target column survives.")
     print("")
     print("From here:")
