@@ -2114,10 +2114,13 @@ def test_init_session_output_uses_data_led_graph_enriched_alpha_search() -> None
     lines = ni.render_data_led_start_lines(Path("research/tsla/demo"))
     rendered = "\n".join(lines)
 
-    assert "<family-a-branch>" in rendered
-    assert "<family-b-branch>" in rendered
+    assert "<feature-factory-branch>" in rendered
+    assert "<model-or-denoise-branch>" in rendered
+    assert "<target-control-branch>" in rendered
     assert "graph-v1" not in rendered
     assert "data-led graph-enriched alpha search" in rendered
+    assert "first serious non-grandma lane should be empirical construction" in rendered
+    assert "simple hand-written rules are diagnostics or refinements" in rendered
     assert "exploration_path.md" in rendered
     assert "research_journal.md" not in rendered
 

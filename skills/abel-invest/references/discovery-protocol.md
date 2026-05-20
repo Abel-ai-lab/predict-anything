@@ -57,6 +57,12 @@ like an alpha source rather than a checklist:
 - proven patterns, feature factories, ML models, and ensembles turn the universe
   into candidate signals
 
+For ordinary alpha search, graph context should feed an empirical construction
+lane early: feature factories, model comparisons, denoise/compression,
+node-subset search, lag/sign/transformation search, regimes, sizing, filters,
+or ensembles. A hand-written rule that happens to read graph nodes is
+graph-realized evidence, but it is not by itself data-driven graph search.
+
 Target-only candidates are baselines, seeds, ablations, and competing strategy
 candidates. Their job is to make graph-derived marginal contribution visible,
 not to replace graph search as the default when graph candidates are live.

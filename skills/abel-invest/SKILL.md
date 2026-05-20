@@ -81,9 +81,9 @@ Always start by resolving workspace state before strategy work.
   optimization). Core path — not optional — when a performance bar is set.
 - Before writing "exhausted / ceiling / no edge":
   read `references/experiment-loop.md` and check the ledger requirements there.
-- Broad empirical construction, including ML, feature-factory, model-family,
-  graph-subset, HPO, regime/filter/sizing, or ensemble search:
-  read `references/principles-to-test.md`.
+- Data-driven candidate construction, especially before the first serious
+  non-grandma candidate lane or when tempted to write another simple rule:
+  read `references/data-driven-construction.md`. Core path.
 
 ## Operating Rules
 
@@ -141,6 +141,11 @@ Alpha search stance:
 - Search hard, then explain. Let observed results, failure modes, and metric
   shape choose the next candidate family. Mechanism stories are useful after
   evidence appears; they are not admission tickets.
+- Ordinary alpha search has a default engine: empirical construction over a
+  bounded target + graph-derived universe. The first serious non-grandma
+  candidate lane should be a feature-factory, model-family, denoise, subset, or
+  ensemble search unless live graph access is blocked, a validated baseline is
+  the obvious launchpad, or the user chose a simple/conservative lane.
 - New sessions use live causal graph discovery when available. Treat the graph
   as the default high-value alpha feature universe beyond target-only history:
   node subsets, lags, signs, transformations, ratios, regimes, model features,
@@ -153,6 +158,12 @@ Alpha search stance:
   candidate. It should not become the lazy default when live graph candidates
   are available; use it to measure whether graph-derived information improves
   the objective or robustness.
+- A graph-supported branch is not automatically data-driven. Runtime graph reads
+  prove input realization; they do not replace feature construction, model
+  comparison, subset/lag/sign search, denoise, or ensemble search.
+- Hand-written single-mechanism branches are diagnostics, controls, ablations,
+  or refinements around an empirical lead. They should not dominate the early
+  search when the graph-derived universe is live and unsearched.
 - A hard user metric target (Sharpe / MaxDD / PnL) is an optimization request.
   Search is expected: use target/baseline context, graph-derived features,
   feature factories, ensembles, parameter search, model-family comparison,

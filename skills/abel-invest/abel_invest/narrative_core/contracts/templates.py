@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-ENGINE_TEMPLATE = '''"""Alpha-search engine for {ticker}. Replace the starter baseline when the candidate is ready.
+ENGINE_TEMPLATE = '''"""Alpha-search engine for {ticker}. Replace the starter wiring scaffold when the candidate is ready.
 
 Default backtest behavior should follow branch.yaml first and the injected context second.
 If provided, self.context contains workspace/session/branch/discovery/readiness metadata from Abel strategy discovery.
@@ -38,11 +38,11 @@ class BranchEngine(StrategyEngine):
         close = ctx.target.series("close")
         if close.empty:
             raise RuntimeError(
-                "The default Abel strategy discovery baseline loaded no usable target bars. "
+                "The default Abel strategy discovery starter scaffold loaded no usable target bars. "
                 "Confirm the requested window in branch.yaml, then rerun "
                 "prepare-branch with the workspace command prefix."
             )
-        # Debug-safe starting point: a simple target-trend starter baseline.
+        # Debug-safe starting point: a simple target-trend wiring scaffold.
         # It exists to make the first branch runnable and comparable, not to
         # pretend that discovery has already found a real edge.
         slow_mean = close.rolling(window=40, min_periods=15).mean()

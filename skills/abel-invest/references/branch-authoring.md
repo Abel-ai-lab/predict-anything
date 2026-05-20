@@ -198,6 +198,8 @@ Before recording a branch, be able to state the minimum audit facts:
 - the input universe and why it is bounded
 - whether the candidate is target/baseline, graph-enriched, mixed, or supplement
 - any search width used to select the submitted candidate
+- whether this is the empirical construction lane, a diagnostic/control, an
+  ablation, or a refinement around an empirical lead
 - whether semantic preflight confirmed legal reads
 - what validation result would make this candidate worth refining or promoting
 
@@ -231,6 +233,9 @@ record the selection influence in `exploration_path.md`.
   become the default when graph candidates are live
 - graph-enriched search should appear early and recur when graph discovery is
   available
+- ordinary alpha search should default to empirical construction over the
+  bounded target + graph-derived universe; simple hand-written mechanisms are
+  diagnostics, controls, ablations, or refinements
 - branch count is not search breadth if every branch hides the same search axis
 - weird low-attention graph nodes are not automatically noise
 - narrative scout can inspire features, but it is not evidence truth

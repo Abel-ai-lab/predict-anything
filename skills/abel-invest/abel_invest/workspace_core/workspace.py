@@ -262,14 +262,16 @@ Run these commands from the workspace root:
 {default_activate_command()}
 ./.venv/bin/abel-invest init-session --ticker TSLA --exp-id tsla-v1
 ./.venv/bin/abel-invest frontier status --session research/tsla/tsla-v1
-./.venv/bin/abel-invest init-branch --session research/tsla/tsla-v1 --branch-id <family-a-branch>
-./.venv/bin/abel-invest init-branch --session research/tsla/tsla-v1 --branch-id <family-b-branch>
+./.venv/bin/abel-invest init-branch --session research/tsla/tsla-v1 --branch-id <feature-factory-branch>
+./.venv/bin/abel-invest init-branch --session research/tsla/tsla-v1 --branch-id <model-or-denoise-branch>
+./.venv/bin/abel-invest init-branch --session research/tsla/tsla-v1 --branch-id <target-control-branch>
 ```
 
 Read or edit these files before the first recorded round:
 
-- `research/tsla/tsla-v1/branches/<family-a-branch>/branch.yaml`
-- `research/tsla/tsla-v1/branches/<family-b-branch>/branch.yaml`
+- `research/tsla/tsla-v1/branches/<feature-factory-branch>/branch.yaml`
+- `research/tsla/tsla-v1/branches/<model-or-denoise-branch>/branch.yaml`
+- `research/tsla/tsla-v1/branches/<target-control-branch>/branch.yaml`
 - `research/tsla/tsla-v1/exploration_path.md`
 - `research/tsla/tsla-v1/branches/<chosen-branch>/engine.py`
 
@@ -278,7 +280,7 @@ Then run the branch preflight and recorded round:
 ```bash
 ./.venv/bin/abel-invest prepare-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
 ./.venv/bin/abel-invest debug-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
-./.venv/bin/abel-invest run-branch --branch research/tsla/tsla-v1/branches/<chosen-branch> -d "baseline"
+./.venv/bin/abel-invest run-branch --branch research/tsla/tsla-v1/branches/<chosen-branch> -d "candidate search result"
 ```
 
 After every recorded round, keep `exploration_path.md` covered with ledger ref,
@@ -298,9 +300,13 @@ Use that path as orientation, not as a rigid script. The important boundary is:
 - `prepare-branch` resolves inputs before you treat any round as evidence
 - the starter `engine.py` is only there to verify branch wiring before a branch-specific candidate exists
 - new sessions default to data-led alpha search with graph-enriched context:
-  use `graph_frontier.json` as the high-value expanded feature universe, not as
-  a full-frontier quota; target-only candidates are baselines, seeds, ablations,
-  and competitors for measuring graph-derived marginal contribution
+  use `graph_frontier.json` as the high-value expanded feature universe for
+  feature factories, model/denoise lanes, node-subset search, lag/sign search,
+  regimes, filters, sizing, and ensembles; do not reduce graph use to a
+  full-frontier quota or a few hand-written node rules
+- target-only candidates are baselines, seeds, ablations, and competitors for
+  measuring graph-derived marginal contribution, not the default main lane when
+  graph-derived data is live and unsearched
 - every recorded round requires an `exploration_path.md` entry with ledger ref,
   chosen path, compact reason, Edge feedback, and artifact refs before the next
   recorded round
@@ -332,7 +338,7 @@ Use that path as orientation, not as a rigid script. The important boundary is:
   best ranked hostable strategy artifact when one is available, and omit it only for
   narrative-only views
 - session `backtest_start` is a default target; branch `requested_start` can override it explicitly
-- the generated `engine.py` is a starter baseline for the first end-to-end run, not a finished strategy
+- the generated `engine.py` is a starter wiring scaffold for the first end-to-end run, not a finished strategy
 
 ## Workspace Boundary
 
@@ -393,14 +399,16 @@ Run these commands from the workspace root:
 ./.venv/bin/abel-invest doctor
 ./.venv/bin/abel-invest init-session --ticker TSLA --exp-id tsla-v1
 ./.venv/bin/abel-invest frontier status --session research/tsla/tsla-v1
-./.venv/bin/abel-invest init-branch --session research/tsla/tsla-v1 --branch-id <family-a-branch>
-./.venv/bin/abel-invest init-branch --session research/tsla/tsla-v1 --branch-id <family-b-branch>
+./.venv/bin/abel-invest init-branch --session research/tsla/tsla-v1 --branch-id <feature-factory-branch>
+./.venv/bin/abel-invest init-branch --session research/tsla/tsla-v1 --branch-id <model-or-denoise-branch>
+./.venv/bin/abel-invest init-branch --session research/tsla/tsla-v1 --branch-id <target-control-branch>
 ```
 
 Read or edit these files before branch execution:
 
-- `research/tsla/tsla-v1/branches/<family-a-branch>/branch.yaml`
-- `research/tsla/tsla-v1/branches/<family-b-branch>/branch.yaml`
+- `research/tsla/tsla-v1/branches/<feature-factory-branch>/branch.yaml`
+- `research/tsla/tsla-v1/branches/<model-or-denoise-branch>/branch.yaml`
+- `research/tsla/tsla-v1/branches/<target-control-branch>/branch.yaml`
 - `research/tsla/tsla-v1/exploration_path.md`
 - `research/tsla/tsla-v1/branches/<chosen-branch>/engine.py`
 
@@ -409,7 +417,7 @@ Then run:
 ```bash
 ./.venv/bin/abel-invest prepare-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
 ./.venv/bin/abel-invest debug-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
-./.venv/bin/abel-invest run-branch --branch research/tsla/tsla-v1/branches/<chosen-branch> -d "baseline"
+./.venv/bin/abel-invest run-branch --branch research/tsla/tsla-v1/branches/<chosen-branch> -d "candidate search result"
 ```
 
 Keep `exploration_path.md` covered before another recorded round. Ask the user
@@ -464,7 +472,7 @@ separate directory.
 ### Run one recorded round
 ```bash
 ./.venv/bin/abel-invest debug-branch --branch research/tsla/tsla-v1/branches/<chosen-branch>
-./.venv/bin/abel-invest run-branch --branch research/tsla/tsla-v1/branches/<chosen-branch> -d "baseline"
+./.venv/bin/abel-invest run-branch --branch research/tsla/tsla-v1/branches/<chosen-branch> -d "candidate search result"
 ./.venv/bin/abel-invest promote-strategy --branch research/tsla/tsla-v1/branches/<chosen-branch> --round <round-id>
 ```
 

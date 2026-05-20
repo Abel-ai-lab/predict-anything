@@ -27,6 +27,8 @@ optimizer skill is required.
 ### 1. Exploration Screening
 
 Use a bounded candidate universe and search it empirically.
+For ordinary non-grandma alpha search, empirical construction is the main lane,
+not an optional late broadening step.
 
 Good candidate-universe sources:
 
@@ -48,6 +50,10 @@ Allowed search moves:
 - feature-factory and ensemble screening
 - regime, sizing, and filter search
 - denoise or compression when temporally legal
+
+Hand-written single-mechanism branches can benchmark, diagnose, ablate, or
+refine a promising shape. They should not replace the empirical construction
+lane when live graph-derived data is available and unsearched.
 
 During screening:
 
@@ -120,6 +126,8 @@ honestly when no survivor clears final-K validation.
 - Hiding search width inside one branch.
 - Treating the whole depth-1 frontier as the only legitimate first candidate.
 - Letting target-only become the default escape from live graph-derived search.
+- Treating graph-supported hand-written rules as a substitute for feature
+  factories, model-family comparison, denoise, subset search, or ensembles.
 - Refusing to report a validated target-only candidate when it is honestly the
   strongest strategy found.
 - Under-counting `--selection-trials`.

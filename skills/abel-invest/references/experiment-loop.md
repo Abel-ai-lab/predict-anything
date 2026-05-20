@@ -28,7 +28,10 @@ Run:
 
 Live graph discovery should run by default when available. Its output is the
 default high-value alpha feature universe, not a mandatory first branch and not
-a requirement to run the whole depth-1 frontier as one basket.
+a requirement to run the whole depth-1 frontier as one basket. For ordinary
+non-grandma alpha search, the first serious candidate lane should be empirical
+construction over a bounded target + graph-derived universe, not another
+hand-written single mechanism.
 
 When resuming, read:
 
@@ -42,29 +45,32 @@ When resuming, read:
 
 Each round should push toward the user's objective.
 
-1. Build a broad candidate universe from validated baselines, target-only
+1. Build a bounded candidate universe from validated baselines, target-only
    features, graph nodes, graph-derived feeds, cross-assets, sector/regime
    context, proven patterns, feature factories, and user constraints.
-2. Search empirically when it can cheaply test parameters, model families, lags,
-   signs, transformations, graph-node subsets, regimes, sizing, filters, or
-   ensemble membership without leaking future information.
+2. Make empirical construction the main lane: feature factories, weak-signal
+   ensembles, model-family comparison, denoise/compression, graph-node subset
+   search, lag/sign/transformation search, regimes, sizing, and filters.
 3. Keep graph-enriched ideas active early and throughout the search when live
    graph candidates exist. Use target-only candidates as baselines, seeds,
    ablations, and competitors, not as the default escape from graph search.
-4. Declare enough branch metadata for runtime and audit: objective, input
+4. Use simple hand-written target or graph rules as diagnostics, controls,
+   ablations, or refinements around an empirical lead; do not let them dominate
+   the early search while the graph-derived feature universe is unsearched.
+5. Declare enough branch metadata for runtime and audit: objective, input
    universe, evaluation window, effective search width, validation scope, and
    any graph-attribution claim you need to make.
-5. Run `prepare-branch` to materialize branch inputs before trusting the
+6. Run `prepare-branch` to materialize branch inputs before trusting the
    candidate.
-6. Run `debug-branch` to check semantic legality before recording evidence.
-7. Run `run-branch` only when the selected candidate is ready to be recorded.
+7. Run `debug-branch` to check semantic legality before recording evidence.
+8. Run `run-branch` only when the selected candidate is ready to be recorded.
    If the candidate was selected from a search, pass `--selection-trials N`,
    where `N` is this round's effective search width only.
-8. Re-read `evidence_ledger.json`, `frontier.md`, and the latest Edge result.
-9. Let metric shape and failure mode decide the next move: refine, broaden,
+9. Re-read `evidence_ledger.json`, `frontier.md`, and the latest Edge result.
+10. Let metric shape and failure mode decide the next move: refine, broaden,
    change model family, change graph subset, add an ablation, re-search the
    current universe, expand the graph, or stop.
-10. Keep `exploration_path.md` covered with ledger ref, chosen path, compact
+11. Keep `exploration_path.md` covered with ledger ref, chosen path, compact
     reason, Edge feedback, and artifact refs before another recorded round.
 
 Optimization is not a deviation. The failure mode is reporting an unvalidated
@@ -119,13 +125,16 @@ Exhaustion is a ledger conclusion.
 Before making that claim, check that the ledger shows:
 
 1. a bounded candidate universe was actually searched or intentionally ruled out
-2. graph-derived candidates were searched when live graph discovery was
+2. empirical construction was tried when the lane was available: feature
+   factory, model comparison, denoise/compression, ensemble, graph subset,
+   lag/sign/transformation, regime, sizing, or filter search
+3. graph-derived candidates were searched when live graph discovery was
    available, unless the user chose a simple/conservative lane
-3. target/baseline performance was compared against graph-enriched performance
+4. target/baseline performance was compared against graph-enriched performance
    where useful
-4. materially different model families, feature constructions, graph subsets,
+5. materially different model families, feature constructions, graph subsets,
    or search axes were tried, not only one hand-written rule
-5. all attempted width is K-accounted, including preflight or workflow ERROR
+6. all attempted width is K-accounted, including preflight or workflow ERROR
    variants that would otherwise be audited but skipped from future DSR
 
 Stop conditions are a gauntlet-PASS candidate at the target or ledger-supported
@@ -193,10 +202,14 @@ the default URL in the skill code if this endpoint changes.
 Preserve this shape:
 
 ```text
-user objective -> alpha universe -> empirical search -> recorded validation -> explanation/reporting
+user objective -> bounded alpha universe -> empirical construction/search -> recorded validation -> explanation/reporting
 ```
 
 Multiple branches on one input set can still be narrow if they do not change a
 useful search axis. Parameter, threshold, model, factor, regime, sizing, and
 node-subset changes are legitimate search axes when they are intentional and
 K-accounted.
+
+Graph-supported input realization is necessary for graph attribution, but it is
+not the same thing as data-driven construction. A sequence of simple rules with
+graph inputs is still a sequence of simple rules.

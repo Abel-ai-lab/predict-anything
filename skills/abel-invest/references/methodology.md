@@ -25,6 +25,12 @@ high Sharpe, high return, or a constrained risk-return profile. Mechanism
 stories organize results after evidence appears; they should not slow the first
 useful empirical test.
 
+**Empirical construction by default.**
+For ordinary non-grandma alpha search, the first serious lane is a bounded
+feature-factory, model-family, denoise, subset, or ensemble search over target
+and graph-derived data. Simple rules can benchmark, diagnose, ablate, or refine
+an empirical lead, but they are not the default search engine.
+
 **Graph as alpha universe.**
 Abel-discovered causal structure is a validated prior and should normally enter
 candidate generation early. It expands the search beyond target-only price and
@@ -44,6 +50,12 @@ search, lag/sign search, ensembles, regime filters, and sizing search are
 legitimate exploration. Make the search width visible; do not pretend a selected
 winner came from one isolated hand-written idea.
 
+**Graph-supported is not enough.**
+Runtime graph reads prove input realization. They do not by themselves prove the
+agent searched the graph as data. Abel Invest should mine the graph-derived
+universe for subsets, lags, transformations, models, regimes, filters, sizing
+signals, and ensemble roles.
+
 **Gate validates; it does not throttle.**
 The gauntlet, DSR, leakage checks, walk-forward behavior, and promotion gate
 decide what can be reported as robust. They should not prevent empirical
@@ -61,7 +73,7 @@ mechanism essay.
 The natural path is:
 
 ```text
-user objective -> broad candidate universe -> empirical search -> recorded validation -> explanation/reporting
+user objective -> bounded candidate universe -> empirical construction/search -> recorded validation -> explanation/reporting
 ```
 
 Candidate-universe sources include:

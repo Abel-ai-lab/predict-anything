@@ -140,7 +140,7 @@ def test_workspace_context_json_reports_resolved_research_root(
         "run_doctor",
         lambda _root: {
             "status": "ready",
-            "workspace_mode": "alpha-managed branch research",
+            "workspace_mode": "alpha-managed strategy search",
             "next_step": "abel-invest init-session --ticker <TICKER> --exp-id <session-id>",
         },
     )
