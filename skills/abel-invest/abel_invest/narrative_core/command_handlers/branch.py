@@ -314,7 +314,7 @@ def prepare_branch_inputs(args: argparse.Namespace) -> int:
         print(f"  {command_prefix} prepare-branch --branch {branch}")
         return completed.returncode or 1
     else:
-        print("  The branch inputs are ready; use debug preflight first, then record a round once the engine reflects the branch thesis.")
+        print("  The branch inputs are ready; use debug preflight first, then record a round once the engine reflects the candidate.")
         print(f"  {command_prefix} debug-branch --branch {branch}")
         print(f"  {command_prefix} run-branch --branch {branch} -d \"baseline\"")
     return completed.returncode
@@ -507,7 +507,7 @@ def run_branch_round(args: argparse.Namespace) -> int:
             emit_missing_hypothesis_warning = should_emit_missing_hypothesis_warning(branch)
     if emit_missing_hypothesis_warning:
         print(
-            "Warning: recording a round without explicit candidate metadata. "
+            "Audit note: recording a round without explicit candidate metadata. "
             "Before the next round, make objective, selected inputs, search width, and validation scope clear; "
             "add graph attribution only when claiming graph-derived contribution.",
             file=sys.stderr,

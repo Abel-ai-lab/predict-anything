@@ -1,11 +1,11 @@
 ---
 name: abel-invest
 description: >
-  Data-led quant strategy discovery, screening, and guarded validation with
-  causal graph priors. Use this skill whenever the user wants to find, improve,
+  Data-led quant alpha search, screening, and guarded validation with causal
+  graph priors. Use this skill whenever the user wants to find, improve,
   screen, backtest, or stress a trading strategy / alpha / signal, hit a
   Sharpe-or-drawdown target, run graph-enriched feature-factory + ensemble
-  research, or continue/prepare/debug an Abel strategy-discovery workspace —
+  search, or continue/prepare/debug an Abel strategy-discovery workspace —
   even if they don't say "Abel" and even when they just ask for "a good
   strategy for X" or "is there alpha in Y". Prefer this over ad-hoc
   hand-designed strategy work.
@@ -16,14 +16,14 @@ metadata:
         - python3
 ---
 
-# Abel Strategy Discovery
+# Abel Invest Alpha Search
 
 Use this skill for:
 
-- strategy discovery and candidate screening
+- alpha search and candidate screening
 - continuing an existing Abel strategy discovery workspace
 - creating sessions and branches
-- preparing, debugging, recording, and reviewing research rounds
+- preparing, debugging, recording, and reviewing strategy rounds
 - interpreting `evidence_ledger.json`, `frontier.md`, `agent_context.md`, and
   `exploration_path.md`
 
@@ -37,17 +37,17 @@ Always start by resolving workspace state before strategy work.
      directory
    - else if `abel-invest-workspace/alpha.workspace.yaml` exists
      under the current directory, use that child workspace
-   - else bootstrap a workspace before deep research work
+   - else bootstrap a workspace before deep strategy work
 3. Prefer `abel-invest workspace context --path . --json` once a CLI is
    available. If `abel-invest` is not on PATH and an existing workspace has a
    venv, use `<workspace-root>/.venv/bin/abel-invest workspace context --path . --json`
    for this first context check. Use the returned `workspace_root`,
    `research_root`, and `command_prefix` instead of guessing from directory
    names or assuming a global PATH.
-4. Baseline-first: before from-scratch discovery, check whether a validated
+4. Baseline-first: before from-scratch search, check whether a validated
    strategy for this target already exists in any baseline / strategy catalog
-   the user maintains. If one exists, treat it as the baseline and ceiling and
-   iterate from it; do not rediscover from scratch.
+   the user maintains. If one exists, treat it as a benchmark and launchpad;
+   iterate from it when useful rather than wasting rounds rediscovering it.
 5. Run `<command_prefix> doctor --path <workspace-root>`.
 6. If doctor reports `runtime_stale`, `env_missing`, `edge_missing`, or
    `edge_contract_missing`, run the exact command from `next_step`, then rerun
@@ -64,7 +64,7 @@ Always start by resolving workspace state before strategy work.
   read `references/experiment-loop.md`.
 - Grandma mode, simple-return screening, or conservative no-leverage exploration:
   read `references/grandma-mode.md`.
-- Live graph discovery, graph frontier expansion, or graph-informed data context:
+- Live graph discovery, graph frontier expansion, or graph-informed alpha context:
   read `references/discovery-protocol.md`.
 - Creating or revising `branch.yaml`, reviewing evidence labels,
   path coverage, input realization, or exploration path use:
@@ -81,8 +81,8 @@ Always start by resolving workspace state before strategy work.
   optimization). Core path — not optional — when a performance bar is set.
 - Before writing "exhausted / ceiling / no edge":
   read `references/experiment-loop.md` and check the ledger requirements there.
-- Considering a plausible but not-yet-canonical research principle, including
-  broad feature-factory or ensemble construction:
+- Broad empirical construction, including ML, feature-factory, model-family,
+  graph-subset, HPO, regime/filter/sizing, or ensemble search:
   read `references/principles-to-test.md`.
 
 ## Operating Rules
@@ -102,24 +102,24 @@ Always:
   bootstrap.
 - If a skill update changed the workspace runtime contract, `doctor` reports
   `runtime_stale`. Run the suggested `next_step` command and rerun doctor before
-  research work. Do not refresh on every entry when doctor is already ready.
+  strategy work. Do not refresh on every entry when doctor is already ready.
 - Reuse existing Abel auth first. If live access is missing, use `abel-auth` and
   rerun `doctor`.
 - Report to the user with the current workspace/session/branch path, doctor
   status, blockers, what evidence exists, and the next action you will take.
 - Treat `agent_context.md` as the compact factual resume surface,
   `exploration_path.md` as the human-facing chosen-path and Edge-feedback log.
-- Baseline-first: before from-scratch discovery, check whether a validated
+- Baseline-first: before from-scratch search, check whether a validated
   strategy for this target already exists in any baseline / strategy catalog the
-  user maintains. If one exists, treat it as the baseline and ceiling and iterate
-  from it; do not rediscover from scratch.
+  user maintains. If one exists, treat it as a benchmark and launchpad; iterate
+  from it when useful rather than wasting rounds rediscovering it.
 
 Never:
 
 - Do not create sessions before workspace context resolves.
 - Do not use `--root` unless intentionally creating a legacy/offline session;
   then pass `--allow-outside-workspace`.
-- Do not treat `branch.yaml` as evidence. It is a research declaration.
+- Do not treat `branch.yaml` as evidence. It is an audit declaration.
 - Do not treat `evidence_ledger.json`, `frontier.md`, or `agent_context.md` as
   generated strategy advice. They are factual surfaces.
 - Do not hide parameter, sizing, threshold, filter, model, factor, or node-subset
@@ -133,73 +133,74 @@ Never:
 - Do not depend on any external skill for guarded optimization; abel-invest runs
   it self-contained.
 
-Research discipline:
+Alpha search stance:
 
 - User objective first. The default job is to find a high-quality strategy for
   the user's stated goal, usually high Sharpe, high return, or an explicit
   risk-return target.
-- Data leads the search. Let observed results, failure modes, and metric shape
-  decide the next candidate family. Mechanism stories explain and organize; they
-  do not admit a strategy by themselves.
-- New sessions use live causal graph discovery when available. The graph is the
-  default high-value expanded candidate universe beyond target-only history, not
-  a mandatory full-frontier first branch.
-- Graph-enriched candidates should normally be tried early unless the user chose
-  a simple/conservative lane, a validated baseline already defines the immediate
-  path, or live graph access is blocked.
-- Target-only candidates are baselines and competing candidates, not second-class
-  evidence. If a target-only strategy survives validation it can be the best
-  strategy; use it to measure graph-derived marginal contribution.
+- Search hard, then explain. Let observed results, failure modes, and metric
+  shape choose the next candidate family. Mechanism stories are useful after
+  evidence appears; they are not admission tickets.
+- New sessions use live causal graph discovery when available. Treat the graph
+  as the default high-value alpha feature universe beyond target-only history:
+  node subsets, lags, signs, transformations, ratios, regimes, model features,
+  sizing signals, filters, and ensemble members are all fair game.
+- Graph-enriched ideas should appear early and recur throughout the search
+  unless the user chose a simple/conservative lane, a validated baseline already
+  defines the immediate path, or live graph access is blocked. Do not turn this
+  into a full-frontier quota or a broad basket ritual.
+- Target-only work is useful as a baseline, seed, ablation, or competing
+  candidate. It should not become the lazy default when live graph candidates
+  are available; use it to measure whether graph-derived information improves
+  the objective or robustness.
 - A hard user metric target (Sharpe / MaxDD / PnL) is an optimization request.
-  Search is allowed: use target/baseline context, graph-derived features,
-  feature factories, ensembles, parameter search, model-family comparison, and
-  node-subset search when useful. Then report only gauntlet-surviving candidates
-  honestly.
+  Search is expected: use target/baseline context, graph-derived features,
+  feature factories, ensembles, parameter search, model-family comparison,
+  HPO, regime/sizing/filter search, and node-subset search when useful. Then
+  report only gauntlet-surviving candidates honestly.
 - `--selection-trials N` is mandatory for any search width. `N` is this round's
   width only; the framework accumulates the campaign total from prior PASS/FAIL
   rounds itself. Fold preflight/ERROR-disqualified variants into a later
   per-round count when they would otherwise be skipped. See
   `references/guarded-optimization.md`.
-- Graph-derived search should mine the causal node universe empirically. Do not
-  force the first serious candidate to use the whole directly discovered depth-1
-  frontier as one basket. Let data select subsets, lags, transformations,
-  models, and graph roles. Do not require 2-hop on the first round; use
-  `frontier expand` when current evidence suggests missing information or a
-  useful expanded feature universe.
+- Graph-derived search should mine the causal node universe empirically. Let
+  data select subsets, lags, transformations, models, and graph roles. Do not
+  require 2-hop on the first round; use `frontier expand` when current evidence
+  suggests missing information or a useful expanded feature universe.
 - Exhaustion is ledger-proven, never asserted. Do not write "exhausted",
-  "ceiling", or "no untested mechanism" unless the ledger shows, K-accounted:
-  full discovered frontier where relevant, materially different mechanism
-  classes, any intentionally tested principle and its search impact, and all
-  attempted width including otherwise-skipped ERROR/preflight variants. A green
-  per-candidate gauntlet does not certify search exhaustiveness.
+  "ceiling", or "no edge" unless the ledger shows, K-accounted: the bounded
+  candidate universe, materially different search axes, graph-derived and
+  target/baseline contrasts where useful, any intentionally tested principle and
+  its search impact, and all attempted width including otherwise-skipped
+  ERROR/preflight variants. A green per-candidate gauntlet does not certify
+  search exhaustiveness.
 - CAP graph nodes are model-supported causal priors. Trust that they carry
   target-relevant information, but do not infer disclosed weight, exact lag,
   signed effect, monotone strength, or tradable direction from the role alone.
   Parent and child roles disclose causal-flow orientation; Abel Invest's
   `blanket` role is a Markov-blanket discovery bucket, not a fixed causal-flow
   direction.
-- When using CAP graph nodes in a branch, state the graph use contract before
-  treating the round as graph-supported candidate evidence: selected nodes,
-  construction, intended role, unresolved assumption, and falsification scope.
-  This contract describes the agent's current use of the nodes; it is not a
-  fixed role implied by the graph.
+- When claiming graph-derived contribution, keep the graph use contract clear:
+  selected nodes, construction, intended role, unresolved assumption, and
+  falsification scope. This can be lightweight before validation and richer
+  after a pass or meaningful near-pass.
 - If a branch combines multiple graph nodes as one same-direction, equal-weight,
   or same-lag basket, declare that construction explicitly. A failed basket only
   invalidates that construction unless other evidence supports a broader graph
   conclusion.
-- Expand graph breadth when current evidence suggests missing information,
-  unavailable inputs, or a promising external mechanism. Do not expand merely to
+- Expand the graph frontier when current evidence suggests missing information,
+  unavailable inputs, or a promising external driver. Do not expand merely to
   satisfy graph coverage.
 - Before expanding to a more distant frontier, consider whether subset, lag,
   sign, transformation, model-family, regime, or sizing search over the current
   graph-derived universe is more likely to improve the user's objective.
-- Branch count is not proof of breadth. Graph-node concentration,
-  strategy-variant coverage, and local refinement are separate facts.
-- Abel Ask or narrative context can scout mechanism ideas, supplemental drivers,
+- Branch count is not proof of breadth. Graph-node concentration, model/factor
+  coverage, strategy-variant coverage, and local refinement are separate facts.
+- Abel Ask or narrative context can scout candidate ideas, supplemental drivers,
   or graph expansion questions. It is not validation evidence.
 - Use narrative scout context only when it helps generate candidate features,
   graph expansion anchors, or interpretation. It is optional context, not a
-  required research ritual.
+  required ritual.
 - Every recorded round requires an `exploration_path.md` entry with the chosen
   path, compact reason, Edge feedback, round ledger reference, and any scout
   influence before the next recorded round.
@@ -207,7 +208,8 @@ Research discipline:
   graph-supported evidence when runtime reads the prepared graph inputs.
   When graph-node reads are inferred from asset reads, preserve that source as a
   fact rather than overstating edge-native field-level proof.
-- The framework defines evidence validity. The agent owns the strategy thinking.
+- The framework defines legality, evidence validity, search-width accounting,
+  and reportability. The agent owns the alpha search.
 - In grandma mode, prefer simple target-only or low-complexity branches, keep
   executed exposure unlevered, and judge candidates by simple return plus
   `pnl_to_maxdd` evidence from the `grandma_daily` profile.
@@ -235,9 +237,9 @@ Glossary:
 - CAP: Abel causal graph surface used as a prior.
 - Edge: Abel runtime that prepares data and validates strategies.
 - DSR: deflated Sharpe ratio accounting; `--selection-trials` records effective
-  search width and is not permission to brute-force candidates.
+  search width and does not replace final validation.
 - Ledger: `evidence_ledger.json`, the evidence record.
-- Frontier: `frontier.md` / `frontier.json`, factual exploration coverage.
+- Frontier: `frontier.md` / `frontier.json`, factual search coverage.
 - PASS/FAIL: Edge validation verdicts, not instructions to stop thinking.
-- Narrative scout: Abel Ask/domain-context pass used for hypothesis generation,
+- Narrative scout: Abel Ask/domain-context pass used for candidate generation,
   not validation.

@@ -135,7 +135,7 @@ def handle_set_hypothesis(args: argparse.Namespace) -> int:
     hypothesis = str(args.text or "").strip()
     if not has_explicit_hypothesis(hypothesis):
         raise RuntimeError(
-            "Hypothesis text must include a real causal claim, not an empty placeholder."
+            "Candidate note must include a real search claim or objective, not an empty placeholder."
         )
     with SessionLock(session):
         persist_branch_hypothesis(branch, hypothesis, source="manual")
@@ -150,13 +150,13 @@ def handle_set_hypothesis(args: argparse.Namespace) -> int:
                 "mode": "",
                 "verdict": "",
                 "decision": "",
-                "description": "Updated persistent branch hypothesis",
+                "description": "Updated persistent branch candidate note",
                 "artifact_path": str((branch / BRANCH_STATE_FILENAME).relative_to(session)),
             },
         )
         render_session(session)
-    print(f"Updated branch hypothesis for {branch}")
-    print(f"  hypothesis: {hypothesis}")
+    print(f"Updated branch candidate note for {branch}")
+    print(f"  candidate_note: {hypothesis}")
     command_prefix = command_prefix_for_path(branch)
     print("")
     print("From here:")

@@ -497,7 +497,7 @@ def test_build_skill_dashboard_bundle_uses_current_evidence_surfaces(tmp_path: P
         "\n".join(
             [
                 "# round-001",
-                "- hypothesis: `AAPL driver strength leads TSLA next-day risk appetite.`",
+                "- candidate_note: `AAPL driver strength leads TSLA next-day risk appetite.`",
                 "- expected_signal: `positive cross-asset lead`",
                 "- changed_dimensions: `drivers`",
                 "- summary: `candidate evidence round`",

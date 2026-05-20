@@ -2110,14 +2110,14 @@ def test_debug_rows_do_not_count_as_recorded_candidate_rounds(tmp_path) -> None:
     assert exploration["dominant_evidence_neighborhood_rows"] == 4
 
 
-def test_init_session_output_uses_data_led_graph_enriched_loop() -> None:
+def test_init_session_output_uses_data_led_graph_enriched_alpha_search() -> None:
     lines = ni.render_data_led_start_lines(Path("research/tsla/demo"))
     rendered = "\n".join(lines)
 
     assert "<family-a-branch>" in rendered
     assert "<family-b-branch>" in rendered
     assert "graph-v1" not in rendered
-    assert "data-led graph-enriched exploration loop" in rendered
+    assert "data-led graph-enriched alpha search" in rendered
     assert "exploration_path.md" in rendered
     assert "research_journal.md" not in rendered
 

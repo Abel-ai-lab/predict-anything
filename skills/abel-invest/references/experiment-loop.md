@@ -14,7 +14,7 @@ Use the resolved workspace `research_root`. Do not pass `--root` unless this
 is an intentional legacy/offline session outside a workspace; in that case pass
 `--allow-outside-workspace` too.
 
-## Standard Path
+## Start Or Resume
 
 Examples assume the current directory is `<workspace_root>` and session paths are
 relative to that root.
@@ -27,17 +27,51 @@ Run:
 ```
 
 Live graph discovery should run by default when available. Its output is the
-default high-value expanded candidate universe, not a mandatory first branch and
-not a requirement to run the whole depth-1 frontier as one basket.
+default high-value alpha feature universe, not a mandatory first branch and not
+a requirement to run the whole depth-1 frontier as one basket.
 
-Then choose a candidate path from the user's objective and the data context:
+When resuming, read:
 
-- existing validated baselines or catalog strategies
-- target-only features as baseline and competing candidates
-- graph-derived feeds and causal nodes as the default expanded feature universe
-- available sector, cross-asset, volume, liquidity, and regime features
-- proven empirical patterns and feature-factory ideas
-- user constraints such as Sharpe, drawdown, return, grandma mode, or no leverage
+- `agent_context.md` for compact factual state
+- `frontier.md` for graph nodes, runtime reads, input realization, search
+  concentration, metric failures, and path coverage
+- `exploration_path.md` for the human-facing path log
+- latest `edge-result.json` / `edge-validation.md` for concrete feedback
+
+## Search Loop
+
+Each round should push toward the user's objective.
+
+1. Build a broad candidate universe from validated baselines, target-only
+   features, graph nodes, graph-derived feeds, cross-assets, sector/regime
+   context, proven patterns, feature factories, and user constraints.
+2. Search empirically when it can cheaply test parameters, model families, lags,
+   signs, transformations, graph-node subsets, regimes, sizing, filters, or
+   ensemble membership without leaking future information.
+3. Keep graph-enriched ideas active early and throughout the search when live
+   graph candidates exist. Use target-only candidates as baselines, seeds,
+   ablations, and competitors, not as the default escape from graph search.
+4. Declare enough branch metadata for runtime and audit: objective, input
+   universe, evaluation window, effective search width, validation scope, and
+   any graph-attribution claim you need to make.
+5. Run `prepare-branch` to materialize branch inputs before trusting the
+   candidate.
+6. Run `debug-branch` to check semantic legality before recording evidence.
+7. Run `run-branch` only when the selected candidate is ready to be recorded.
+   If the candidate was selected from a search, pass `--selection-trials N`,
+   where `N` is this round's effective search width only.
+8. Re-read `evidence_ledger.json`, `frontier.md`, and the latest Edge result.
+9. Let metric shape and failure mode decide the next move: refine, broaden,
+   change model family, change graph subset, add an ablation, re-search the
+   current universe, expand the graph, or stop.
+10. Keep `exploration_path.md` covered with ledger ref, chosen path, compact
+    reason, Edge feedback, and artifact refs before another recorded round.
+
+Optimization is not a deviation. The failure mode is reporting an unvalidated
+raw winner, not searching. Use honest K/search-width accounting and final
+validation before claiming success.
+
+## Branch Execution
 
 Create one or more branches for selected candidates:
 
@@ -53,53 +87,9 @@ Then prepare, debug, and record the agent-chosen candidate:
 <command_prefix> run-branch --branch research/<ticker>/<exp_id>/branches/<candidate-branch> -d "candidate search result"
 ```
 
-If the recorded candidate was selected from a local parameter, model, factor, or
-node-subset search, pass `--selection-trials N`, where `N` is this round's
-effective search width only.
-
-After the recorded round, keep `research/<ticker>/<exp_id>/exploration_path.md`
-covered with ledger ref, chosen path, compact reason, Edge feedback, and artifact
-refs before another recorded round.
-
-Only after the user asks to publish the paper-ready session, or agrees after a
-PASS:
-
-```bash
-<command_prefix> visualize-session --session research/<ticker>/<exp_id> --with-strategy-artifact
-```
-
-## Research Loop
-
-Each round should advance the search toward the user objective.
-
-1. Read `agent_context.md` when resuming.
-2. Use `frontier.md` for factual context: available graph nodes, runtime reads,
-   input realization, search concentration, metric failures, and path coverage.
-3. Use `exploration_path.md` as the concise round log. It protects visualization
-   and replay completeness; entries should stay short.
-4. Generate candidates from the target/baseline context and the graph-enriched
-   candidate universe.
-5. Prefer empirical screening when it can cheaply test parameter choices, model
-   families, lags, signs, transformations, graph-node subsets, or feature
-   factories without leaking future information.
-6. Compare graph-enriched candidates against target/baseline candidates to
-   measure marginal graph contribution instead of assuming it.
-7. Declare enough branch metadata for runtime and audit: objective, input
-   universe, evaluation window, search width, and validation scope. Mechanism
-   and graph-attribution notes can stay lightweight until evidence is strong.
-8. Run `prepare-branch` before trusting branch inputs.
-9. Run `debug-branch` before recording evidence.
-10. Run `run-branch` only when declaration and debug facts are ready enough for
-    the evidence label you want.
-11. Re-read `evidence_ledger.json`, `frontier.md`, and the latest Edge result.
-12. Let metric failures choose the next route: refine, re-search, change model
-    family, change graph subset, add target/baseline contrast, or stop.
-13. Ensure `exploration_path.md` has the recorded round before starting another
-    recorded round.
-
-Optimization is not a deviation. The failure mode is reporting an unvalidated
-raw winner, not searching. Use honest K/search-width accounting and final
-validation before claiming success.
+If performance scouting happened before the recorded candidate, declare the
+effective search width and record what happened in `exploration_path.md`. Treat
+the result as search-informed rather than pretending it was one isolated idea.
 
 ## Layer Ownership
 
@@ -120,25 +110,21 @@ selected one submitted candidate from multiple variants, pass
 `--selection-trials N`, where `N` is this round's width only, never a running
 campaign total. `guarded-optimization.md` owns the final-K reporting rules.
 
-If performance scouting happened before the recorded candidate, declare the
-effective search width and record what happened in `exploration_path.md`. Treat
-the result as search-informed rather than pretending it was one isolated idea.
-
 ## Before Exhaustion Or No-Edge Claims
 
 Do not write "exhausted", "ceiling", or "no edge" from a single failed
-mechanism, a small round count, or a green per-candidate gauntlet. Exhaustion is
-a ledger conclusion.
+candidate family, a small round count, or a green per-candidate gauntlet.
+Exhaustion is a ledger conclusion.
 
 Before making that claim, check that the ledger shows:
 
 1. a bounded candidate universe was actually searched or intentionally ruled out
-2. graph-derived candidates were considered when live graph discovery was
+2. graph-derived candidates were searched when live graph discovery was
    available, unless the user chose a simple/conservative lane
 3. target/baseline performance was compared against graph-enriched performance
    where useful
-4. materially different model families, feature constructions, or search axes
-   were tried, not only one hand-written rule
+4. materially different model families, feature constructions, graph subsets,
+   or search axes were tried, not only one hand-written rule
 5. all attempted width is K-accounted, including preflight or workflow ERROR
    variants that would otherwise be audited but skipped from future DSR
 
@@ -164,7 +150,7 @@ prepared graph inputs, that round is summarized as a graph input read gap and
 should not be used as evidence for graph-derived contribution.
 
 The generated surfaces should show what happened, not tell you which driver,
-proxy, threshold, model family, or mechanism to try next.
+proxy, threshold, model family, or route to try next.
 
 Abel Ask or narrative context can help form candidate features, graph expansion
 anchors, and interpretation. It is scout context, not validation evidence.
@@ -202,17 +188,15 @@ Default router base URL: `https://api.abel.ai/router/`.
 `abel-auth` is the canonical owner for API key setup. Maintainers should update
 the default URL in the skill code if this endpoint changes.
 
-## Exploration Discipline
+## Alpha Search Discipline
 
-`discovery-protocol.md` owns graph context, CAP role interpretation, frontier
-expansion, and narrative scout facts. In the round loop, preserve the core
-shape:
+Preserve this shape:
 
 ```text
-user objective -> candidate universe -> empirical screening -> recorded validation -> explanation
+user objective -> alpha universe -> empirical search -> recorded validation -> explanation/reporting
 ```
 
-Multiple branches on one graph input set can still be a narrow search if they do
-not change the useful search axis. Parameter, threshold, model, factor, and node
-subset changes are legitimate search axes when they are intentional and
+Multiple branches on one input set can still be narrow if they do not change a
+useful search axis. Parameter, threshold, model, factor, regime, sizing, and
+node-subset changes are legitimate search axes when they are intentional and
 K-accounted.

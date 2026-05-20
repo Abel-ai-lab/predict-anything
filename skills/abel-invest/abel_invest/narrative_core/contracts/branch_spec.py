@@ -25,9 +25,9 @@ def normalize_hypothesis_text(value: str) -> str:
     if text:
         return text
     return (
-        "Hypothesis missing. Before the next round, state the causal claim, "
-        "graph use contract when applicable, expected sign/timing assumption, "
-        "and invalidation condition explicitly."
+        "Candidate note missing. Before the next round, state the search "
+        "objective, selected input universe, search width when applicable, "
+        "and graph-use claim when claiming graph-derived contribution."
     )
 
 
@@ -37,6 +37,7 @@ def has_explicit_hypothesis(value: str) -> bool:
         text
         and text != "No hypothesis supplied."
         and not text.startswith("Hypothesis missing.")
+        and not text.startswith("Candidate note missing.")
     )
 
 
@@ -634,14 +635,14 @@ def build_context_guide_markdown(
         "- use `ctx.points()` when you need path-sensitive cross-calendar logic",
         "",
         "## Declaration Fields",
-        "- `hypothesis`: compact candidate claim or search objective",
+        "- `hypothesis`: legacy field name for compact candidate note or search objective",
         "- `evidence_intent`: candidate, control, diagnostic, or draft",
         "- `input_claim`: graph_supported, target_only, supplement, or mixed",
         "- graph-attribution claims should state selected nodes, construction, intended role, unresolved assumption, and falsification scope",
         "- `mechanism_family`: factual mechanism label when known",
         "- `invalidation_condition`: what would weaken the claim or candidate path",
         "",
-        "## Protocol Checklist",
+        "## Audit Checklist",
         "1. Inspect `probe_samples.json` and `data_manifest.json`.",
         "2. Edit `engine.py` against `DecisionContext`.",
         "3. Run debug-branch with the workspace command prefix first to read semantic preflight.",

@@ -3,9 +3,11 @@
 Use this reference when a hard performance target is set, such as Sharpe, Lo,
 MaxDD, PnL, or a constrained risk-return objective.
 
-Optimization is first-class. The failure mode is not search; the failure mode is
-reporting a raw search winner as robust before legality, K accounting, and the
-gauntlet agree.
+Optimization is first-class. When the user gives a hard performance target,
+Abel Invest should behave like an alpha searcher, not like a hand-authored
+mechanism essay. The failure mode is not search; the failure mode is reporting a
+raw search winner as robust before legality, K accounting, and the gauntlet
+agree.
 
 Self-contained: the agent runs this via abel-invest's own CLI only. No external
 optimizer skill is required.
@@ -17,7 +19,8 @@ optimizer skill is required.
 - MaxDD / PnL / LossYrs / Lo / IC / DSR / triangle are validation gates or
   diagnostics, not a reason to hide the primary objective.
 - Use target/baseline behavior to measure whether graph-enriched candidates add
-  value beyond target self-history.
+  value beyond target self-history, but keep graph-derived search active when
+  graph candidates are live.
 
 ## Two-Stage Loop
 
@@ -33,7 +36,7 @@ Good candidate-universe sources:
   feature universe
 - sector, cross-asset, liquidity, volume, and regime features when justified by
   user goal or evidence
-- proven patterns and feature factories
+- proven patterns, feature factories, learned models, and ensembles
 
 Allowed search moves:
 
@@ -43,12 +46,14 @@ Allowed search moves:
 - model-family comparison
 - HPO
 - feature-factory and ensemble screening
+- regime, sizing, and filter search
 - denoise or compression when temporally legal
 
 During screening:
 
 - do not use future information
-- do not search an unbounded universe unless the user explicitly asks for it
+- do not search an unbounded universe unless the user explicitly asks for that
+  scope
 - record enough detail to reproduce the submitted candidate
 - keep count of effective search width
 - failures are information; they do not need to clear the gauntlet
@@ -114,7 +119,8 @@ honestly when no survivor clears final-K validation.
 - Reporting a raw search winner as robust.
 - Hiding search width inside one branch.
 - Treating the whole depth-1 frontier as the only legitimate first candidate.
-- Refusing to let a validated target-only candidate compete when it is the
+- Letting target-only become the default escape from live graph-derived search.
+- Refusing to report a validated target-only candidate when it is honestly the
   strongest strategy found.
 - Under-counting `--selection-trials`.
 - Passing cumulative `--selection-trials`.

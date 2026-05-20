@@ -1,98 +1,90 @@
 # Methodology
 
-Use this optional reference when the user asks why the workflow is data-led,
-why the causal graph still matters, why evidence labels are strict, or why
-validation gates do not replace strategy search.
+Use this optional reference when the user asks why Abel Invest is data-driven,
+why the causal graph still matters, why search is allowed, or why validation
+gates do not replace strategy search.
 
 ## Boundary
 
-The product boundary is:
+Abel Invest is an alpha-search product.
 
 ```text
-framework = runtime legality, evidence facts, search-width accounting, validation
-agent = candidate generation, strategy search, and research judgment
+framework = temporal legality, evidence facts, search-width accounting, reportability
+agent = candidate generation, empirical search, and strategy judgment
 ```
 
-`abel-edge` owns runtime legality and validation metrics.
-`abel-invest` owns branch declarations, evidence labels, candidate-universe
-facts, search-width accounting, and the exploration path surface.
+`abel-edge` owns runtime legality and validation metrics. `abel-invest` owns
+branch declarations, evidence labels, candidate-universe facts, search-width
+accounting, and the exploration path surface. The agent owns what to try next.
 
-## Core Principles
+## Core Stance
 
-**Data-led objective search.**
+**Search hard, then explain.**
 The job is to find a high-quality strategy for the user's objective, usually
-high Sharpe, high return, or a constrained risk-return profile. Observed
-results, failure modes, and metric shape should drive the next candidate family.
-Mechanism stories organize and explain the search; they do not admit a strategy.
+high Sharpe, high return, or a constrained risk-return profile. Mechanism
+stories organize results after evidence appears; they should not slow the first
+useful empirical test.
 
-**Graph as default high-value candidate universe.**
+**Graph as alpha universe.**
 Abel-discovered causal structure is a validated prior and should normally enter
 candidate generation early. It expands the search beyond target-only price and
-volume history. That does not mean the first serious candidate must use the
-entire depth-1 frontier as one basket. The graph supplies a node universe; data
-selects subsets, lags, transformations, model families, and roles such as alpha,
-filter, sizing signal, or regime context.
+volume history. The graph supplies a rich node universe; data selects subsets,
+lags, signs, transformations, model families, interaction terms, filters,
+sizing signals, and regime roles.
 
-**Target-only is baseline and competitor, not second-class evidence.**
-Target-only candidates can be first-class strategies when they survive
-validation. They also establish the benchmark for graph-derived marginal
-contribution. A graph-enriched candidate should earn its place by improving the
-objective or robustness relative to target/baseline behavior, not by graph
-membership alone.
+**Target-only as benchmark, seed, and competitor.**
+Target-only candidates are useful baselines, simple seeds, ablations, and
+competing strategies. They should not become the default hiding place when live
+graph candidates are available. Their main product role is to reveal whether
+graph-derived information improves the objective or robustness.
 
-**Search is allowed when honestly accounted.**
-Parameter search, model hyperparameter search, factor construction, graph-node
-subset search, lag/sign search, and feature-factory screening are legitimate
-ways to find strategies. The product should make search width visible and
-K-accounted rather than pushing the agent to hide many experiments inside one
-hand-written strategy.
+**ML and feature factories are normal.**
+Feature-factory screening, model-family comparison, HPO, graph-node subset
+search, lag/sign search, ensembles, regime filters, and sizing search are
+legitimate exploration. Make the search width visible; do not pretend a selected
+winner came from one isolated hand-written idea.
 
-**Gate validates; it does not throttle exploration.**
+**Gate validates; it does not throttle.**
 The gauntlet, DSR, leakage checks, walk-forward behavior, and promotion gate
 decide what can be reported as robust. They should not prevent empirical
 screening. A raw-metric winner is not a strategy success until it clears the
 required validation with honest search-width accounting.
 
-**Evidence entry; mechanism is post-hoc.**
-A candidate enters on validation survival, not on the strength of its mechanism
-story. Mechanism and graph-attribution notes are most useful after a pass or
-meaningful near-pass, when there is evidence worth explaining.
-
-**Runtime legality is non-negotiable.**
-If a strategy reads information it could not have seen at decision time, the
-backtest is invalid. The current authoring contract expresses legal reads
-through `DecisionContext` and semantic preflight.
-
-**Multi-dimensional validation beats single-metric reporting.**
-The validation profile can evolve, but the principle is stable: avoid promoting
-strategies from one attractive metric when other evidence says the signal is
-fragile, concentrated, illegal, or not robust after K accounting.
-
-**The exploration path is evidence-linked and concise.**
+**Artifact completeness stays hard.**
 `exploration_path.md` preserves each recorded round's selected path, compact
-reason, Edge feedback, and ledger/artifact references. It protects
-visualization and replay completeness. It should not require a heavy mechanism
-essay before the next candidate can run.
+reason, Edge feedback, and ledger/artifact refs. It protects visualization and
+replay completeness. Keep it short and evidence-linked; do not turn it into a
+mechanism essay.
 
-## Current Workflow Consequence
+## Search Shape
 
-The branch-default path is:
+The natural path is:
+
+```text
+user objective -> broad candidate universe -> empirical search -> recorded validation -> explanation/reporting
+```
+
+Candidate-universe sources include:
+
+- validated baselines or catalog strategies
+- target history and target-only simple features
+- causal graph nodes and graph-derived feeds
+- sector, cross-asset, liquidity, volume, and regime feeds
+- proven empirical patterns
+- feature factories, learned models, and ensembles
+- user constraints such as drawdown, no leverage, or grandma mode
+
+The runtime path stays stable:
 
 1. resolve workspace and doctor readiness
-2. check existing baselines or strategy catalog entries
-3. start or resume a session; run live graph discovery when available
-4. build a candidate universe from target/baseline features, graph nodes,
-   available cross-assets, proven patterns, and user constraints
-5. generate and screen candidates empirically, including graph-enriched feature
-   factories, ensembles, node subsets, lag/sign searches, model-family
-   comparisons, and simple target baselines
-6. keep search width honest and avoid temporal leakage
-7. declare enough candidate metadata for runtime and audit: objective, inputs,
-   window, search width, and validation scope
-8. prepare branch inputs
-9. write `compute_decisions(self, ctx)` against `DecisionContext`
-10. run semantic preflight
-11. record selected candidates through Edge with the right `--selection-trials`
-12. inspect ledger/frontier facts and metric failures
-13. keep `exploration_path.md` covered before the next recorded round
-14. explain mechanism and graph contribution after evidence, not before
+2. start or resume a session; run live graph discovery when available
+3. search candidates empirically without temporal leakage
+4. declare enough candidate metadata for runtime and audit
+5. `prepare-branch` to materialize inputs
+6. `debug-branch` to check semantic legality
+7. `run-branch` to record selected candidates with `--selection-trials` when
+   search width was used
+8. read ledger/frontier/Edge facts
+9. keep `exploration_path.md` covered
+10. explain mechanism and graph contribution after there is evidence worth
+    explaining

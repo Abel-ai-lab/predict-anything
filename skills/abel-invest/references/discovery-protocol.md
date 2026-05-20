@@ -1,4 +1,4 @@
-# Graph-Informed Data Context
+# Graph-Informed Alpha Context
 
 Use this reference after workspace preflight is complete when live graph
 discovery, graph-derived feeds, or frontier expansion are relevant.
@@ -7,15 +7,16 @@ Commands below use the workspace `command_prefix` returned by
 
 ## Purpose
 
-The graph frontier answers one question:
+The graph frontier answers one product question:
 
 Which causal graph nodes are currently known, and how can they enrich the
-candidate universe?
+alpha universe?
 
 It does not prescribe the first strategy branch. It does not mean the whole
 depth-1 frontier should be traded as one basket. CAP graph nodes are a validated
 source of structure and should normally enter candidate generation early, but
-data decides the tradable expression.
+data decides the tradable expression: subset, lag, sign, transformation, model,
+filter, sizing signal, or ensemble role.
 
 Live graph discovery is the normal session opening:
 
@@ -43,20 +44,22 @@ The branch selects inputs from this session context in `branch.yaml`. The
 evidence ledger later records declared, prepared, and actual graph node read
 facts.
 
-## Candidate Universe
+## Alpha Universe
 
-Use the graph as the default high-value expanded feature universe:
+Use the graph as the default high-value expanded feature universe, and search it
+like an alpha source rather than a checklist:
 
 - target history and validated baselines establish the benchmark
 - graph nodes and graph-derived feeds are the normal next place to look for
-  incremental information
+  incremental information when live graph candidates exist
 - available cross-assets, sector peers, volume, liquidity, and regime variables
   can supplement the graph when the user goal or evidence supports them
-- proven patterns and feature factories turn the universe into candidate signals
+- proven patterns, feature factories, ML models, and ensembles turn the universe
+  into candidate signals
 
-Target-only candidates are not second-class. They are baselines and competing
-strategy candidates. Their job is to make graph-derived marginal contribution
-visible.
+Target-only candidates are baselines, seeds, ablations, and competing strategy
+candidates. Their job is to make graph-derived marginal contribution visible,
+not to replace graph search as the default when graph candidates are live.
 
 ## CAP Role Interpretation
 
@@ -91,10 +94,11 @@ Use graph context as a search prior and feature universe:
 - compare linear, tree, ensemble, and hybrid model families when useful
 - use graph-derived signals as alpha core, confirmation, filter, sizing signal,
   or regime context according to what the data supports
+- keep weak standalone graph signals if they add diversity inside an ensemble
 
 Do not expand the graph merely to satisfy coverage. Expand when current
 evidence suggests missing information, unavailable inputs, an external
-mechanism, or a promising feature universe outside the current frontier:
+driver, or a promising feature universe outside the current frontier:
 
 ```bash
 <command_prefix> frontier status --session research/<ticker>/<exp_id>
@@ -107,8 +111,8 @@ candidate-universe question. The result is new or updated nodes in
 
 Good expansion reasons include a missing liquidity, supply-chain, market-state,
 or demand-regime motif; current-frontier availability or input-realization
-limits; or user/narrative context that names a plausible real-world mechanism
-outside the current frontier. Weak reasons include "graph breadth is always
+limits; or user/narrative context that names a plausible external driver
+outside the current frontier. Weak reasons include "more graph nodes are always
 good" or "the product expects graph coverage."
 
 Before expanding to a more distant frontier, consider whether the current graph
@@ -118,7 +122,7 @@ the user's objective.
 
 ## Narrative Scout
 
-Abel Ask and narrative context can improve exploration efficiency by generating
+Abel Ask and narrative context can improve search efficiency by generating
 candidate features, supplemental drivers, graph expansion anchors, or
 interpretation. Use them when they help the empirical search.
 
@@ -150,8 +154,8 @@ When moving from graph context into a branch:
 
 - choose inputs that match the candidate search question
 - write selected runtime inputs into `branch.yaml`
-- keep graph attribution lightweight before validation unless the branch needs
-  a specific graph claim
+- keep graph attribution lightweight before validation unless the branch needs a
+  specific graph claim
 - use readiness to understand coverage, not to auto-ban ideas
 - run `prepare-branch` before a recorded round
 - after the round, check input realization facts before treating a declared
@@ -169,4 +173,4 @@ selected_inputs:
 ```
 
 Readiness is advisory. Do not collapse every branch onto the latest common start
-unless the branch thesis truly requires strict overlap.
+unless the candidate expression truly requires strict overlap.

@@ -351,7 +351,7 @@ def classify_result_frame(result: dict[str, object]) -> tuple[str, str]:
             )
         return (
             "validation_result",
-            "Validation ran on the current mechanism; interpret this as research evidence rather than a workflow blocker.",
+            "Validation ran on the current candidate expression; interpret this as search evidence rather than a workflow blocker.",
         )
 
     if verdict == "PASS" and str(semantic.get("verdict") or "").upper() == "PASS":

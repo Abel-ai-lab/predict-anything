@@ -104,11 +104,12 @@ def resolve_session_root(
 def render_data_led_start_lines(session: Path) -> list[str]:
     command_prefix = command_prefix_for_path(session)
     return [
-        "data-led graph-enriched exploration loop:",
+        "data-led graph-enriched alpha search:",
         f"read {session / EXPLORATION_PATH_FILENAME} and latest Edge results before choosing the next candidate or round",
         f"{command_prefix} init-branch --session {session} --branch-id <family-a-branch>",
         f"{command_prefix} init-branch --session {session} --branch-id <family-b-branch>",
         "edit branch.yaml with objective, selected inputs, search width when applicable, and validation scope",
+        "use graph candidates early when live graph discovery is available; use target-only as baseline, seed, ablation, or competitor",
         f"after each recorded round, keep {EXPLORATION_PATH_FILENAME} updated with ledger ref, chosen path, compact reason, Edge feedback, and artifact refs",
     ]
 

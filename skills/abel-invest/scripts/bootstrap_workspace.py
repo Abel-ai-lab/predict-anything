@@ -259,7 +259,7 @@ defaults:
 def render_readme(name: str) -> str:
     return f"""# {name}
 
-This is an Abel strategy discovery workspace.
+This is an Abel Invest alpha-search workspace.
 
 From this workspace root, use `./.venv/bin/abel-invest` as the command prefix,
 or activate `.venv` first and then use `abel-invest`.
@@ -289,8 +289,9 @@ Report to the user:
 
 Do not treat `branch.yaml` as evidence. Prepare and debug branch inputs before a
 recorded round, and update `exploration_path.md` after every recorded round.
-Graph context is a high-value candidate universe, not a required full-frontier
-first strategy.
+Graph context is a high-value alpha universe, not a required full-frontier first
+strategy. Target-only is a baseline, seed, ablation, or competitor, not the
+default substitute for live graph search.
 """
 
 

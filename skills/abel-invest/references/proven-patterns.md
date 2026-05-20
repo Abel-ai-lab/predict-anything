@@ -2,11 +2,10 @@
 
 These are patterns that worked on specific assets at specific times.
 They are evidence of what's possible, not instructions for what to do.
-Read them for inspiration during EXPLORE mode, ideally after the branch already
-has a runnable `branch.yaml -> prepare-branch -> debug-branch` path.
+Read them as candidate generators and feature-library ideas during EXPLORE mode.
 Do NOT copy-paste or treat the listed metrics as targets. Understand the
-mechanism, declare why it applies to the current branch, and let new evidence
-decide.
+candidate shape, adapt it to the current alpha universe, and let new evidence
+decide whether it deserves more search width.
 
 These notes are not the primary legality contract.
 
@@ -145,7 +144,7 @@ through 0.50/1.50 — Sharpe-Lo tradeoff. In that run, 0.60/1.40 maximized Lo wi
 collapsing Sharpe below threshold.
 
 **Failure modes**: RSI as an ML feature is noise. RSI as a position overlay is signal.
-This distinction was confirmed in BNB research: adding RSI as a feature degraded Sharpe
+This distinction was confirmed in a BNB run: adding RSI as a feature degraded Sharpe
 by 8%; using it as an overlay improved Lo. Do not conflate the two uses. After the
 overlay, cap the final position so `abs(position) <= 1`.
 
@@ -173,7 +172,7 @@ differ per asset:
 - BNB: H=1/3/5 weights 50/30/20 — crypto volatility benefits from multi-horizon
 
 **Failure modes**: Copying META weights to AAPL degraded performance — each asset
-must run independent autoresearch to find its optimal horizon weights.
+must run independent search to find its optimal horizon weights.
 
 **Look-ahead traps**:
 - Training targets: `y = returns.shift(-H)` — correct, this is the future return.
@@ -195,7 +194,7 @@ single-asset momentum. Abel shows ETH→BNB causal weight = 0, so this is a
 correlation-derived supplement rather than a causal core signal. It was still
 tradeable, but only as an empirically validated add-on.
 
-**When**: BNB Phase 1 research. Adding 8 crypto peers (ADA, ETH, SOL, XRP, etc.)
+**When**: BNB Phase 1 search. Adding 8 crypto peers (ADA, ETH, SOL, XRP, etc.)
 was the single biggest breakthrough: IC +34%, top-18 parent list includes ADA and ETH.
 Direct Abel parents only gave 2 of the top-18 — 2-hop + crypto sector peers dominated.
 

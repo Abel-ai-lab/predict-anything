@@ -16,13 +16,14 @@ Commands below use the workspace `command_prefix` returned by
 - `run-branch` consumes prepared inputs and records evidence.
 
 The graph frontier gives high-value leads, not answers. Readiness gives
-coverage clues, not permission. A branch is a candidate strategy expression:
-objective, input universe, runtime constraints, and enough explanation to make
-the search reproducible.
+coverage facts, not a veto. A branch is a candidate strategy expression:
+objective, input universe, runtime constraints, and enough detail to make the
+search reproducible and auditable.
 
-## Candidate Metadata
+## Candidate Audit Surface
 
-Do not make every branch carry a full mechanism essay before it can run. Split
+Do not make every branch carry a full mechanism essay before it can run.
+`branch.yaml` should unblock runtime and audit with compact facts. Split
 metadata into two layers.
 
 Minimum metadata for ordinary candidate exploration:
@@ -41,7 +42,7 @@ Explanation metadata, useful but not always blocking before a first run:
 - graph attribution or graph use contract
 - invalidation scope
 - narrative scout notes
-- why a candidate family is worth further search
+- why a candidate family is worth further search or later explanation
 
 The evidence ledger derives labels from explicit declaration fields plus actual
 edge runtime facts. `frontier.md` and `frontier.json` report facts; they are not
@@ -50,9 +51,10 @@ a strategy advisor.
 ## Evidence Boundary
 
 `branch.yaml` is a claim, not proof. For strong, comparable evidence, keep these
-fields meaningful when possible:
+compatibility fields meaningful when possible. The field names are stable API
+surface; they do not require the agent to write a pre-evidence theory:
 
-- `hypothesis`
+- `hypothesis` (legacy field name for candidate note / search objective)
 - `evidence_intent`
 - `input_claim`
 - `mechanism_family`
@@ -64,8 +66,8 @@ fields meaningful when possible:
 - `exploration_role`
 
 Incomplete explanation fields should not make a promising candidate impossible
-to test, but they can limit how much mechanism or graph attribution the result
-supports.
+to test. They can limit how much mechanism or graph attribution the result
+supports until the agent writes a clearer post-evidence explanation.
 
 `selected_inputs` is the one authoring field for branch inputs. Prefer
 structured graph node entries when graph attribution matters:
@@ -169,7 +171,7 @@ construction. Do not conclude that graph nodes are useless unless materially
 different graph-derived constructions, target/baseline comparisons, and search
 axes have been tested or intentionally ruled out.
 
-When an insight should survive as a research conclusion, cite evidence such as
+When an insight should survive as a strategy conclusion, cite evidence such as
 `ledger:<branch_id>:<round_id>`, `frontier.md`, or a raw artifact path.
 
 ## Prepared Inputs
@@ -190,7 +192,7 @@ used by the current runtime.
 
 ## Candidate Self-Check
 
-Before recording a branch, be able to state:
+Before recording a branch, be able to state the minimum audit facts:
 
 - the objective or metric target
 - the input universe and why it is bounded
@@ -201,14 +203,16 @@ Before recording a branch, be able to state:
 
 For graph-attribution claims, also state the selected graph nodes,
 construction, intended role, unresolved assumption, and falsification scope.
+Keep this compact before validation; expand it after a pass or meaningful
+near-pass.
 
 If a branch was chosen because it ranked best in a local metric scan, that is
 normal candidate search. Declare the search width with `--selection-trials` and
 record the selection influence in `exploration_path.md`.
 
-## What To Do
+## Minimal Runtime Path
 
-1. State candidate metadata in `branch.yaml`.
+1. State the audit-relevant candidate metadata in `branch.yaml`.
 2. Run `<command_prefix> prepare-branch --branch ...`.
 3. Inspect `inputs/context_guide.md`, `inputs/probe_samples.json`, and
    `inputs/data_manifest.json`.
@@ -220,11 +224,12 @@ record the selection influence in `exploration_path.md`.
 9. Keep `exploration_path.md` covered with ledger ref, chosen path, compact
    reason, Edge feedback, and artifact refs.
 
-## Research Judgment
+## Alpha Search Judgment
 
 - causal discovery is a high-value prior, not a trading instruction
-- target-only is a baseline and competitor, not second-class evidence
-- graph-enriched search should normally be tried early when graph discovery is
+- target-only is a baseline, seed, ablation, and competitor; it should not
+  become the default when graph candidates are live
+- graph-enriched search should appear early and recur when graph discovery is
   available
 - branch count is not search breadth if every branch hides the same search axis
 - weird low-attention graph nodes are not automatically noise
@@ -233,4 +238,4 @@ record the selection influence in `exploration_path.md`.
 - metric failure is evidence about the candidate expression, not a reason to
   hack metrics
 - stop honestly when recent rounds are no longer improving and no high-quality
-  new direction remains
+  new direction remains after the bounded search is ledger-supported

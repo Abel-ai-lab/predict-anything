@@ -35,7 +35,8 @@ tuning to improve the ratio.
 
 ## What Not To Do
 
-- Do not treat grandma mode as permission to brute-force metric targets.
+- Do not treat grandma mode as a way to ignore validation or search-width
+  accounting.
 - Do not promote a levered candidate even if total return looks attractive.
 - Do not require graph-enriched breadth before a simple target-only candidate can be
   judged.

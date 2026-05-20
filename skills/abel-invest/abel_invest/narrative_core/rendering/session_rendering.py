@@ -132,7 +132,7 @@ def print_status(session: Path) -> None:
             f"{latest.get('verdict', 'n/a')} {latest.get('score', '?/?')} "
             f"{latest_note.get('failure_signature', 'unknown')} "
             f"active={latest_note.get('signal_activity', 'n/a')} "
-            f"hypothesis={'yes' if has_explicit_hypothesis(branch_hypothesis) else 'no'}"
+            f"candidate_note={'yes' if has_explicit_hypothesis(branch_hypothesis) else 'no'}"
         )
 
 
