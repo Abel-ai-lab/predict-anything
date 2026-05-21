@@ -486,7 +486,7 @@ def test_prepare_branch_inputs_writes_runtime_contract_artifacts(tmp_path, monke
     assert "DecisionContext" in context_guide
 
 
-def test_default_branch_spec_starts_as_graph_first_draft_declaration(tmp_path) -> None:
+def test_default_branch_spec_starts_with_graph_enriched_candidate_context(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-decl", tmp_path / "research")
     ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
@@ -966,7 +966,7 @@ def test_run_branch_round_records_dsr_k_accounting(tmp_path, monkeypatch, capsys
     assert result == 0
     captured = capsys.readouterr()
     assert "Selection-trials audit" in captured.err
-    assert "does not make sweep-selected candidates part of standard discovery" in captured.err
+    assert "does not by itself validate raw sweep winners" in captured.err
 
     dsr_rows = _read_jsonl(session / "dsr_trials.jsonl")
     assert len(dsr_rows) == 1
@@ -1487,7 +1487,7 @@ def test_run_branch_round_appends_exploration_path_edge_feedback(tmp_path, monke
     path_text = (session / "exploration_path.md").read_text(encoding="utf-8")
     assert "ledger:graph-v1:round-001" in path_text
     assert "path: test AAPL graph momentum timing" in path_text
-    assert "why: AAPL driver strength leads TSLA next-day risk appetite." in path_text
+    assert "compact reason: AAPL driver strength leads TSLA next-day risk appetite." in path_text
     assert "AAPL driver strength leads TSLA next-day risk appetite." in path_text
     assert "Edge feedback" in path_text
     assert "FAIL" in path_text
@@ -1613,7 +1613,7 @@ def test_path_coverage_required_after_recorded_evidence_without_round_entries(tm
     frontier = json.loads((session / ni.FRONTIER_JSON_FILENAME).read_text(encoding="utf-8"))
     context_text = (session / ni.AGENT_CONTEXT_FILENAME).read_text(encoding="utf-8")
 
-    assert frontier["graph_priority"]["graph_first_uncovered"] is False
+    assert frontier["candidate_universe"]["graph_supported_candidate_round_count"] == 6
     assert frontier["exploration_breadth"]["branch_family_count"] == 2
     assert frontier["path_coverage"] == {
         "recorded_round_count": 6,
@@ -1894,7 +1894,8 @@ def test_path_coverage_and_input_realization_for_empty_workspace_9_shape(tmp_pat
 
     labels = frontier["evidence_label_counts"]
     assert labels["candidate_causal_evidence"] == 1
-    assert labels["target_control_evidence"] == 3
+    assert labels["candidate_strategy_evidence"] == 3
+    assert labels.get("target_control_evidence", 0) == 0
     assert frontier["path_coverage"]["path_coverage_complete"] is False
     assert frontier["path_coverage"]["recorded_round_count"] == 4
     assert frontier["input_realization"] == {
@@ -1905,7 +1906,7 @@ def test_path_coverage_and_input_realization_for_empty_workspace_9_shape(tmp_pat
     }
 
     gap_row = next(row for row in ledger["rows"] if row["branch_id"] == "momentum-regime")
-    assert gap_row["evidence_label"] == "target_control_evidence"
+    assert gap_row["evidence_label"] == "candidate_strategy_evidence"
     assert gap_row["input_realization"]["graph_input_read_gap"] is True
     assert gap_row["input_realization"]["realized_input_claim"] == "target_only"
     assert "path_coverage_complete: `false`" in frontier_text
@@ -1948,7 +1949,7 @@ def test_input_breadth_remains_factual_without_route_warning(tmp_path) -> None:
     context_text = (session / ni.AGENT_CONTEXT_FILENAME).read_text(encoding="utf-8")
 
     assert frontier["input_breadth"]["input_breadth_thin"] is True
-    assert frontier["graph_priority"]["graph_candidates_available"] is True
+    assert frontier["candidate_universe"]["graph_candidates_available"] is True
     assert "input_breadth_thin: `true`" in context_text
     assert "input_breadth_thin=true" not in "\n".join(
         ni.path_coverage_warning_lines(session)
@@ -1972,7 +1973,7 @@ def test_input_breadth_remains_factual_without_route_warning(tmp_path) -> None:
     assert frontier["input_breadth"]["input_breadth_thin"] is False
 
 
-def test_graph_priority_warns_when_graph_candidates_are_uncovered(tmp_path) -> None:
+def test_candidate_universe_keeps_graph_context_factual_for_target_only_search(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-graph-uncovered", tmp_path / "research")
     ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
@@ -1996,16 +1997,14 @@ def test_graph_priority_warns_when_graph_candidates_are_uncovered(tmp_path) -> N
     frontier = json.loads((session / ni.FRONTIER_JSON_FILENAME).read_text(encoding="utf-8"))
     context_text = (session / ni.AGENT_CONTEXT_FILENAME).read_text(encoding="utf-8")
 
-    assert frontier["graph_priority"]["graph_candidates_available"] is True
-    assert frontier["graph_priority"]["graph_first_uncovered"] is True
-    assert frontier["graph_priority"]["graph_discovery_missing"] is False
-    assert "graph_first_uncovered: `true`" in context_text
-    assert ni.graph_priority_warning_lines(session) == [
-        "graph_first_uncovered=true graph_discovery_k=2 target_only_saturation=true"
-    ]
+    assert frontier["candidate_universe"]["graph_candidates_available"] is True
+    assert frontier["candidate_universe"]["graph_discovery_k"] == 2
+    assert frontier["evidence_label_counts"]["candidate_strategy_evidence"] == 3
+    assert "graph_candidates_available: `true`" in context_text
+    assert "## Candidate Universe" in context_text
 
 
-def test_mixed_graph_reads_remain_supplemental_for_graph_priority(tmp_path) -> None:
+def test_mixed_graph_reads_remain_supplemental_for_candidate_universe(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-mixed-supplemental", tmp_path / "research")
     ni.write_graph_frontier_from_discovery_payload(session, _sample_discovery())
     ni.write_readiness(session, _sample_readiness())
@@ -2028,10 +2027,10 @@ def test_mixed_graph_reads_remain_supplemental_for_graph_priority(tmp_path) -> N
 
     assert frontier["evidence_label_counts"]["supplemental_evidence"] == 3
     assert frontier["input_breadth"]["graph_supported_candidate_round_count"] == 0
-    assert frontier["graph_priority"]["graph_first_uncovered"] is True
+    assert frontier["candidate_universe"]["graph_candidates_available"] is True
 
 
-def test_graph_priority_warns_when_discovery_is_missing_and_target_only_saturates(tmp_path) -> None:
+def test_missing_discovery_remains_factual_without_target_only_route_warning(tmp_path) -> None:
     session = ni.init_session_dir("TSLA", "tsla-graph-missing", tmp_path / "research")
     target_branch = ni.init_branch_dir(session, "target-control")
     target_spec = _complete_candidate_spec(target_branch, selected_inputs=[])
@@ -2052,15 +2051,9 @@ def test_graph_priority_warns_when_discovery_is_missing_and_target_only_saturate
     ni.render_session(session)
     frontier = json.loads((session / ni.FRONTIER_JSON_FILENAME).read_text(encoding="utf-8"))
 
-    assert frontier["graph_priority"]["graph_candidates_available"] is False
-    assert frontier["graph_priority"]["graph_discovery_missing"] is True
-    assert frontier["graph_priority"]["graph_first_uncovered"] is False
-    assert ni.graph_priority_warning_lines(session) == [
-        "graph_discovery_missing=true "
-        "graph_discovery_source=pending "
-        "graph_discovery_k=0 "
-        "target_only_saturation=true"
-    ]
+    assert frontier["candidate_universe"]["graph_candidates_available"] is False
+    assert frontier["candidate_universe"]["graph_discovery_source"] == "pending"
+    assert frontier["evidence_label_counts"]["candidate_strategy_evidence"] == 3
 
 
 def test_debug_rows_do_not_count_as_recorded_candidate_rounds(tmp_path) -> None:
@@ -2117,14 +2110,17 @@ def test_debug_rows_do_not_count_as_recorded_candidate_rounds(tmp_path) -> None:
     assert exploration["dominant_evidence_neighborhood_rows"] == 4
 
 
-def test_init_session_output_uses_graph_first_research_loop() -> None:
-    lines = ni.render_breadth_first_start_lines(Path("research/tsla/demo"))
+def test_init_session_output_uses_data_led_graph_enriched_alpha_search() -> None:
+    lines = ni.render_data_led_start_lines(Path("research/tsla/demo"))
     rendered = "\n".join(lines)
 
-    assert "<family-a-branch>" in rendered
-    assert "<family-b-branch>" in rendered
+    assert "<feature-factory-branch>" in rendered
+    assert "<model-or-denoise-branch>" in rendered
+    assert "<target-control-branch>" in rendered
     assert "graph-v1" not in rendered
-    assert "graph-first research loop" in rendered
+    assert "data-led graph-enriched alpha search" in rendered
+    assert "first serious non-grandma lane should be empirical construction" in rendered
+    assert "simple hand-written rules are diagnostics or refinements" in rendered
     assert "exploration_path.md" in rendered
     assert "research_journal.md" not in rendered
 

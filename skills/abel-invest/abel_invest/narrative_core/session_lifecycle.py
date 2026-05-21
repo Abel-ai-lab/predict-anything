@@ -101,15 +101,17 @@ def resolve_session_root(
     )
 
 
-def render_breadth_first_start_lines(session: Path) -> list[str]:
+def render_data_led_start_lines(session: Path) -> list[str]:
     command_prefix = command_prefix_for_path(session)
     return [
-        "graph-first research loop:",
-        f"read {session / EXPLORATION_PATH_FILENAME} and latest Edge results before choosing the next branch or round",
-        f"{command_prefix} init-branch --session {session} --branch-id <family-a-branch>",
-        f"{command_prefix} init-branch --session {session} --branch-id <family-b-branch>",
-        "edit each branch.yaml with graph/input hypotheses and agent-chosen mechanism-family declarations",
-        f"after each recorded round, keep {EXPLORATION_PATH_FILENAME} updated with the path, why, Edge feedback, and ledger ref",
+        "data-led graph-enriched alpha search:",
+        f"read {session / EXPLORATION_PATH_FILENAME} and latest Edge results before choosing the next candidate or round",
+        "ordinary alpha search posture: empirical construction over a bounded target + graph-derived universe",
+        f"{command_prefix} init-branch --session {session} --branch-id <candidate-branch>",
+        "edit branch.yaml with objective, selected inputs, search width when applicable, and validation scope",
+        "let data decide how to express graph-derived information: features, models, subsets, lags, regimes, sizing, filters, or ensembles",
+        "use target-only as baseline, seed, ablation, or competitor; simple hand-written rules are diagnostics or refinements, not the default main lane",
+        f"after each recorded round, keep {EXPLORATION_PATH_FILENAME} updated with ledger ref, chosen path, compact reason, Edge feedback, and artifact refs",
     ]
 
 

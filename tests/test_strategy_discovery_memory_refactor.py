@@ -497,7 +497,7 @@ def test_build_skill_dashboard_bundle_uses_current_evidence_surfaces(tmp_path: P
         "\n".join(
             [
                 "# round-001",
-                "- hypothesis: `AAPL driver strength leads TSLA next-day risk appetite.`",
+                "- candidate_note: `AAPL driver strength leads TSLA next-day risk appetite.`",
                 "- expected_signal: `positive cross-asset lead`",
                 "- changed_dimensions: `drivers`",
                 "- summary: `candidate evidence round`",
@@ -876,7 +876,7 @@ def test_post_skill_dashboard_session_sends_to_session_endpoint() -> None:
     assert timeout == 60
 
 
-def test_select_best_pass_strategy_sorts_validation_rounds_by_pass_rate_first(
+def test_select_best_pass_strategy_sorts_validation_rounds_by_sharpe_first(
     tmp_path: Path,
 ) -> None:
     session = ni.init_session_dir("MSFT", "msft-v1", tmp_path / "research")
@@ -934,34 +934,32 @@ def test_select_best_pass_strategy_sorts_validation_rounds_by_pass_rate_first(
     assert result.skip_reason == ""
     assert result.validation_round_count == 4
     assert result.pass_round_count == 4
-    assert result.eligible_count == 3
-    assert result.selected_branch_id == "regime_switch"
-    assert result.selected_round_id == "round-002"
+    assert result.eligible_count == 4
+    assert result.selected_branch_id == "momentum_lead"
+    assert result.selected_round_id == "round-006"
     assert result.selected is not None
     assert result.selected.selection_rank == 1
-    assert result.selected.selection_metric_values == {
-        "pass_rate": 11 / 13,
-        "sharpe": 0.508,
-        "calmar": 0.5,
-        "max_dd": -0.1805,
-    }
+    assert result.selected.selection_metric_values["sharpe"] == 0.967
+    assert result.selected.selection_metric_values["annual_return"] == 0.42
+    assert result.selected.selection_metric_values["max_dd_abs"] == 0.1278
+    assert result.selected.selection_metric_values["pass_rate"] == 10 / 13
 
 
-def test_select_best_pass_strategy_sorts_by_sharpe_calmar_max_dd_then_latest(
+def test_select_best_pass_strategy_sorts_by_sharpe_return_drawdown_then_latest(
     tmp_path: Path,
 ) -> None:
     session = ni.init_session_dir("MSFT", "msft-v1", tmp_path / "research")
     lower_sharpe = ni.init_branch_dir(session, "lower_sharpe")
-    higher_calmar = ni.init_branch_dir(session, "higher_calmar")
-    lower_calmar = ni.init_branch_dir(session, "lower_calmar")
-    better_drawdown = ni.init_branch_dir(session, "better_drawdown")
+    lower_return = ni.init_branch_dir(session, "lower_return")
+    worse_drawdown = ni.init_branch_dir(session, "worse_drawdown")
+    earlier = ni.init_branch_dir(session, "earlier")
     later = ni.init_branch_dir(session, "later")
-    for branch, sharpe, calmar, max_dd in [
-        (lower_sharpe, 1.1, 9.0, -0.05),
-        (higher_calmar, 1.2, 3.1, -0.12),
-        (lower_calmar, 1.2, 2.9, -0.03),
-        (better_drawdown, 1.2, 3.1, -0.08),
-        (later, 1.2, 3.1, -0.08),
+    for branch, sharpe, annual_return, max_dd in [
+        (lower_sharpe, 1.1, 0.90, -0.05),
+        (lower_return, 1.2, 0.20, -0.03),
+        (worse_drawdown, 1.2, 0.30, -0.12),
+        (earlier, 1.2, 0.30, -0.08),
+        (later, 1.2, 0.30, -0.08),
     ]:
         _write_strategy_result_row(
             session,
@@ -972,7 +970,7 @@ def test_select_best_pass_strategy_sorts_by_sharpe_calmar_max_dd_then_latest(
             lo_adj=1.0,
             max_dd=max_dd,
             score="9/13",
-            calmar=calmar,
+            annual_return=annual_return,
         )
         ni.append_tsv_row(
             session / "events.tsv",
@@ -997,6 +995,61 @@ def test_select_best_pass_strategy_sorts_by_sharpe_calmar_max_dd_then_latest(
     assert result.selected_branch_id == "later"
     assert result.selected is not None
     assert result.selected.session_round_index == 5
+
+
+def test_select_best_pass_strategy_can_host_discarded_fail_validation_rounds(
+    tmp_path: Path,
+) -> None:
+    session = ni.init_session_dir("AAPL", "aapl-v1", tmp_path / "research")
+    lower = ni.init_branch_dir(session, "lower_discarded_fail")
+    higher = ni.init_branch_dir(session, "higher_discarded_fail")
+    for index, (branch, sharpe, annual_return, max_dd) in enumerate(
+        [
+            (lower, 1.1, 0.10, -0.08),
+            (higher, 1.4, 0.05, -0.12),
+        ],
+        start=1,
+    ):
+        _write_strategy_result_row(
+            session,
+            branch,
+            round_id="round-001",
+            verdict="FAIL",
+            sharpe=sharpe,
+            lo_adj=sharpe,
+            max_dd=max_dd,
+            score="7/9",
+            annual_return=annual_return,
+            decision="discard",
+        )
+        ni.append_tsv_row(
+            session / "events.tsv",
+            ni.EVENTS_HEADER,
+            {
+                "timestamp": f"2026-04-24T01:2{index}:00+00:00",
+                "event": "round_recorded",
+                "branch_id": branch.name,
+                "round_id": "round-001",
+                "mode": "explore",
+                "verdict": "FAIL",
+                "decision": "discard",
+                "description": branch.name,
+                "artifact_path": (
+                    f"branches/{branch.name}/outputs/round-001-edge-result.json"
+                ),
+            },
+        )
+
+    result = ni.select_best_pass_strategy(session)
+
+    assert result.skip_reason == ""
+    assert result.validation_round_count == 2
+    assert result.eligible_count == 2
+    assert result.selected_branch_id == "higher_discarded_fail"
+    assert result.selected_round_id == "round-001"
+    assert result.selected is not None
+    assert result.selected.decision == "discard"
+    assert result.selected.selection_metric_values["sharpe"] == 1.4
 
 
 def test_select_best_pass_strategy_returns_skip_when_no_validation(tmp_path: Path) -> None:
@@ -1103,10 +1156,13 @@ def test_build_strategy_artifact_manifest_uses_router_contract_fields(
         "selectionScope": "session",
         "selectionMetricOrder": ["pass_rate", "sharpe", "calmar", "max_dd"],
         "selectionMetricValues": {
+            "lo_adjusted": 1.056,
+            "annual_return": 0.42,
             "pass_rate": 1.0,
             "sharpe": 0.967,
             "calmar": 3.28,
             "max_dd": -0.1278,
+            "max_dd_abs": 0.1278,
         },
         "selectionRank": 1,
     }
@@ -1291,7 +1347,10 @@ def test_export_selected_strategy_artifact_writes_local_bundle(
         "runtime/data_manifest.json",
         "edge/promotion-gate.json",
     ]
-    assert manifest["source"]["selectionMode"] == "auto_best_validation_by_pass_rate"
+    assert (
+        manifest["source"]["selectionMode"]
+        == "auto_best_validation_by_pass_rate"
+    )
     assert manifest["source"]["selectionScope"] == "session"
     assert manifest["promotion"]["mode"] == "zero_change"
 

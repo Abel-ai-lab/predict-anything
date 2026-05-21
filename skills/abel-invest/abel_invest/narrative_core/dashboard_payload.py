@@ -94,7 +94,11 @@ def build_skill_dashboard_bundle(branch: Path, *, uploaded_at: str | None = None
     }
 
     discovered_drivers = ordered_unique_upper(ledger.get("discovered_drivers") or [])
-    graph_priority = frontier.get("graph_priority") if isinstance(frontier.get("graph_priority"), dict) else {}
+    candidate_universe = (
+        frontier.get("candidate_universe")
+        if isinstance(frontier.get("candidate_universe"), dict)
+        else {}
+    )
     input_realization = frontier.get("input_realization") if isinstance(frontier.get("input_realization"), dict) else {}
     path_coverage = frontier.get("path_coverage") if isinstance(frontier.get("path_coverage"), dict) else {}
     return {
@@ -111,7 +115,13 @@ def build_skill_dashboard_bundle(branch: Path, *, uploaded_at: str | None = None
                 "graphDiscoveryK": ledger.get("graph_discovery_k", discovery.get("K_discovery", 0)),
                 "discoveredDrivers": discovered_drivers,
                 "frontierRows": frontier.get("row_count", 0),
-                "graphFirstUncovered": bool(graph_priority.get("graph_first_uncovered")),
+                "graphCandidatesAvailable": bool(
+                    candidate_universe.get("graph_candidates_available")
+                ),
+                "graphCandidateCoverage": candidate_universe.get(
+                    "discovered_driver_coverage",
+                    "0/0",
+                ),
                 "pathCoverage": path_coverage,
                 "inputRealization": input_realization,
             },

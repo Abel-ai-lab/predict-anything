@@ -102,15 +102,16 @@ def print_status(session: Path) -> None:
             print(f"Coverage hint: {line}")
     if frontier:
         labels = frontier.get("evidence_label_counts") or {}
-        graph_priority = frontier.get("graph_priority") or {}
+        candidate_universe = frontier.get("candidate_universe") or {}
         path_coverage = frontier.get("path_coverage") or {}
         print(
             "Evidence frontier: "
             f"rows={frontier.get('row_count', 0)} "
             f"candidate_causal={labels.get('candidate_causal_evidence', 0)} "
+            f"candidate_strategy={labels.get('candidate_strategy_evidence', 0)} "
             f"target_control={labels.get('target_control_evidence', 0)} "
             f"workflow_blockers={frontier.get('workflow_blockers', 0)} "
-            f"graph_first_uncovered={str(graph_priority.get('graph_first_uncovered', False)).lower()} "
+            f"graph_candidates_available={str(candidate_universe.get('graph_candidates_available', False)).lower()} "
             f"path_coverage_complete={str(path_coverage.get('path_coverage_complete', False)).lower()}"
         )
     for branch in branches:
@@ -131,7 +132,7 @@ def print_status(session: Path) -> None:
             f"{latest.get('verdict', 'n/a')} {latest.get('score', '?/?')} "
             f"{latest_note.get('failure_signature', 'unknown')} "
             f"active={latest_note.get('signal_activity', 'n/a')} "
-            f"hypothesis={'yes' if has_explicit_hypothesis(branch_hypothesis) else 'no'}"
+            f"candidate_note={'yes' if has_explicit_hypothesis(branch_hypothesis) else 'no'}"
         )
 
 
@@ -241,28 +242,6 @@ def validate_exploration_protocol(session: Path, failures: list[str]) -> None:
             "exploration path coverage incomplete: "
             f"missing_path_rounds={', '.join(str(item) for item in missing_rounds)}"
         )
-
-
-def graph_priority_warning_lines(session: Path) -> list[str]:
-    frontier = load_json_object(session / FRONTIER_JSON_FILENAME)
-    graph_priority = frontier.get("graph_priority") if isinstance(frontier.get("graph_priority"), dict) else {}
-    if not graph_priority:
-        return []
-    lines: list[str] = []
-    if graph_priority.get("graph_discovery_missing"):
-        lines.append(
-            "graph_discovery_missing=true "
-            f"graph_discovery_source={graph_priority.get('graph_discovery_source', 'unknown')} "
-            f"graph_discovery_k={graph_priority.get('graph_discovery_k', 0)} "
-            f"target_only_saturation={str(graph_priority.get('target_only_saturation', False)).lower()}"
-        )
-    if graph_priority.get("graph_first_uncovered"):
-        lines.append(
-            "graph_first_uncovered=true "
-            f"graph_discovery_k={graph_priority.get('graph_discovery_k', 0)} "
-            f"target_only_saturation={str(graph_priority.get('target_only_saturation', False)).lower()}"
-        )
-    return lines
 
 
 def path_coverage_missing_rounds(session: Path) -> list[str]:
