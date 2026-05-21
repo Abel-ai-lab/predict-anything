@@ -876,7 +876,7 @@ def test_post_skill_dashboard_session_sends_to_session_endpoint() -> None:
     assert timeout == 60
 
 
-def test_select_best_pass_strategy_sorts_validation_rounds_by_pass_rate_first(
+def test_select_best_pass_strategy_sorts_validation_rounds_by_sharpe_first(
     tmp_path: Path,
 ) -> None:
     session = ni.init_session_dir("MSFT", "msft-v1", tmp_path / "research")
@@ -935,33 +935,31 @@ def test_select_best_pass_strategy_sorts_validation_rounds_by_pass_rate_first(
     assert result.validation_round_count == 4
     assert result.pass_round_count == 4
     assert result.eligible_count == 3
-    assert result.selected_branch_id == "regime_switch"
-    assert result.selected_round_id == "round-002"
+    assert result.selected_branch_id == "momentum_lead"
+    assert result.selected_round_id == "round-006"
     assert result.selected is not None
     assert result.selected.selection_rank == 1
-    assert result.selected.selection_metric_values == {
-        "pass_rate": 11 / 13,
-        "sharpe": 0.508,
-        "calmar": 0.5,
-        "max_dd": -0.1805,
-    }
+    assert result.selected.selection_metric_values["sharpe"] == 0.967
+    assert result.selected.selection_metric_values["annual_return"] == 0.42
+    assert result.selected.selection_metric_values["max_dd_abs"] == 0.1278
+    assert result.selected.selection_metric_values["pass_rate"] == 10 / 13
 
 
-def test_select_best_pass_strategy_sorts_by_sharpe_calmar_max_dd_then_latest(
+def test_select_best_pass_strategy_sorts_by_sharpe_return_drawdown_then_latest(
     tmp_path: Path,
 ) -> None:
     session = ni.init_session_dir("MSFT", "msft-v1", tmp_path / "research")
     lower_sharpe = ni.init_branch_dir(session, "lower_sharpe")
-    higher_calmar = ni.init_branch_dir(session, "higher_calmar")
-    lower_calmar = ni.init_branch_dir(session, "lower_calmar")
-    better_drawdown = ni.init_branch_dir(session, "better_drawdown")
+    lower_return = ni.init_branch_dir(session, "lower_return")
+    worse_drawdown = ni.init_branch_dir(session, "worse_drawdown")
+    earlier = ni.init_branch_dir(session, "earlier")
     later = ni.init_branch_dir(session, "later")
-    for branch, sharpe, calmar, max_dd in [
-        (lower_sharpe, 1.1, 9.0, -0.05),
-        (higher_calmar, 1.2, 3.1, -0.12),
-        (lower_calmar, 1.2, 2.9, -0.03),
-        (better_drawdown, 1.2, 3.1, -0.08),
-        (later, 1.2, 3.1, -0.08),
+    for branch, sharpe, annual_return, max_dd in [
+        (lower_sharpe, 1.1, 0.90, -0.05),
+        (lower_return, 1.2, 0.20, -0.03),
+        (worse_drawdown, 1.2, 0.30, -0.12),
+        (earlier, 1.2, 0.30, -0.08),
+        (later, 1.2, 0.30, -0.08),
     ]:
         _write_strategy_result_row(
             session,
@@ -972,7 +970,7 @@ def test_select_best_pass_strategy_sorts_by_sharpe_calmar_max_dd_then_latest(
             lo_adj=1.0,
             max_dd=max_dd,
             score="9/13",
-            calmar=calmar,
+            annual_return=annual_return,
         )
         ni.append_tsv_row(
             session / "events.tsv",
@@ -1099,14 +1097,22 @@ def test_build_strategy_artifact_manifest_uses_router_contract_fields(
         "ticker": "TSLA",
         "branchId": "momentum_lead",
         "roundId": "round-006",
-        "selectionMode": "auto_best_validation_by_pass_rate",
+        "selectionMode": "auto_best_validation_by_sharpe_annual_return",
         "selectionScope": "session",
-        "selectionMetricOrder": ["pass_rate", "sharpe", "calmar", "max_dd"],
+        "selectionMetricOrder": [
+            "sharpe",
+            "annual_return",
+            "max_dd_abs",
+            "pass_rate",
+        ],
         "selectionMetricValues": {
+            "lo_adjusted": 1.056,
+            "annual_return": 0.42,
             "pass_rate": 1.0,
             "sharpe": 0.967,
             "calmar": 3.28,
             "max_dd": -0.1278,
+            "max_dd_abs": 0.1278,
         },
         "selectionRank": 1,
     }
@@ -1291,7 +1297,10 @@ def test_export_selected_strategy_artifact_writes_local_bundle(
         "runtime/data_manifest.json",
         "edge/promotion-gate.json",
     ]
-    assert manifest["source"]["selectionMode"] == "auto_best_validation_by_pass_rate"
+    assert (
+        manifest["source"]["selectionMode"]
+        == "auto_best_validation_by_sharpe_annual_return"
+    )
     assert manifest["source"]["selectionScope"] == "session"
     assert manifest["promotion"]["mode"] == "zero_change"
 
@@ -2515,7 +2524,7 @@ def test_upload_strategy_artifact_for_session_returns_upload_summary(
     assert result["selectedBranchId"] == "momentum_lead"
 
 
-def test_visualize_session_uploads_narrative_only_by_default(
+def test_visualize_session_uploads_narrative_only_with_without_strategy_artifact(
     tmp_path: Path,
     monkeypatch,
     capsys,
@@ -2537,8 +2546,8 @@ def test_visualize_session_uploads_narrative_only_by_default(
     )
     monkeypatch.setitem(
         ni.upload_skill_dashboard_session.__globals__,
-        "upload_strategy_artifact_for_session",
-        lambda **kwargs: artifact_calls.append(kwargs),
+        "export_selected_strategy_artifact",
+        lambda *args, **kwargs: artifact_calls.append((args, kwargs)),
     )
 
     ni.upload_skill_dashboard_session(
@@ -2547,7 +2556,7 @@ def test_visualize_session_uploads_narrative_only_by_default(
             api_key="secret-key",
             output_json=None,
             dry_run=False,
-            with_strategy_artifact=False,
+            without_strategy_artifact=True,
             artifact_output_dir=None,
             python_bin=None,
         )
@@ -2557,7 +2566,7 @@ def test_visualize_session_uploads_narrative_only_by_default(
     assert "Online session view" in capsys.readouterr().out
 
 
-def test_visualize_session_uploads_strategy_artifact_with_flag(
+def test_visualize_session_uploads_strategy_artifact_by_default(
     tmp_path: Path,
     monkeypatch,
     capsys,
@@ -2615,7 +2624,7 @@ def test_visualize_session_uploads_strategy_artifact_with_flag(
             api_key="secret-key",
             output_json=None,
             dry_run=False,
-            with_strategy_artifact=True,
+            without_strategy_artifact=False,
             artifact_output_dir=None,
             python_bin=None,
         )
@@ -2673,7 +2682,7 @@ def test_visualize_session_aborts_before_upload_when_agent_refactor_fails(
                 api_key="secret-key",
                 output_json=None,
                 dry_run=False,
-                with_strategy_artifact=True,
+                without_strategy_artifact=False,
                 artifact_output_dir=None,
                 python_bin=None,
             )

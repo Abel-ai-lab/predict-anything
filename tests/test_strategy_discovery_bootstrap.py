@@ -52,11 +52,7 @@ def test_strategy_discovery_dependencies_constrain_edge_major_version() -> None:
     pyproject = Path(__file__).resolve().parents[1] / "skills" / "abel-invest" / "pyproject.toml"
     data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
 
-    assert "abel-edge>=0.8.5" in data["project"]["dependencies"]
-    assert not any(
-        dependency.startswith("abel-edge") and "<0.9.0" in dependency
-        for dependency in data["project"]["dependencies"]
-    )
+    assert "abel-edge>=0.8.6,<0.9.0" in data["project"]["dependencies"]
 
 
 def test_strategy_discovery_bootstrap_lets_pyproject_install_dependencies() -> None:
@@ -136,3 +132,31 @@ def test_strategy_discovery_cli_exposes_env_refresh() -> None:
     assert args.command == "env"
     assert args.env_command == "refresh"
     assert args.path == "abel-invest-workspace"
+
+
+def test_visualize_session_strategy_artifact_is_default_with_session_only_opt_out() -> None:
+    parser = build_parser()
+
+    default_args = parser.parse_args(
+        ["visualize-session", "--session", "research/tsla/tsla-v1"]
+    )
+    opt_out_args = parser.parse_args(
+        [
+            "visualize-session",
+            "--session",
+            "research/tsla/tsla-v1",
+            "--without-strategy-artifact",
+        ]
+    )
+
+    assert default_args.without_strategy_artifact is False
+    assert opt_out_args.without_strategy_artifact is True
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "visualize-session",
+                "--session",
+                "research/tsla/tsla-v1",
+                "--with-strategy-artifact",
+            ]
+        )

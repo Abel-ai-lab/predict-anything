@@ -286,7 +286,7 @@ recorded round.
 Only after asking the user and getting agreement for visual review, run:
 
 ```bash
-./.venv/bin/abel-invest visualize-session --session research/tsla/tsla-v1 --with-strategy-artifact
+./.venv/bin/abel-invest visualize-session --session research/tsla/tsla-v1
 ```
 
 Use that path as orientation, not as a rigid script. The important boundary is:
@@ -330,9 +330,9 @@ Use that path as orientation, not as a rigid script. The important boundary is:
 - `frontier.md` reports input realization: declared graph-supported inputs only
   count as realized when the engine reads prepared graph inputs
 - `visualize-session` creates an online session view from the session folder;
-  use `--with-strategy-artifact` by default so the review includes the selected
-  best ranked hostable strategy artifact when one is available, and omit it only for
-  narrative-only views
+  it includes the selected best ranked hostable strategy artifact when one is
+  available by default. Use `--without-strategy-artifact` only for narrative-only
+  views
 - session `backtest_start` is a default target; branch `requested_start` can override it explicitly
 - the generated `engine.py` is a starter wiring scaffold for the first end-to-end run, not a finished strategy
 
@@ -416,7 +416,7 @@ Keep `exploration_path.md` covered before another recorded round. Ask the user
 before creating an online session view. If the user agrees:
 
 ```bash
-./.venv/bin/abel-invest visualize-session --session research/tsla/tsla-v1 --with-strategy-artifact
+./.venv/bin/abel-invest visualize-session --session research/tsla/tsla-v1
 ```
 
 Run `doctor` before `init-session`. If it reports `auth_missing`, use
@@ -444,12 +444,12 @@ path updated. Check path coverage before starting another round. Check input
 realization before claiming graph-derived contribution. Do not create the online
 session view automatically; after a
 candidate PASS, ask the user first. If the user agrees or explicitly asks to
-publish the paper-ready session, `visualize-session --with-strategy-artifact`
+publish the paper-ready session, `visualize-session --session <session>`
 builds the view from the session folder and uploads the selected strategy
 artifact. If the command reports `needs_agent_refactor`, read the emitted
 `refactor-request.json`, edit only the promoted copy named there, write
 `refactor-report.json`, and rerun the same command. Do not start a separate
-agent process. Omit the flag only for narrative-only views.
+agent process. Use `--without-strategy-artifact` only for narrative-only views.
 This workspace is for alpha-managed strategy search, so do not create a
 standalone `abel-edge init` project inside it. Put standalone edge work in a
 separate directory.
