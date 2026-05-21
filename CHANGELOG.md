@@ -4,7 +4,7 @@ All notable changes to `causal-abel` will be documented in this file.
 
 This project follows a repo-level release log so agents can summarize user-visible changes across GitHub and ClawHub-facing revisions.
 
-## [1.5.0] - 2026-05-21
+## [1.4.1] - 2026-05-21
 
 ### Added
 
