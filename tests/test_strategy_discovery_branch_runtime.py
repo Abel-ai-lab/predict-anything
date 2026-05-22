@@ -484,6 +484,9 @@ def test_prepare_branch_inputs_writes_runtime_contract_artifacts(tmp_path, monke
     assert probe_samples["target"] == "TSLA"
     assert len(probe_samples["sample_decision_dates"]) >= 2
     assert "DecisionContext" in context_guide
+    assert "Disposable Search" in context_guide
+    assert "session `scratch/` directory" in context_guide
+    assert "not validation evidence" in context_guide
 
 
 def test_default_branch_spec_starts_with_graph_enriched_candidate_context(tmp_path) -> None:
@@ -2119,6 +2122,9 @@ def test_init_session_output_uses_data_led_graph_enriched_alpha_search() -> None
     assert "<target-control-branch>" in rendered
     assert "graph-v1" not in rendered
     assert "data-led graph-enriched alpha search" in rendered
+    assert "Sharpe > 2 is aspirational" in rendered
+    assert "disposable probes may live in research/tsla/demo/scratch" in rendered
+    assert "equivalent heredoc/notebook/query cell" in rendered
     assert "first serious non-grandma lane should be empirical construction" in rendered
     assert "simple hand-written rules are diagnostics or refinements" in rendered
     assert "exploration_path.md" in rendered
