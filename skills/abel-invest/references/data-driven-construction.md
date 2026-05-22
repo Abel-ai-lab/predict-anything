@@ -52,9 +52,13 @@ to serious empirical construction, but data measurements need prepared data.
 Use frontier/readiness facts to choose a bounded scout universe, then
 `prepare-branch` a narrow scout or candidate branch before measuring target
 behavior, graph lead/lag/sign, node subset, transformation, feature family,
-model family, filter, sizing, or risk shape. Do not turn scratch into
-paperwork; promote the best shapes and record selection influence plus
-effective width when the scout materially chose the submitted candidate.
+model family, filter, sizing, or risk shape. The prepared branch can stop at
+prepare when its job is data/cache materialization; do not record a flat or
+no-signal round just to make the scout official. A single correlation table is
+a diagnostic, not the whole scout when graph/model construction is still
+available. Do not turn scratch into paperwork; promote the best shapes and
+record selection influence plus effective width when the scout materially chose
+the submitted candidate.
 
 ## What Simple Rules Are For
 

@@ -218,7 +218,8 @@ notebook cell, or query cell when files are awkward. These probes are not
 validation evidence; they are a normal way to decide what deserves formal
 recorded evidence, especially on a fresh or unfamiliar ticker. When the probe
 needs market data, first prepare a narrow scout/candidate branch so the cache
-and `inputs/` exist.
+and `inputs/` exist. That branch may be prepare-only; do not `run-branch` a
+flat or no-signal strategy solely to warm cache.
 
 ## Minimal Runtime Path
 

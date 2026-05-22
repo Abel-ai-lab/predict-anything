@@ -61,6 +61,10 @@ candidate branch so Edge materializes cache plus `inputs/data_manifest.json`,
 scout from those prepared inputs or the warmed cache before deciding what
 deserves `debug-branch` / `run-branch`.
 
+Do not run a flat or no-signal materialization branch just to warm cache or make
+the scout official. A prepared branch may be prepare-only; `run-branch` is for
+meaningful candidates, controls, diagnostics, or ablations.
+
 Use a compact scout to answer the highest-leverage questions:
 
 - target-only behavior: autocorrelation, trend/reversal, volatility regime, and
@@ -69,6 +73,11 @@ Use a compact scout to answer the highest-leverage questions:
   transformations, spreads, and horizons
 - construction choice: whether a feature factory, learned model, ensemble,
   filter, sizing rule, or simpler diagnostic is worth formal validation
+
+A single linear correlation table is a useful first diagnostic, not a completed
+first-look scout when graph/model construction remains available. Do not abandon
+the graph-derived universe unless graph subset, lag/sign, transformation, model,
+or risk-expression alternatives have been tested or intentionally ruled out.
 
 Store temporary scripts or summaries in `research/<ticker>/<exp_id>/scratch/`
 when useful. If the runtime discourages files, use an equivalent one-off shell
@@ -94,7 +103,8 @@ Each round should push toward the user's objective.
    first-look scout before the first broad recorded run unless the path is
    user-specified, a continuation, a baseline/control, or a very narrow
    diagnostic. When that scout needs market data, materialize it through a
-   prepared scout/candidate branch first. Probes are search workbench material,
+   prepared scout/candidate branch first; the branch can stop at prepare if
+   its job is data/cache materialization. Probes are search workbench material,
    not validation evidence.
 4. Keep graph-enriched ideas active early and throughout the search when live
    graph candidates exist. Use target-only candidates as baselines, seeds,
@@ -110,7 +120,9 @@ Each round should push toward the user's objective.
 8. Run `debug-branch` to check semantic legality before recording evidence.
 9. Run `run-branch` only when the selected candidate is ready to be recorded.
    If the candidate was selected from a search, pass `--selection-trials N`,
-   where `N` is this round's effective search width only.
+   where `N` is this round's effective search width only. Inline heredocs,
+   notebook cells, and query cells count the same as saved scratch files when
+   they materially select the submitted candidate.
 10. Re-read `evidence_ledger.json`, `frontier.md`, and the latest Edge result.
 11. Let metric shape and failure mode decide the next move. The framework shows
    facts; it does not prescribe the next driver, proxy, threshold, model

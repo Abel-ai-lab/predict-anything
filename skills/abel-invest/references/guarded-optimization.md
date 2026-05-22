@@ -41,7 +41,8 @@ During screening:
 - keep count of effective search width
 - for a fresh or unfamiliar ticker, prefer a compact first-look scout before a
   broad recorded run; when the scout needs market data, use a prepared
-  scout/candidate branch first
+  scout/candidate branch first, and do not record a flat/no-signal run solely
+  for cache materialization
 - failures are information; they do not need to pass final validation
 - use `research/<ticker>/<session_id>/scratch/`, a one-off shell heredoc,
   notebook cell, or query cell for disposable screening when useful

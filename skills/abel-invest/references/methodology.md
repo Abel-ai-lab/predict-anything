@@ -60,7 +60,8 @@ are awkward. For a fresh or unfamiliar ticker, use frontier/readiness facts to
 choose a bounded scout universe, prepare a narrow scout/candidate branch to
 materialize data, then run a compact first-look scout to learn whether target
 behavior, graph lags/signs, subsets, transforms, models, filters, or sizing
-deserve recorded branch work.
+deserve recorded branch work. The materialization branch can be prepare-only;
+do not record a flat/no-signal run just to make scouting official.
 
 **Graph-supported is not enough.**
 Runtime graph reads prove input realization. They do not by themselves prove the

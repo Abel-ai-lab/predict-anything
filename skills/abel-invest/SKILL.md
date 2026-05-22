@@ -123,7 +123,11 @@ Always:
   `research/<ticker>/<session_id>/scratch/`; when file creation is awkward, an
   equivalent one-off shell heredoc or notebook/query cell is fine. Scratch work
   is normal Abel Invest research, not product code and not
-  validation evidence.
+  validation evidence. Keep the scout compact but real: compare target
+  baseline behavior, graph lead/lag/subset shape, and the best available
+  construction/risk axis before committing a broad candidate. A single linear
+  correlation table is a diagnostic, not enough by itself to abandon
+  graph-informed empirical construction.
 
 Never:
 
@@ -142,6 +146,9 @@ Never:
   the final purpose of the search.
 - Do not treat `--selection-trials` as a strategy-quality shortcut; it is
   reportability accounting, not a brake on empirical search.
+- Do not `run-branch` a flat/no-signal branch solely to warm cache or make a
+  scout feel official. `prepare-branch` is enough for data materialization; use
+  recorded runs for meaningful candidates, controls, diagnostics, or ablations.
 - Never pass a running/cumulative total to `--selection-trials`; pass this
   round's search width only.
 - Do not depend on any external skill for guarded optimization; abel-invest runs
@@ -166,10 +173,12 @@ Alpha search stance:
   should normally be probe-informed. Starting the experiment loop does not mean
   immediately recording a broad candidate. Use the graph frontier to pick a
   bounded scout universe, prepare a narrow scout/candidate branch to materialize
-  data, run a compact scout on prepared inputs or cache, then promote the best
-  1-2 candidate shapes into audited branch work. Direct recorded branches remain
-  valid for user-specified strategies, existing leads, baselines, controls,
-  continuations, or very narrow diagnostic branches.
+  data, run a compact multi-axis scout on prepared inputs or cache, then
+  promote the best 1-2 candidate shapes into audited branch work. A
+  prepare-only scout branch is fine when its job is cache/input materialization;
+  do not record a no-signal round just to start scouting. Direct recorded
+  branches remain valid for user-specified strategies, existing leads,
+  baselines, controls, continuations, or very narrow diagnostic branches.
 - New sessions use live causal graph discovery when available. Treat the graph
   as the default high-value alpha feature universe beyond target-only history:
   node subsets, lags, signs, transformations, ratios, regimes, model features,
