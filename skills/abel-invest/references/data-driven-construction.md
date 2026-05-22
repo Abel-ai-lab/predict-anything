@@ -5,12 +5,13 @@ next idea is drifting toward another hand-written rule.
 
 This is the default construction stance, not a separate workflow. Runtime
 legality, honest search-width accounting, and validation still decide what can
-be reported.
+be reported. When the user gives no metric target, the ordinary objective is a
+strong tradable strategy with Sharpe > 2 as the aspirational target.
 
 ## Default Posture
 
-Build candidates by empirical construction over a bounded universe. Usual
-ingredients include:
+Build candidates by high-capacity empirical construction over a scoped
+universe. Usual ingredients include:
 
 - target history and any validated baseline or catalog strategy
 - live graph nodes and graph-derived feeds when available
@@ -38,6 +39,19 @@ This list is not a route plan. Use the bounded feature universe most likely to
 improve the user's objective, and let observed behavior decide how the search
 evolves.
 
+## Disposable Search Workbench
+
+Temporary scripts, feature screens, quick model comparisons, CSV/JSON summaries,
+notebook cells, query cells, or one-off shell heredocs are normal Abel Invest
+research. Prefer `research/<ticker>/<session_id>/scratch/` for files. Scratch
+outputs are not validation evidence; they help choose what is worth formal,
+audited validation.
+
+Do not make scratch a ceremony. Use it before or between recorded rounds when
+it helps discover sign, horizon, subset, feature family, model family, filter,
+sizing, or risk shape. If it materially selects the formal candidate, record the
+selection influence and effective width.
+
 ## What Simple Rules Are For
 
 Simple target-only or graph-node rules are useful as:
@@ -60,6 +74,10 @@ with `--selection-trials N` or the current candidate search metadata path.
 
 Do not report a raw search winner as robust until it clears the gauntlet with
 honest width accounting.
+
+K is an audit meter, not an exploration brake. Large empirical searches are
+allowed when the candidate ceiling justifies them; they simply carry their real
+selection width.
 
 ## Failure Reading
 

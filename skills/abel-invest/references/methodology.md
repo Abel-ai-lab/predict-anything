@@ -21,7 +21,9 @@ accounting, and the exploration path surface. The agent owns what to try next.
 
 **Search hard, then explain.**
 The job is to find a high-quality strategy for the user's objective, usually
-high Sharpe, high return, or a constrained risk-return profile. Mechanism
+high Sharpe, high return, or a constrained risk-return profile. When the user
+does not specify a metric target, Sharpe > 2 is the aspirational default, with
+high return, controlled drawdown, and reportable evidence quality. Mechanism
 stories organize results after evidence appears; they should not slow the first
 useful empirical test.
 
@@ -50,6 +52,11 @@ Feature construction, model-family comparison, HPO, graph-node subset search,
 lag/sign search, ensembles, regime filters, and sizing search are legitimate
 exploration. Make the search width visible; do not pretend a selected winner
 came from one isolated hand-written idea.
+
+Disposable scripts, tables, notebooks, query cells, and shell heredocs are part
+of that workbench. Prefer `research/<ticker>/<session_id>/scratch/` for files,
+but do not make scratch a prerequisite ceremony. Use it whenever it helps move
+faster than a formal recorded branch.
 
 **Graph-supported is not enough.**
 Runtime graph reads prove input realization. They do not by themselves prove the

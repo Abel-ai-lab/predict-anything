@@ -103,11 +103,16 @@ def resolve_session_root(
 
 def render_data_led_start_lines(session: Path) -> list[str]:
     command_prefix = command_prefix_for_path(session)
+    scratch_dir = session / "scratch"
     return [
         "data-led graph-enriched alpha search:",
         f"read {session / EXPLORATION_PATH_FILENAME} and latest Edge results before choosing the next candidate or round",
-        "ordinary alpha search posture: empirical construction over a bounded target + graph-derived universe",
-        f"{command_prefix} init-branch --session {session} --branch-id <candidate-branch>",
+        "default objective when unspecified: pursue a strong strategy; Sharpe > 2 is aspirational, with high return, controlled drawdown, and audited evidence",
+        "first serious non-grandma lane should be empirical construction over a scoped target + graph-derived universe",
+        f"disposable probes may live in {scratch_dir} or an equivalent heredoc/notebook/query cell; they are search workbench material, not validation evidence",
+        f"{command_prefix} init-branch --session {session} --branch-id <feature-factory-branch>",
+        f"{command_prefix} init-branch --session {session} --branch-id <model-or-denoise-branch>",
+        f"{command_prefix} init-branch --session {session} --branch-id <target-control-branch>",
         "edit branch.yaml with objective, selected inputs, search width when applicable, and validation scope",
         "let data decide how to express graph-derived information: features, models, subsets, lags, regimes, sizing, filters, or ensembles",
         "use target-only as baseline, seed, ablation, or competitor; simple hand-written rules are diagnostics or refinements, not the default main lane",

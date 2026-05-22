@@ -3,6 +3,11 @@
 Use this reference when a hard performance target is set, such as Sharpe, Lo,
 MaxDD, PnL, or a constrained risk-return objective.
 
+If the user gives no metric target, Abel Invest still has a default search
+aspiration: find a strong tradable strategy, with Sharpe > 2 as the aspirational
+target plus high return, controlled drawdown, and reportable evidence quality.
+That default uses the normal experiment loop; it is not a separate mode.
+
 Optimization is first-class. When the user gives a hard performance target,
 Abel Invest should behave like an alpha searcher, not like a hand-authored
 mechanism essay. The failure mode is not search; the failure mode is reporting a
@@ -63,6 +68,8 @@ During screening:
 - record enough detail to reproduce the submitted candidate
 - keep count of effective search width
 - failures are information; they do not need to clear the gauntlet
+- use `research/<ticker>/<session_id>/scratch/`, a one-off shell heredoc,
+  notebook cell, or query cell for disposable screening when useful
 
 ### 2. Validation Selection
 
@@ -92,6 +99,9 @@ Final reported candidates must clear the applicable validation profile:
 
 Failing a gate disqualifies the candidate from robust reporting, but it does not
 invalidate the usefulness of the search path.
+
+K accounting makes the search reportable. It should not make the agent avoid a
+promising high-capacity lead; it should make the reported claim honest.
 
 ## K Rule
 

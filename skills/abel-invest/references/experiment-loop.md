@@ -29,9 +29,14 @@ Run:
 Live graph discovery should run by default when available. Its output is the
 default high-value alpha feature universe, not a mandatory first branch and not
 a requirement to run the whole depth-1 frontier as one basket. For ordinary
-non-grandma alpha search, keep the search posture empirical and graph-informed
-over a bounded target + graph-derived universe, not another hand-written single
-mechanism.
+non-grandma alpha search, keep the search posture empirical, high-capacity, and
+graph-informed over a scoped target + graph-derived universe, not another
+hand-written single mechanism.
+
+When the user gives no metric target, use a strong-strategy default: Sharpe > 2
+is the aspirational target, supported by high return, controlled drawdown, and
+reportable evidence quality. This is a search direction, not a promise and not
+a separate mode.
 
 When resuming, read:
 
@@ -52,26 +57,32 @@ Each round should push toward the user's objective.
    ensembles, model-family comparison, denoise/compression, graph-node subset
    search, lag/sign/transformation search, regimes, sizing, and filters are
    available degrees of freedom, not a fixed checklist.
-3. Keep graph-enriched ideas active early and throughout the search when live
+3. Use disposable empirical probes when they accelerate search. Temporary
+   scripts, feature screens, quick model comparisons, notebooks, query cells, or
+   compact tables may live under `research/<ticker>/<exp_id>/scratch/`; if the
+   runtime makes files awkward, use an equivalent one-off shell heredoc or
+   notebook/query cell. Probes are search workbench material, not validation
+   evidence and not a prerequisite ceremony.
+4. Keep graph-enriched ideas active early and throughout the search when live
    graph candidates exist. Use target-only candidates as baselines, seeds,
    ablations, and competitors, not as the default escape from graph search.
-4. Use simple hand-written target or graph rules as diagnostics, controls,
+5. Use simple hand-written target or graph rules as diagnostics, controls,
    ablations, or refinements around an empirical lead; do not let them dominate
    the early search while the graph-derived feature universe is unsearched.
-5. Declare enough branch metadata for runtime and audit: objective, input
+6. Declare enough branch metadata for runtime and audit: objective, input
    universe, evaluation window, effective search width, validation scope, and
    any graph-attribution claim you need to make.
-6. Run `prepare-branch` to materialize branch inputs before trusting the
+7. Run `prepare-branch` to materialize branch inputs before trusting the
    candidate.
-7. Run `debug-branch` to check semantic legality before recording evidence.
-8. Run `run-branch` only when the selected candidate is ready to be recorded.
+8. Run `debug-branch` to check semantic legality before recording evidence.
+9. Run `run-branch` only when the selected candidate is ready to be recorded.
    If the candidate was selected from a search, pass `--selection-trials N`,
    where `N` is this round's effective search width only.
-9. Re-read `evidence_ledger.json`, `frontier.md`, and the latest Edge result.
-10. Let metric shape and failure mode decide the next move. The framework shows
+10. Re-read `evidence_ledger.json`, `frontier.md`, and the latest Edge result.
+11. Let metric shape and failure mode decide the next move. The framework shows
    facts; it does not prescribe the next driver, proxy, threshold, model
    family, or route.
-11. Keep `exploration_path.md` covered with ledger ref, chosen path, compact
+12. Keep `exploration_path.md` covered with ledger ref, chosen path, compact
     reason, Edge feedback, and artifact refs before another recorded round.
 
 Optimization is not a deviation. The failure mode is reporting an unvalidated
@@ -97,6 +108,8 @@ Then prepare, debug, and record the agent-chosen candidate:
 If performance scouting happened before the recorded candidate, declare the
 effective search width and record what happened in `exploration_path.md`. Treat
 the result as search-informed rather than pretending it was one isolated idea.
+K records the search cost honestly; it is not a reason to avoid pursuing a
+high-ceiling lead.
 
 ## Layer Ownership
 

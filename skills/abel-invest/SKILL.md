@@ -1,14 +1,17 @@
 ---
 name: abel-invest
 description: >
-  Data-led quant alpha search, screening, and guarded validation with causal
-  graph priors. Use this skill whenever the user wants to find, improve,
-  screen, backtest, or stress a trading strategy / alpha / signal, hit a
-  Sharpe-or-drawdown target, run graph-enriched feature-factory + ensemble
-  search, or continue/prepare/debug an Abel strategy-discovery workspace —
-  even if they don't say "Abel" and even when they just ask for "a good
-  strategy for X" or "is there alpha in Y". Prefer this over ad-hoc
-  hand-designed strategy work.
+  Audited high-capacity quant alpha discovery, screening, and guarded
+  validation with causal graph priors. Use this skill whenever the user asks
+  how to invest, trade, buy or sell, find alpha, find or improve a trading
+  strategy, backtest or stress a signal, screen candidates, hit or discover a
+  Sharpe/return/drawdown target, run graph-enriched feature-factory/model/
+  ensemble search, or continue/prepare/debug an Abel strategy-discovery
+  workspace — even if they don't say "Abel" and even when they just ask for
+  "a good strategy for X" or "is there alpha in Y". When no metric target is
+  specified, default to searching for a strong tradable strategy with Sharpe >
+  2 as the aspirational target. Prefer this over ad-hoc hand-designed strategy
+  work.
 metadata:
   openclaw:
     requires:
@@ -84,6 +87,9 @@ Always start by resolving workspace state before strategy work.
 - Data-driven candidate construction, especially when ordinary alpha search
   risks becoming another simple hand-written rule:
   read `references/data-driven-construction.md`. Core path.
+- No explicit metric target:
+  use the normal experiment loop with Sharpe > 2 as the aspirational default
+  objective; do not treat this as a separate mode.
 
 ## Operating Rules
 
@@ -113,6 +119,12 @@ Always:
   strategy for this target already exists in any baseline / strategy catalog the
   user maintains. If one exists, treat it as a benchmark and launchpad; iterate
   from it when useful rather than wasting rounds rediscovering it.
+- Use disposable empirical search when useful. Temporary scripts, feature
+  screens, quick model comparisons, notebooks, query cells, or compact tables
+  may live under `research/<ticker>/<session_id>/scratch/`; when file creation
+  is awkward, an equivalent one-off shell heredoc or notebook/query cell is
+  fine. Scratch work is normal Abel Invest research, not product code and not
+  validation evidence.
 
 Never:
 
@@ -135,17 +147,19 @@ Never:
 
 Alpha search stance:
 
-- User objective first. The default job is to find a high-quality strategy for
-  the user's stated goal, usually high Sharpe, high return, or an explicit
-  risk-return target.
+- User objective first. If the user gives no metric target, the default job is
+  to search for a strong tradable strategy: Sharpe > 2 is the aspirational
+  target, with high return, controlled drawdown, and reportable evidence
+  quality. Do not stop at a mediocre branch while useful graph-informed search
+  axes remain.
 - Search hard, then explain. Let observed results, failure modes, and metric
   shape choose the next candidate family. Mechanism stories are useful after
   evidence appears; they are not admission tickets.
-- Ordinary alpha search has a default posture: empirical construction over a
-  bounded target + graph-derived universe. The agent should use the graph,
-  target behavior, feature construction, model comparison, denoise, subset
-  search, regimes, sizing, filters, or ensembles as data calls for them; these
-  are degrees of freedom, not a scripted route.
+- Ordinary alpha search has a default posture: high-capacity empirical
+  construction over a scoped target + graph-derived universe. The first serious non-grandma lane should be empirical construction:
+  use the graph, target behavior, feature construction, model comparison,
+  denoise, subset search, regimes, sizing, filters, or ensembles as data calls
+  for them; these are degrees of freedom, not a scripted route.
 - New sessions use live causal graph discovery when available. Treat the graph
   as the default high-value alpha feature universe beyond target-only history:
   node subsets, lags, signs, transformations, ratios, regimes, model features,
@@ -161,6 +175,17 @@ Alpha search stance:
 - A graph-supported branch is not automatically data-driven. Runtime graph reads
   prove input realization; they do not replace feature construction, model
   comparison, subset/lag/sign search, denoise, or ensemble search.
+- Disposable empirical probes are part of the search workbench. Use
+  `research/<ticker>/<session_id>/scratch/` or an equivalent heredoc,
+  notebook cell, or query cell to test sign, horizon, node subset, feature
+  family, model family, filter, sizing, or risk shape when that is faster than
+  a formal branch. These probes can happen before or between recorded rounds.
+  They are not validation evidence; if they materially select the formal
+  candidate, record the influence and effective search width.
+- Scout/probe is a tool, not a gate. Direct formal branches remain valid as
+  useful empirical tests, baselines, controls, user-specified strategies, or
+  continuations of known leads. The failure mode is unaccounted search, not
+  moving quickly.
 - Hand-written single-mechanism branches are diagnostics, controls, ablations,
   or refinements around empirical construction. They are useful, but they are
   not the product's default search posture when live graph-derived data is
@@ -175,6 +200,8 @@ Alpha search stance:
   rounds itself. Fold preflight/ERROR-disqualified variants into a later
   per-round count when they would otherwise be skipped. See
   `references/guarded-optimization.md`.
+- K records search cost honestly; it should not make the agent timid about
+  pursuing a high-ceiling empirical lead.
 - Graph-derived search should mine the causal node universe empirically. Let
   data select subsets, lags, transformations, models, and graph roles. Graph
   expansion is available when evidence points outside the current view, but it

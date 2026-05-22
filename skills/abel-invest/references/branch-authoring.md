@@ -212,6 +212,12 @@ If a branch was chosen because it ranked best in a local metric scan, that is
 normal candidate search. Declare the search width with `--selection-trials` and
 record the selection influence in `exploration_path.md`.
 
+Disposable empirical search can live in
+`research/<ticker>/<session_id>/scratch/`, or in an equivalent one-off heredoc,
+notebook cell, or query cell when files are awkward. These probes are not
+validation evidence and are not a prerequisite ceremony; they are a normal way
+to decide what deserves formal branch code.
+
 ## Minimal Runtime Path
 
 1. State the audit-relevant candidate metadata in `branch.yaml`.
@@ -234,8 +240,10 @@ record the selection influence in `exploration_path.md`.
 - graph-enriched search should appear early and recur when graph discovery is
   available
 - ordinary alpha search should keep an empirical construction posture over the
-  bounded target + graph-derived universe; simple hand-written mechanisms are
+  scoped target + graph-derived universe; simple hand-written mechanisms are
   diagnostics, controls, ablations, or refinements
+- when no metric target is provided, pursue a strong strategy with Sharpe > 2
+  as the aspirational default rather than stopping at a mediocre branch
 - branch count is not search breadth if every branch hides the same search axis
 - weird low-attention graph nodes are not automatically noise
 - narrative scout can inspire features, but it is not evidence truth
