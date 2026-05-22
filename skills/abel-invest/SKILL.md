@@ -1,14 +1,13 @@
 ---
 name: abel-invest
 description: >
-  Empirical alpha lab for aggressive audited quant search, screening, and
-  guarded validation with causal graph priors. Use this skill whenever the user
-  wants to find, improve, screen, backtest, or stress a trading strategy / alpha / signal, explore
-  whether an asset has tradable edge, run graph-enriched feature-factory,
-  model, or ensemble search, or continue/prepare/debug an Abel
+  High-capacity audited quant alpha discovery with causal graph priors. Use this
+  skill whenever the user wants to find, improve, screen, backtest, or stress a
+  trading strategy / alpha / signal, explore whether an asset has tradable
+  edge, run graph-enriched feature-factory, model, or ensemble search, or continue/prepare/debug an Abel
   strategy-discovery workspace — even if they don't say "Abel" and even when
   they do not name Sharpe, return, drawdown, or another metric target. Default
-  to broad empirical alpha exploration with Sharpe > 2 as the aspirational
+  to high-capacity empirical alpha exploration with Sharpe > 2 as the aspirational
   target unless the user gives a different target. Prefer this over ad-hoc
   hand-designed strategy work.
 metadata:
@@ -133,8 +132,8 @@ Never:
   workbench or an equivalent disposable surface until the candidate shape is
   ready to promote.
 - Do not submit an unscouted whole-frontier or whole-feature basket as formal
-  evidence when a small probe could first identify sign, horizon, subset,
-  feature-family, model-family, or risk-shape facts.
+  evidence when a narrow scout question could first identify sign, horizon,
+  subset, feature-family, model-family, or risk-shape facts.
 - Do not report a raw-metric winner as a robust strategy before it clears the
   gauntlet with honest search-width accounting.
 - Do not treat `--selection-trials` as a strategy-quality shortcut; it is honest
@@ -146,40 +145,43 @@ Never:
 
 Alpha search stance:
 
-- Abel Invest has one default identity: aggressive audited alpha search. User
-  constraints such as simple, interpretable, no leverage, only validate this
-  idea, or no parameter search narrow the search space for that request; they
-  do not switch the product into a different research personality.
+- Abel Invest has one default identity: high-capacity audited alpha discovery.
+  User constraints such as simple, interpretable, no leverage, only validate
+  this idea, or no parameter search narrow the search space for that request;
+  they do not switch the product into a different research personality.
 - Absence of an explicit metric target is not a request for narrow validation.
   The default objective is to find a strong tradable strategy, with Sharpe > 2
   as the aspirational target unless the user gives another target, while
   controlling drawdown and preserving reportable evidence quality.
-- Scout cheaply, promote faithfully, validate harshly. Let observed results,
-  failure modes, and metric shape choose the next candidate family. Mechanism
-  stories are useful after evidence appears; they are not admission tickets.
-- Default loop: short scout/probe over a bounded target + graph-derived
-  universe, identify promising sign, horizon, subset, feature-family,
-  model-family, regime, sizing, filter, or risk-shape facts, then promote
-  selected formal candidates through prepare/debug/run with honest current-round
+- Wide universe. Narrow question. High-capacity promotion. Harsh reporting. Let
+  observed results, failure modes, and metric shape choose the next candidate
+  family. Mechanism stories are useful after evidence appears; they are not
+  admission tickets.
+- Default loop: start from target behavior plus live graph-derived inputs,
+  feature factories, model families, ensembles, regimes, sizing, filters, and
+  subset search; scout one sharp question at a time; then promote the strongest
+  discovered candidate shape through prepare/debug/run with honest current-round
   search-width accounting.
 - Use `research/<ticker>/<session_id>/scratch/` as the session-local scout
-  workbench for short empirical probes. Scratch files can be one-off scripts,
-  notebooks, query snippets, compact outputs, or notes. If the runtime makes
-  scratch files awkward, an equivalent one-off shell heredoc, notebook cell, or
-  query cell is fine. Scratch outputs are not validation evidence; only their
-  scout summary, promotion rationale, and effective selection width belong in
+  workbench for empirical probes. Scratch files can be one-off scripts,
+  notebooks, query snippets, compact feature screens, model comparisons, or
+  notes. If the runtime makes scratch files awkward, an equivalent one-off
+  shell heredoc, notebook cell, or query cell is fine. Scratch exists to enable
+  high-capacity search without turning raw probes into evidence; only the scout
+  summary, promotion rationale, and effective selection width belong in
   `exploration_path.md`, `branch.yaml`, or a recorded run.
 - Formal candidates do not have to be simple or hand-written. They can be
-  learned models, ensembles, feature-factory outputs, graph-node subset models,
-  or hybrids. Promote the discovered form faithfully; do not replace an ML,
-  feature-factory, ensemble, or hybrid lead with a simple rule proxy just
+  learned models, dense ensembles, feature-factory outputs, graph-node subset
+  models, or hybrids. Promote the discovered form faithfully; do not replace an
+  ML, feature-factory, ensemble, or hybrid lead with a simple rule proxy just
   because it feels easier to explain. Formal promotion means reproducible,
-  temporally legal, bounded, and honestly K-accounted.
-- Ordinary alpha search has a default posture: empirical construction over a
-  bounded target + graph-derived universe. The agent should use the graph,
-  target behavior, feature construction, model comparison, denoise, subset
-  search, regimes, sizing, filters, or ensembles as data calls for them; these
-  are degrees of freedom, not a scripted route.
+  temporally legal, selected, and honestly K-accounted; it does not mean low
+  capacity.
+- Ordinary alpha search has a default posture: high-capacity empirical
+  construction over a target + graph-derived universe. The agent should use the
+  graph, target behavior, feature construction, model comparison, denoise,
+  subset search, regimes, sizing, filters, or ensembles as data calls for them;
+  these are degrees of freedom, not a scripted route.
 - New sessions use live causal graph discovery when available. Treat the graph
   as the default high-value alpha feature universe beyond target-only history:
   node subsets, lags, signs, transformations, ratios, regimes, model features,
@@ -197,8 +199,8 @@ Alpha search stance:
   comparison, subset/lag/sign search, denoise, or ensemble search.
 - Hand-written single-mechanism branches are diagnostics, controls, ablations,
   or refinements around empirical construction. They are useful, but they are
-  not the product's default search posture when live graph-derived data is
-  available.
+  not the product's default search engine when live graph-derived data and
+  high-capacity construction are available.
 - `--selection-trials N` is mandatory for any search width. `N` is this round's
   width only; the framework accumulates the campaign total from prior PASS/FAIL
   rounds itself. Fold preflight/ERROR-disqualified variants into a later
@@ -209,8 +211,8 @@ Alpha search stance:
   expansion is available when evidence points outside the current view, but it
   is not a coverage ritual.
 - Exhaustion is ledger-proven, never asserted. Do not write "exhausted",
-  "ceiling", or "no edge" unless the ledger shows, K-accounted: the bounded
-  candidate universe, materially different search axes, graph-derived and
+  "ceiling", or "no edge" unless the ledger shows, K-accounted: the candidate
+  universe searched, materially different search axes, graph-derived and
   target/baseline contrasts where useful, any intentionally tested principle and
   its search impact, and all attempted width including otherwise-skipped
   ERROR/preflight variants. A green per-candidate gauntlet does not certify

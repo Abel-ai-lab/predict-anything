@@ -2117,11 +2117,12 @@ def test_init_session_output_uses_data_led_graph_enriched_alpha_search() -> None
     rendered = "\n".join(lines)
 
     assert "graph-v1" not in rendered
-    assert "empirical alpha lab" in rendered
+    assert "high-capacity audited alpha discovery" in rendered
+    assert "wide universe, narrow question, high-capacity promotion, harsh reporting" in rendered
     assert "Sharpe > 2 / strong tradable edge" in rendered
-    assert "short scout/probe" in rendered
+    assert "scout one sharp question" in rendered
     assert "research/tsla/demo/scratch" in rendered
-    assert "promote that form instead of a simple proxy" in rendered
+    assert "promote that high-capacity form instead of a simple proxy" in rendered
     assert "simple hand-written rules are diagnostics or refinements" in rendered
     assert "scratch probes as search aids, not validation evidence" in rendered
     assert "exploration_path.md" in rendered
