@@ -229,9 +229,9 @@ anchors, and interpretation. It is scout context, not validation evidence.
 
 Do not create an online session view automatically. When the strategy context
 is mature enough to be useful to review visually, ask the user whether to
-visualize the session. This can be after a strong candidate PASS, after several
+visualize the session. This can be after a strong candidate, after several
 informative candidate rounds, before promotion, or whenever the agent would
-naturally summarize that the strategy is worth a visual review. If the user
+naturally summarize that the exploration is worth a visual review. If the user
 agrees, or if the user explicitly asks to visualize the session, pass the
 session folder to the command:
 
@@ -239,9 +239,11 @@ session folder to the command:
 <command_prefix> visualize-session --session research/<ticker>/<exp_id>
 ```
 
-The command builds the online view from local session evidence and uploads the
-automatically selected best `PASS` strategy artifact when one is available. Use
-`visualize-session --without-strategy-artifact` only when the user explicitly
+The command builds the online view from local session evidence. By default it
+also attaches the automatically selected best hostable validation strategy
+artifact when one is available; this attachment is selected by Sharpe, return,
+drawdown, and validation pass-rate, and does not require every gate to pass.
+Use `visualize-session --without-strategy-artifact` only when the user explicitly
 asks for a session view without strategy artifact upload. If the command reports
 `needs_agent_refactor`, read the emitted `refactor-request.json` and handle it
 in the current skill loop. If `kind` is `state_intent_self_check`, inspect the

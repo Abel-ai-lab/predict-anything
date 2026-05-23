@@ -226,6 +226,9 @@ Visualization and promotion:
 - If the user agrees or explicitly asks, run
   `<command_prefix> visualize-session --session <session>`
   yourself and share the returned Markdown link.
+- Visualization is for reviewing the whole session. A strategy artifact is an
+  optional attachment selected from hostable validation evidence; a missing
+  attachment should not block visual review.
 - Use `visualize-session --without-strategy-artifact` only when the user
   explicitly asks for a session view without strategy artifact upload.
 - If visualization reports `needs_agent_refactor`, handle the emitted
