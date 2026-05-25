@@ -26,15 +26,13 @@ from abel_invest.narrative_core.contracts.paths import (
 )
 from abel_invest.narrative_core.io import _now, read_tsv_rows
 from abel_invest.narrative_core.promotion import (
-    PROMOTION_ADAPTER_STATE_PATH,
     PROMOTION_GATE_FILENAME,
+    PROMOTION_HOSTED_REWRITE_SCOPE,
     PROMOTION_MODE_AGENT_REFACTOR,
-    PROMOTION_MODE_AUTO_ADAPTER,
     PROMOTION_MODE_NEEDS_AGENT_REFACTOR,
     PROMOTION_MODE_ZERO_CHANGE,
     PROMOTION_PATCH_FILENAME,
     PROMOTION_REFACTOR_REPORT_FILENAME,
-    STATE_INTENT_FILENAME,
     PromotionNeedsAgentRefactor,
     PromotionResult,
     prepare_promotion,
@@ -97,7 +95,7 @@ DENYLISTED_STRATEGY_FILENAMES = {
     "id_rsa",
     "id_rsa.pub",
     "results.tsv",
-    STATE_INTENT_FILENAME,
+    "state_intent.json",
 }
 DENYLISTED_STRATEGY_SUFFIXES = {
     ".key",
@@ -359,19 +357,17 @@ def build_strategy_artifact_manifest(
         field_name="backtest.effective_window.end",
     )
 
+    has_initial_state = (
+        promotion is not None
+        and any(_is_runtime_initial_state_file(item.artifact_path) for item in promotion.packaged_files)
+    )
     runtime_state = {
         "schema": RUNTIME_STATE_SCHEMA,
         "mode": "explicit_state_dir",
         "path": "state/",
         "bootstrap": {
-            "mode": "copy_from_base"
-            if promotion is not None
-            and any(entry.role == "initial_state" for entry in promotion.state_entries)
-            else "none",
-            "path": "runtime/initial-state/"
-            if promotion is not None
-            and any(entry.role == "initial_state" for entry in promotion.state_entries)
-            else None,
+            "mode": "copy_from_base" if has_initial_state else "none",
+            "path": "runtime/initial-state/" if has_initial_state else None,
         },
     }
     promotion_payload = _manifest_promotion_payload(candidate, promotion=promotion)
@@ -440,8 +436,6 @@ def build_strategy_artifact_manifest(
         ],
         "backtest": backtest_payload,
     }
-    if promotion is not None and promotion.state_intent_payload is not None:
-        manifest["stateIntent"] = promotion.state_intent_payload
     manifest["promotion"] = promotion_payload
     return manifest
 
@@ -701,6 +695,11 @@ def _candidate_from_row(
     session_round_index: int = 0,
 ) -> StrategyArtifactCandidate | None:
     result_path = _resolve_session_relative_path(session, row.get("result_path"))
+    round_id = _clean(row.get("round_id"))
+    if result_path is None and round_id:
+        inferred_result_path = branch / "outputs" / f"{round_id}-edge-result.json"
+        if inferred_result_path.is_file():
+            result_path = inferred_result_path
     if result_path is None or not result_path.is_file():
         return None
 
@@ -731,7 +730,11 @@ def _candidate_from_row(
         return None
 
     report_path = _existing_optional_path(session, row.get("report_path"))
+    if report_path is None and round_id:
+        report_path = _existing_optional_file(branch / "outputs" / f"{round_id}-edge-validation.md")
     handoff_path = _existing_optional_path(session, row.get("handoff_path"))
+    if handoff_path is None and round_id:
+        handoff_path = _existing_optional_file(branch / "outputs" / f"{round_id}-edge-handoff.json")
     metric_input_path = _infer_metric_input_path(result_path)
     return StrategyArtifactCandidate(
         session=session,
@@ -744,7 +747,7 @@ def _candidate_from_row(
         source_session_id=_clean(row.get("exp_id")) or session.name,
         ticker=_clean(row.get("ticker")) or session.parent.name.upper(),
         branch_id=_clean(row.get("branch_id")) or branch.name,
-        round_id=_clean(row.get("round_id")),
+        round_id=round_id,
         decision=_clean(row.get("decision")),
         mode=_clean(row.get("mode")),
         description=_clean(row.get("description")),
@@ -1109,15 +1112,12 @@ def _manifest_promotion_payload(
             else None,
         },
     }
-    if mode == PROMOTION_MODE_AUTO_ADAPTER:
-        payload["adapter"] = {
-            "kind": PROMOTION_ADAPTER_STATE_PATH,
-            "scope": "state_path_normalization",
-        }
     if mode == PROMOTION_MODE_AGENT_REFACTOR:
         payload["refactor"] = {
-            "kind": "agent_assisted",
-            "summary": "Refactored dynamic state path construction to ctx.state_dir.",
+            "kind": PROMOTION_HOSTED_REWRITE_SCOPE,
+            "summary": promotion.report.get("refactorSummary")
+            if promotion is not None
+            else "Agent refactored the strategy for hosted paper.",
             "patchPath": f"edge/{PROMOTION_PATCH_FILENAME}",
             "reportPath": f"edge/{PROMOTION_REFACTOR_REPORT_FILENAME}",
         }
@@ -1147,11 +1147,10 @@ def _required_artifact_source_files(
 
     files = strategy_files + files
     if promotion is not None:
-        for entry in promotion.state_entries:
-            if entry.role == "initial_state":
-                files.append((f"runtime/initial-state/{entry.path}", entry.source_path))
-            elif entry.role == "runtime_asset":
-                files.append((f"strategy/{entry.path}", entry.source_path))
+        for item in promotion.packaged_files:
+            if any(existing_path == item.artifact_path for existing_path, _ in files):
+                continue
+            files.append((item.artifact_path, item.source_path))
         files.append((f"edge/{PROMOTION_GATE_FILENAME}", promotion.gate_path))
         if promotion.patch_path is not None:
             files.append((f"edge/{PROMOTION_PATCH_FILENAME}", promotion.patch_path))
@@ -1164,6 +1163,10 @@ def _required_artifact_source_files(
                     promotion.refactor_report_path,
                 )
             )
+        for artifact_path, source_path in sorted(promotion.extra_source_map.items()):
+            if any(existing_path == artifact_path for existing_path, _ in files):
+                continue
+            files.append((artifact_path, source_path))
     seen_paths: set[str] = set()
     for artifact_path, source_path in files:
         if artifact_path in seen_paths:
@@ -1185,21 +1188,40 @@ def _strategy_source_files(
         promotion.strategy_source_path if promotion is not None else candidate.strategy_source_path
     )
     files = [(STRATEGY_ARTIFACT_ENTRYPOINT, strategy_source_path)]
-    promoted_state_paths = {
-        Path(entry.path)
-        for entry in (promotion.state_entries if promotion is not None else ())
-        if entry.role in {"initial_state", "runtime_asset"}
-    }
+    packaged_branch_sources = _packaged_branch_sources(candidate, promotion=promotion)
     for source_path in sorted(path for path in candidate.branch.rglob("*") if path.is_file()):
         if source_path == candidate.strategy_source_path:
             continue
         relative = source_path.relative_to(candidate.branch)
-        if relative in promoted_state_paths:
+        if source_path.resolve() in packaged_branch_sources:
             continue
         if _is_denylisted_strategy_source(relative):
             continue
         files.append((f"strategy/{relative.as_posix()}", source_path))
     return files
+
+
+def _is_runtime_initial_state_file(artifact_path: str) -> bool:
+    return str(artifact_path or "").startswith("runtime/initial-state/")
+
+
+def _packaged_branch_sources(
+    candidate: StrategyArtifactCandidate,
+    *,
+    promotion: PromotionResult | None,
+) -> set[Path]:
+    if promotion is None:
+        return set()
+    branch_root = candidate.branch.resolve()
+    sources: set[Path] = set()
+    for item in promotion.packaged_files:
+        try:
+            source = item.source_path.resolve()
+            source.relative_to(branch_root)
+        except ValueError:
+            continue
+        sources.add(source)
+    return sources
 
 
 def _is_denylisted_strategy_source(relative: Path) -> bool:
@@ -1300,6 +1322,10 @@ def _existing_optional_path(session: Path, value: str | None) -> Path | None:
     if path is None or not path.is_file():
         return None
     return path
+
+
+def _existing_optional_file(path: Path) -> Path | None:
+    return path if path.is_file() else None
 
 
 def _manifest_backtest_metrics(

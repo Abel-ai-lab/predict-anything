@@ -232,9 +232,9 @@ Visualization and promotion:
 - Use `visualize-session --without-strategy-artifact` only when the user
   explicitly asks for a session view without strategy artifact upload.
 - If visualization reports `needs_agent_refactor`, handle the emitted
-  `refactor-request.json` in this same skill loop. For `state_intent_self_check`,
-  write `state_intent.json`. For `agent_assisted`, edit only the promoted copy,
-  write `refactor-report.json`, and rerun the same command.
+  `refactor-request.json` in this same skill loop. For `hosted_paper_rewrite`,
+  edit only the promoted copy, package required files through the requested
+  report fields, write `refactor-report.json`, and rerun the same command.
 - The default Abel router base URL is `https://api.abel.ai/router/`. `abel-auth`
   owns API key setup; do not ask for a router URL unless the user is testing a
   non-default router.

@@ -6,24 +6,25 @@ import ast
 from dataclasses import dataclass
 import json
 from pathlib import Path
-import re
+import sys
 from typing import Any, Callable
 
 from abel_edge.research.promotion_gate import build_promotion_gate_report
 
 
-STATE_INTENT_FILENAME = "state_intent.json"
-STATE_INTENT_SCHEMA = "abel-invest.state-intent/v1"
 LOCAL_RUNTIME_STATE_DIR = Path(".abel-runtime") / "state"
 PROMOTION_MODE_ZERO_CHANGE = "zero_change"
-PROMOTION_MODE_AUTO_ADAPTER = "auto_adapter"
 PROMOTION_MODE_NEEDS_AGENT_REFACTOR = "needs_agent_refactor"
 PROMOTION_MODE_AGENT_REFACTOR = "agent_refactor"
-PROMOTION_ADAPTER_STATE_PATH = "state_path_adapter"
 PROMOTION_GATE_FILENAME = "promotion-gate.json"
 PROMOTION_PATCH_FILENAME = "promotion.patch"
 PROMOTION_REFACTOR_REPORT_FILENAME = "refactor-report.json"
 PROMOTION_REFACTOR_REQUEST_FILENAME = "refactor-request.json"
+PROMOTION_DEPENDENCY_SCAN_FILENAME = "dependency-scan.json"
+PROMOTION_PACKAGING_PLAN_FILENAME = "packaging-plan.json"
+PROMOTION_AGENT_REPORT_SCHEMA = "abel-invest.agent-refactor-report/v1"
+PROMOTION_AGENT_REQUEST_SCHEMA = "abel-invest.agent-refactor-request/v1"
+PROMOTION_HOSTED_REWRITE_SCOPE = "hosted_paper_rewrite"
 STATE_SELF_CHECK_FILE_SUFFIXES = {
     ".joblib",
     ".npy",
@@ -74,24 +75,69 @@ STATE_SELF_CHECK_SOURCE_PATH_PARTS = {
     "scaler",
     "scalers",
 }
+PROMOTION_ALLOWED_RUNTIME_IMPORTS = {
+    "abel_edge",
+    "numpy",
+    "pandas",
+}
+PROMOTION_FILE_READ_FUNCTIONS = {
+    "open",
+    "pd.read_csv",
+    "pd.read_json",
+    "pd.read_parquet",
+    "pd.read_pickle",
+    "pandas.read_csv",
+    "pandas.read_json",
+    "pandas.read_parquet",
+    "pandas.read_pickle",
+    "np.load",
+    "numpy.load",
+    "joblib.load",
+    "pickle.load",
+}
+PROMOTION_FILE_WRITE_FUNCTIONS = {
+    "Path.write_text",
+    "Path.write_bytes",
+    "np.save",
+    "numpy.save",
+    "joblib.dump",
+    "pickle.dump",
+}
+PROMOTION_BRANCH_FILE_SUFFIXES = {
+    ".csv",
+    ".json",
+    ".joblib",
+    ".npy",
+    ".npz",
+    ".pkl",
+    ".py",
+    ".txt",
+    ".yaml",
+    ".yml",
+}
 
 
 @dataclass(frozen=True)
-class StateIntentEntry:
-    path: str
-    role: str
-    mutable_in_paper: bool
-    required_for_signal: bool
-    produced_by: str
+class PromotionPackagedFile:
+    artifact_path: str
     source_path: Path
+    purpose: str
+    role: str
+
+    @property
+    def path(self) -> str:
+        if self.artifact_path.startswith("runtime/initial-state/"):
+            return self.artifact_path.removeprefix("runtime/initial-state/")
+        if self.artifact_path.startswith("strategy/"):
+            return self.artifact_path.removeprefix("strategy/")
+        return self.artifact_path
 
 
 @dataclass(frozen=True)
 class PromotionResult:
     mode: str
     strategy_source_path: Path
-    state_intent_payload: dict[str, Any] | None
-    state_entries: tuple[StateIntentEntry, ...]
+    packaged_files: tuple[PromotionPackagedFile, ...]
     extra_source_map: dict[str, Path]
     patch_path: Path | None
     gate_path: Path
@@ -100,7 +146,7 @@ class PromotionResult:
 
     @property
     def adapted(self) -> bool:
-        return self.mode == PROMOTION_MODE_AUTO_ADAPTER
+        return self.mode == PROMOTION_MODE_AGENT_REFACTOR
 
 
 class PromotionNeedsAgentRefactor(RuntimeError):
@@ -116,132 +162,112 @@ def prepare_promotion(
     sha256_file: Callable[[Path], str],
     verify_promotion: Callable[..., dict[str, Any]] | None = None,
 ) -> PromotionResult:
-    state_intent_payload = _load_state_intent_payload(candidate.branch)
     promoted_dir = destination / "promoted"
     promoted_dir.mkdir(parents=True, exist_ok=True)
-    if state_intent_payload is None:
-        self_check_signals = _state_intent_self_check_signals(
-            candidate.branch,
-            strategy_source_path=candidate.strategy_source_path,
-            is_denylisted_source=is_denylisted_source,
-        )
-        if self_check_signals:
-            request_path = _write_state_intent_self_check_request(
-                promoted_dir,
-                branch=candidate.branch,
-                source_path=candidate.strategy_source_path,
-                signals=self_check_signals,
-            )
-            raise PromotionNeedsAgentRefactor(
-                "state intent self-check required before promotion; "
-                f"{len(self_check_signals)} durable state signal(s) found; "
-                f"request written to {request_path}"
-            )
-    state_entries = tuple(
-        _state_intent_entries(
-            candidate.branch,
-            payload=state_intent_payload,
-            is_denylisted_source=is_denylisted_source,
-        )
+    promoted_source = promoted_dir / "engine.py"
+    existing_refactor_report = promoted_dir / PROMOTION_REFACTOR_REPORT_FILENAME
+    original_text = candidate.strategy_source_path.read_text(encoding="utf-8")
+    agent_refactor_ready = promoted_source.is_file() and existing_refactor_report.is_file()
+    dependency_scan = _collect_hosted_paper_dependency_scan(
+        candidate.branch,
+        strategy_source_path=candidate.strategy_source_path,
+        is_denylisted_source=is_denylisted_source,
     )
+    dependency_scan_path = None
+    packaging_plan_path = None
+
+    hosted_rewrite_signals = _hosted_paper_rewrite_signals(dependency_scan)
+    if hosted_rewrite_signals and not agent_refactor_ready:
+        promoted_source.write_text(original_text, encoding="utf-8")
+        dependency_scan_path = _write_dependency_scan(promoted_dir, dependency_scan)
+        request_path = _write_hosted_paper_rewrite_request(
+            promoted_dir,
+            branch=candidate.branch,
+            source_path=promoted_source,
+            dependency_scan=dependency_scan,
+            scan_path=dependency_scan_path,
+            signals=hosted_rewrite_signals,
+        )
+        raise PromotionNeedsAgentRefactor(
+            "hosted paper rewrite required before promotion; "
+            f"{len(hosted_rewrite_signals)} hosted-paper risk signal(s) found; "
+            f"request written to {request_path}"
+        )
+
     strategy_source_path = candidate.strategy_source_path
     patch_path = None
     refactor_report_path = None
     mode = PROMOTION_MODE_ZERO_CHANGE
-    adapter_replacements: list[dict[str, str]] = []
     refactor_replacements: list[dict[str, str]] = []
     refactor_summary = ""
+    packaged_files: tuple[PromotionPackagedFile, ...] = ()
+    refactor_report: dict[str, Any] | None = None
+    promoted_text = original_text
 
-    if state_entries:
-        promoted_source = promoted_dir / "engine.py"
-        existing_refactor_report = promoted_dir / PROMOTION_REFACTOR_REPORT_FILENAME
-        original_text = candidate.strategy_source_path.read_text(encoding="utf-8")
-        agent_refactor_ready = (
-            promoted_source.is_file() and existing_refactor_report.is_file()
-        )
-        if agent_refactor_ready:
-            promoted_text = promoted_source.read_text(encoding="utf-8")
-            refactor_report = _load_agent_refactor_report(existing_refactor_report)
-            refactor_replacements = _report_replacements(refactor_report)
-            if not refactor_replacements:
-                raise PromotionNeedsAgentRefactor(
-                    "agent refactor report must include at least one replacement"
-                )
-            refactor_summary = _clean(refactor_report.get("summary")) or (
-                "Agent refactored stateful paths to ctx.state_dir."
-            )
-            mode = PROMOTION_MODE_AGENT_REFACTOR
-            strategy_source_path = promoted_source
-            refactor_report_path = existing_refactor_report
-        else:
-            promoted_text = original_text
-            for entry in state_entries:
-                if entry.role != "initial_state":
-                    continue
-                promoted_text, changed = _adapt_state_path_literal(
-                    promoted_text,
-                    entry.path,
-                )
-                if changed:
-                    adapter_replacements.append(
-                        {
-                            "path": entry.path,
-                            "replacement": f'ctx.state_dir / "{entry.path}"',
-                        }
-                    )
-
-        missing_state_paths = [
-            entry.path
-            for entry in state_entries
-            if entry.role == "initial_state"
-            and not _source_uses_state_path(promoted_text, entry.path)
-        ]
-        if missing_state_paths:
-            promoted_source.write_text(promoted_text, encoding="utf-8")
-            request_path = _write_agent_refactor_request(
-                promoted_dir,
-                source_path=promoted_source,
-                missing_state_paths=missing_state_paths,
-            )
+    if agent_refactor_ready:
+        promoted_text = promoted_source.read_text(encoding="utf-8")
+        refactor_report = _load_agent_refactor_report(existing_refactor_report)
+        refactor_replacements = _report_replacements(refactor_report)
+        if not _report_has_hosted_rewrite_contract(refactor_report):
             raise PromotionNeedsAgentRefactor(
-                "initial_state path is not bound to runtime state path: "
-                f"{', '.join(missing_state_paths)}; "
-                f"agent refactor request written to {request_path}"
+                "agent refactor report must use hosted_paper_rewrite scope"
             )
+        refactor_summary = _clean(refactor_report.get("summary")) or (
+            "Agent refactored the promoted strategy for hosted paper."
+        )
+        packaged_files = tuple(
+            _report_packaged_files(
+                refactor_report,
+                branch=candidate.branch,
+                is_denylisted_source=is_denylisted_source,
+            )
+        )
+        artifact_refactor_report_path = _write_artifact_refactor_report(
+            promoted_dir,
+            refactor_report,
+        )
+        _validate_agent_paper_signal_contract(
+            refactor_report,
+            promoted_text,
+            require_paper_signal=True,
+        )
+        mode = PROMOTION_MODE_AGENT_REFACTOR
+        strategy_source_path = promoted_source
+        refactor_report_path = artifact_refactor_report_path
 
-        replacements = adapter_replacements + refactor_replacements
-        if mode == PROMOTION_MODE_AGENT_REFACTOR:
-            patch_path = promoted_dir / PROMOTION_PATCH_FILENAME
-            patch_path.write_text(
-                _simple_patch_summary(
-                    candidate.strategy_source_path,
-                    replacements,
-                    scope="agent_refactor_state_path_normalization",
-                ),
-                encoding="utf-8",
-            )
-        elif adapter_replacements:
-            mode = PROMOTION_MODE_AUTO_ADAPTER
-            promoted_source.write_text(promoted_text, encoding="utf-8")
-            strategy_source_path = promoted_source
-            patch_path = promoted_dir / PROMOTION_PATCH_FILENAME
-            patch_path.write_text(
-                _simple_patch_summary(candidate.strategy_source_path, replacements),
-                encoding="utf-8",
-            )
-    else:
-        replacements = []
+    replacements = refactor_replacements
+    if mode == PROMOTION_MODE_AGENT_REFACTOR:
+        dependency_scan_path = _write_dependency_scan(
+            promoted_dir,
+            _collect_hosted_paper_dependency_scan(
+                candidate.branch,
+                strategy_source_path=strategy_source_path,
+                is_denylisted_source=is_denylisted_source,
+            ),
+        )
+        packaging_plan_path = _write_packaging_plan(
+            promoted_dir,
+            packaged_files=packaged_files,
+            refactor_report=refactor_report,
+        )
+        patch_path = promoted_dir / PROMOTION_PATCH_FILENAME
+        patch_path.write_text(
+            _simple_patch_summary(
+                candidate.strategy_source_path,
+                replacements,
+                scope=_clean(refactor_report.get("scope"))
+                if refactor_report is not None
+                else "agent_refactor",
+            ),
+            encoding="utf-8",
+        )
+    _validate_promoted_source_static(strategy_source_path)
 
     original_sha = sha256_file(candidate.strategy_source_path)
     promoted_sha = sha256_file(strategy_source_path)
-    adapter_payload = (
-        {"kind": PROMOTION_ADAPTER_STATE_PATH, "scope": "state_path_normalization"}
-        if mode == PROMOTION_MODE_AUTO_ADAPTER
-        else None
-    )
     refactor_payload = (
         {
-            "kind": "agent_assisted",
+            "kind": PROMOTION_HOSTED_REWRITE_SCOPE,
             "summary": refactor_summary,
             "patchPath": f"edge/{PROMOTION_PATCH_FILENAME}",
             "reportPath": f"edge/{PROMOTION_REFACTOR_REPORT_FILENAME}",
@@ -263,7 +289,7 @@ def prepare_promotion(
             promotion_mode=mode,
             promoted_source_path=strategy_source_path,
             replacements=replacements,
-            state_entries=state_entries,
+            packaged_files=packaged_files,
             destination=destination,
         )
         if isinstance(verification.get("behavior_equivalence"), dict):
@@ -276,9 +302,8 @@ def prepare_promotion(
         original_source_sha256=original_sha,
         promoted_source_sha256=promoted_sha,
         patch_sha256=sha256_file(patch_path) if patch_path is not None else None,
-        adapter=adapter_payload,
         refactor=refactor_payload,
-        state_entries=state_entries,
+        state_entries=packaged_files,
         behavior_equivalence=behavior_equivalence,
         paper_dry_run=paper_dry_run,
     )
@@ -292,14 +317,15 @@ def prepare_promotion(
         )
 
     extra_source_map = {strategy_entrypoint: strategy_source_path}
-    for entry in state_entries:
-        if entry.role == "initial_state":
-            extra_source_map[f"runtime/initial-state/{entry.path}"] = entry.source_path
-        elif entry.role == "runtime_asset":
-            extra_source_map[f"strategy/{entry.path}"] = entry.source_path
+    for item in packaged_files:
+        extra_source_map[item.artifact_path] = item.source_path
     extra_source_map[f"edge/{PROMOTION_GATE_FILENAME}"] = gate_path
     if patch_path is not None:
         extra_source_map[f"edge/{PROMOTION_PATCH_FILENAME}"] = patch_path
+    if dependency_scan_path is not None:
+        extra_source_map[f"edge/{PROMOTION_DEPENDENCY_SCAN_FILENAME}"] = dependency_scan_path
+    if packaging_plan_path is not None:
+        extra_source_map[f"edge/{PROMOTION_PACKAGING_PLAN_FILENAME}"] = packaging_plan_path
     if mode == PROMOTION_MODE_AGENT_REFACTOR:
         assert refactor_report_path is not None
         extra_source_map[f"edge/{PROMOTION_REFACTOR_REPORT_FILENAME}"] = refactor_report_path
@@ -307,103 +333,500 @@ def prepare_promotion(
     return PromotionResult(
         mode=mode,
         strategy_source_path=strategy_source_path,
-        state_intent_payload=state_intent_payload,
-        state_entries=state_entries,
+        packaged_files=packaged_files,
         extra_source_map=extra_source_map,
         patch_path=patch_path,
         gate_path=gate_path,
         refactor_report_path=refactor_report_path,
         report={
             "mode": mode,
-            "stateIntentPath": str((candidate.branch / STATE_INTENT_FILENAME).resolve())
-            if state_intent_payload is not None
-            else "",
-            "stateEntryCount": len(state_entries),
+            "initialStateFileCount": len(
+                [
+                    item
+                    for item in packaged_files
+                    if item.role == "initial_state"
+                    or item.artifact_path.startswith("runtime/initial-state/")
+                ]
+            ),
+            "packagedFileCount": len(packaged_files),
             "replacementCount": len(replacements),
-            "adapterReplacementCount": len(adapter_replacements),
             "refactorReplacementCount": len(refactor_replacements),
+            "refactorSummary": refactor_summary,
             "patchPath": str(patch_path) if patch_path is not None else "",
             "refactorReportPath": str(refactor_report_path)
             if refactor_report_path is not None
             else "",
             "gatePath": str(gate_path),
+            "dependencyScanPath": str(dependency_scan_path)
+            if dependency_scan_path is not None
+            else "",
+            "packagingPlanPath": str(packaging_plan_path)
+            if packaging_plan_path is not None
+            else "",
         },
     )
 
 
-def _load_state_intent_payload(branch: Path) -> dict[str, Any] | None:
-    path = branch / STATE_INTENT_FILENAME
-    if not path.is_file():
-        return None
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise RuntimeError(f"{STATE_INTENT_FILENAME} must contain a JSON object")
-    if payload.get("schema") != STATE_INTENT_SCHEMA:
-        raise RuntimeError(
-            f"{STATE_INTENT_FILENAME} schema must be {STATE_INTENT_SCHEMA!r}"
-        )
-    entries = payload.get("entries")
-    if not isinstance(entries, list):
-        raise RuntimeError(f"{STATE_INTENT_FILENAME} entries must be a list")
-    return payload
-
-
-def _state_intent_entries(
+def _collect_hosted_paper_dependency_scan(
     branch: Path,
     *,
-    payload: dict[str, Any] | None,
+    strategy_source_path: Path,
     is_denylisted_source: Callable[[Path], bool],
-) -> list[StateIntentEntry]:
-    if payload is None:
-        return []
-    entries: list[StateIntentEntry] = []
+) -> dict[str, Any]:
+    source = strategy_source_path.read_text(encoding="utf-8")
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        tree = None
+    imports = _source_import_facts(tree)
+    file_accesses = _source_file_access_facts(tree)
+    absolute_literals = [
+        {"value": literal, "reason": "developer_local_absolute_path"}
+        for literal in _source_string_literals(source)
+        if _is_local_absolute_path(literal)
+    ]
+    branch_files = []
+    state_dependency_signals = _state_dependency_signals(
+        branch,
+        strategy_source_path=strategy_source_path,
+        is_denylisted_source=is_denylisted_source,
+    )
+    for path in sorted(branch.rglob("*")):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(branch)
+        if relative.name == "engine.py" or is_denylisted_source(relative):
+            continue
+        if relative.suffix.lower() not in PROMOTION_BRANCH_FILE_SUFFIXES:
+            continue
+        branch_files.append(
+            {
+                "path": relative.as_posix(),
+                "suffix": relative.suffix.lower(),
+                "bytes": path.stat().st_size,
+            }
+        )
+    return {
+        "schema": "abel-invest.hosted-paper-dependency-scan/v1",
+        "sourcePath": _display_source_path(branch, strategy_source_path),
+        "paperSignal": {
+            "implemented": _source_overrides_get_paper_signal(source),
+        },
+        "absolutePathLiterals": absolute_literals,
+        "fileAccesses": file_accesses,
+        "imports": imports,
+        "branchFiles": branch_files[:200],
+        "stateDependencies": state_dependency_signals,
+    }
+
+
+def _hosted_paper_rewrite_signals(scan: dict[str, Any]) -> list[dict[str, str]]:
+    signals: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    paper_signal = scan.get("paperSignal")
+    if not isinstance(paper_signal, dict) or paper_signal.get("implemented") is not True:
+        _append_hosted_rewrite_signal(
+            signals,
+            seen,
+            kind="missing_paper_signal",
+            value="get_paper_signal",
+            reason="promoted strategy must implement hosted paper fast path",
+        )
+    for item in scan.get("absolutePathLiterals") or []:
+        if not isinstance(item, dict):
+            continue
+        _append_hosted_rewrite_signal(
+            signals,
+            seen,
+            kind="developer_local_absolute_path",
+            value=_clean(item.get("value")),
+            reason="promoted strategy must not depend on developer-local absolute paths",
+        )
+    for item in scan.get("fileAccesses") or []:
+        if not isinstance(item, dict):
+            continue
+        value = _clean(item.get("path"))
+        if not _is_local_absolute_path(value):
+            continue
+        _append_hosted_rewrite_signal(
+            signals,
+            seen,
+            kind="developer_local_file_access",
+            value=value,
+            reason="file dependency must be packaged and read through runtime paths",
+        )
+    for item in scan.get("imports") or []:
+        if not isinstance(item, dict):
+            continue
+        if item.get("classification") in {"stdlib", "allowed_runtime"}:
+            continue
+        _append_hosted_rewrite_signal(
+            signals,
+            seen,
+            kind="nonstandard_import",
+            value=_clean(item.get("module")),
+            reason="non-standard imports must be confirmed for hosted paper runtime",
+        )
+    for item in scan.get("stateDependencies") or []:
+        if not isinstance(item, dict):
+            continue
+        _append_hosted_rewrite_signal(
+            signals,
+            seen,
+            kind=_clean(item.get("kind")) or "state_dependency",
+            value=_clean(item.get("value")),
+            reason=_clean(item.get("reason"))
+            or "state-like dependency must be classified by hosted rewrite",
+        )
+    return signals
+
+
+def _append_hosted_rewrite_signal(
+    signals: list[dict[str, str]],
+    seen: set[tuple[str, str]],
+    *,
+    kind: str,
+    value: str,
+    reason: str,
+) -> None:
+    if not value:
+        return
+    key = (kind, value)
+    if key in seen:
+        return
+    seen.add(key)
+    signals.append({"kind": kind, "value": value, "reason": reason})
+
+
+def _write_dependency_scan(promoted_dir: Path, scan: dict[str, Any]) -> Path:
+    path = promoted_dir / PROMOTION_DEPENDENCY_SCAN_FILENAME
+    path.write_text(
+        json.dumps(scan, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _write_packaging_plan(
+    promoted_dir: Path,
+    *,
+    packaged_files: tuple[PromotionPackagedFile, ...],
+    refactor_report: dict[str, Any] | None,
+) -> Path:
+    path = promoted_dir / PROMOTION_PACKAGING_PLAN_FILENAME
+    payload = {
+        "schema": "abel-invest.promotion-packaging-plan/v1",
+        "source": {
+            "refactorReportSummary": _clean((refactor_report or {}).get("summary")),
+        },
+        "files": [
+            {
+                "artifactPath": item.artifact_path,
+                "sourceRef": item.source_path.name,
+                "purpose": item.purpose,
+                "role": item.role,
+            }
+            for item in packaged_files
+        ],
+    }
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _write_artifact_refactor_report(
+    promoted_dir: Path,
+    report: dict[str, Any],
+) -> Path:
+    path = promoted_dir / "refactor-report.artifact.json"
+    payload = json.loads(json.dumps(report))
+    paths = payload.get("paths")
+    if isinstance(paths, dict):
+        paths["packagedFiles"] = [
+            _sanitized_packaged_file_entry(item)
+            for item in paths.get("packagedFiles") or []
+            if isinstance(item, dict)
+        ]
+        paths["initialStateFiles"] = [
+            _sanitized_packaged_file_entry(item)
+            for item in paths.get("initialStateFiles") or []
+            if isinstance(item, dict)
+        ]
+    if isinstance(payload.get("packagedFiles"), list):
+        payload["packagedFiles"] = [
+            _sanitized_packaged_file_entry(item)
+            for item in payload.get("packagedFiles") or []
+            if isinstance(item, dict)
+        ]
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _sanitized_packaged_file_entry(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in item.items()
+        if key not in {"source", "sourcePath", "localSourcePath"}
+    }
+
+
+def _write_hosted_paper_rewrite_request(
+    promoted_dir: Path,
+    *,
+    branch: Path,
+    source_path: Path,
+    dependency_scan: dict[str, Any],
+    scan_path: Path,
+    signals: list[dict[str, str]],
+) -> Path:
+    request_path = promoted_dir / PROMOTION_REFACTOR_REQUEST_FILENAME
+    request_path.write_text(
+        json.dumps(
+            {
+                "schema": PROMOTION_AGENT_REQUEST_SCHEMA,
+                "kind": "hosted_paper_rewrite",
+                "sourcePath": str(source_path),
+                "scope": PROMOTION_HOSTED_REWRITE_SCOPE,
+                "dependencyScanPath": str(scan_path),
+                "signals": signals,
+                "facts": dependency_scan,
+                "runtimeContract": {
+                    "baseAssets": "read immutable files through ctx.paths.base_strategy",
+                    "runtimeConfig": "read immutable runtime config through ctx.paths.runtime",
+                    "strategyState": (
+                        "read/write mutable strategy state under "
+                        "ctx.state_dir / 'strategy'"
+                    ),
+                    "paperCursor": (
+                        "use runtime paper cursor helpers or paper-log.csv semantics; "
+                        "do not use paper-log.csv as private strategy state"
+                    ),
+                },
+                "requiredReportTemplate": {
+                    "schema": PROMOTION_AGENT_REPORT_SCHEMA,
+                    "kind": PROMOTION_HOSTED_REWRITE_SCOPE,
+                    "summary": "<brief hosted paper rewrite summary>",
+                    "scope": PROMOTION_HOSTED_REWRITE_SCOPE,
+                    "paths": {
+                        "packagedFiles": [
+                            {
+                                "artifactPath": "strategy/assets/<file>",
+                                "sourcePath": "<absolute or branch-relative source file>",
+                                "purpose": "<why the promoted strategy needs this read-only asset>",
+                            }
+                        ],
+                        "initialStateFiles": [
+                            {
+                                "artifactPath": "runtime/initial-state/strategy/<file>",
+                                "sourcePath": "<absolute or branch-relative source file>",
+                                "purpose": "<why paper startup needs this mutable state seed>",
+                            }
+                        ],
+                    },
+                    "paperSignal": {
+                        "implemented": True,
+                        "incrementalReady": True,
+                        "notes": "uses runtime cursor plus strategy-owned state",
+                    },
+                    "limitations": [],
+                    "replacements": [],
+                },
+                "instructions": (
+                    "Refactor only the promoted copy. Remove developer-local paths, "
+                    "package required external read-only files through paths.packagedFiles, "
+                    "package required mutable startup state through paths.initialStateFiles, "
+                    "read immutable assets through ctx.paths.base_strategy, write mutable "
+                    "strategy state only under ctx.state_dir / 'strategy', and implement "
+                    "get_paper_signal(as_of=...) when the strategy can produce hosted "
+                    "paper signals. Then write refactor-report.json beside this request "
+                    "and rerun the same publish or promote command. If the candidate "
+                    "cannot safely produce continuing paper signals, report that as a "
+                    "limitation instead of forcing promotion."
+                ),
+                "branchPath": str(branch),
+            },
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    return request_path
+
+
+def _report_has_hosted_rewrite_contract(report: dict[str, Any]) -> bool:
+    return (
+        _clean(report.get("kind")) == PROMOTION_HOSTED_REWRITE_SCOPE
+        and _clean(report.get("scope")) == PROMOTION_HOSTED_REWRITE_SCOPE
+    )
+
+
+def _report_packaged_files(
+    report: dict[str, Any],
+    *,
+    branch: Path,
+    is_denylisted_source: Callable[[Path], bool],
+) -> list[PromotionPackagedFile]:
+    paths = report.get("paths")
+    packaged_groups: list[tuple[Any, str | None]] = []
+    if isinstance(paths, dict):
+        packaged_groups.append((paths.get("packagedFiles") or [], None))
+        packaged_groups.append((paths.get("initialStateFiles") or [], "initial_state"))
+    else:
+        packaged_groups.append(([], None))
+    if isinstance(report.get("packagedFiles"), list):
+        packaged_groups.append((report.get("packagedFiles") or [], None))
+
+    packaged: list[PromotionPackagedFile] = []
     seen: set[str] = set()
-    for raw in payload.get("entries", []):
-        if not isinstance(raw, dict):
-            raise RuntimeError("state intent entries must be objects")
-        relative = _validate_state_intent_relative_path(
-            raw.get("path"),
-            is_denylisted_source=is_denylisted_source,
-        )
-        if relative in seen:
-            raise RuntimeError(f"duplicate state intent path: {relative}")
-        seen.add(relative)
-        role = _clean(raw.get("role"))
-        if role not in {"runtime_asset", "initial_state", "evidence", "exclude", "unknown"}:
-            raise RuntimeError(f"unsupported state intent role: {role!r}")
-        if role == "unknown":
+    for raw_files, forced_role in packaged_groups:
+        if not isinstance(raw_files, list):
             raise PromotionNeedsAgentRefactor(
-                f"unknown state intent requires agent refactor: {relative}"
+                "refactor report paths packaged file fields must be lists"
             )
-        mutable = raw.get("mutableInPaper")
-        required = raw.get("requiredForSignal")
-        if not isinstance(mutable, bool) or not isinstance(required, bool):
-            raise RuntimeError("state intent mutableInPaper/requiredForSignal must be boolean")
-        source_path = _state_intent_source_path(branch, relative=relative, role=role)
-        if role not in {"exclude", "evidence"} and not source_path.is_file():
-            raise RuntimeError(f"state intent source file is missing: {relative}")
-        entries.append(
-            StateIntentEntry(
-                path=relative,
+        for raw in raw_files:
+            if not isinstance(raw, dict):
+                raise PromotionNeedsAgentRefactor("packaged file entries must be objects")
+            artifact_path = _normalize_report_packaged_artifact_path(
+                raw.get("artifactPath") or raw.get("path"),
+                forced_role=forced_role,
+            )
+            if artifact_path in seen:
+                raise PromotionNeedsAgentRefactor(
+                    f"duplicate packaged artifact path: {artifact_path}"
+                )
+            seen.add(artifact_path)
+            role = _packaged_file_role(artifact_path)
+            _validate_packaged_artifact_path(
+                artifact_path,
                 role=role,
-                mutable_in_paper=mutable,
-                required_for_signal=required,
-                produced_by=_clean(raw.get("producedBy")),
-                source_path=source_path,
+                is_denylisted_source=is_denylisted_source,
             )
-        )
-    return entries
+            source_path = _resolve_report_source_path(raw, branch=branch, artifact_path=artifact_path)
+            if not source_path.is_file():
+                raise PromotionNeedsAgentRefactor(
+                    f"packaged source file is missing for {artifact_path}: {source_path}"
+                )
+            packaged.append(
+                PromotionPackagedFile(
+                    artifact_path=artifact_path,
+                    source_path=source_path,
+                    purpose=_clean(raw.get("purpose")),
+                    role=role,
+                )
+            )
+    return packaged
 
 
-def _state_intent_source_path(branch: Path, *, relative: str, role: str) -> Path:
+def _normalize_report_packaged_artifact_path(value: Any, *, forced_role: str | None) -> str:
+    text = str(value or "").replace("\\", "/").strip()
+    if forced_role == "initial_state" and text and not text.startswith("runtime/initial-state/"):
+        text = f"runtime/initial-state/{text.removeprefix('state/')}"
+    path = Path(text)
+    if not text or path.is_absolute() or ".." in path.parts:
+        raise PromotionNeedsAgentRefactor(f"invalid packaged artifact path: {text!r}")
+    return path.as_posix()
+
+
+def _packaged_file_role(artifact_path: str) -> str:
+    if artifact_path.startswith("runtime/initial-state/"):
+        return "initial_state"
+    if artifact_path.startswith("strategy/"):
+        return "base_asset"
+    raise PromotionNeedsAgentRefactor(
+        "packaged files must use strategy/** or runtime/initial-state/** artifact paths: "
+        f"{artifact_path}"
+    )
+
+
+def _validate_packaged_artifact_path(
+    artifact_path: str,
+    *,
+    role: str,
+    is_denylisted_source: Callable[[Path], bool],
+) -> None:
+    if role == "base_asset":
+        relative = Path(artifact_path.removeprefix("strategy/"))
+        if is_denylisted_source(relative):
+            raise PromotionNeedsAgentRefactor(
+                f"packaged artifact path is denylisted: {artifact_path}"
+            )
+        return
     if role == "initial_state":
-        runtime_state_path = branch / LOCAL_RUNTIME_STATE_DIR / relative
-        if runtime_state_path.is_file():
-            return runtime_state_path
-    return branch / relative
+        relative = Path(artifact_path.removeprefix("runtime/initial-state/"))
+        if relative.is_absolute() or ".." in relative.parts or not relative.parts:
+            raise PromotionNeedsAgentRefactor(
+                f"invalid runtime initial state artifact path: {artifact_path}"
+            )
+        if is_denylisted_source(relative):
+            raise PromotionNeedsAgentRefactor(
+                f"runtime initial state artifact path is denylisted: {artifact_path}"
+            )
 
 
-def _state_intent_self_check_signals(
+def _resolve_report_source_path(
+    raw: dict[str, Any],
+    *,
+    branch: Path,
+    artifact_path: str,
+) -> Path:
+    source_text = _clean(raw.get("sourcePath") or raw.get("source"))
+    if source_text:
+        source = Path(source_text).expanduser()
+        return source if source.is_absolute() else branch / source
+    if artifact_path.startswith("strategy/"):
+        return branch / artifact_path.removeprefix("strategy/")
+    if artifact_path.startswith("runtime/initial-state/"):
+        return branch / artifact_path.removeprefix("runtime/initial-state/")
+    return branch / artifact_path
+
+
+def _validate_agent_paper_signal_contract(
+    report: dict[str, Any],
+    source: str,
+    *,
+    require_paper_signal: bool,
+) -> None:
+    paper_signal = report.get("paperSignal")
+    if not isinstance(paper_signal, dict):
+        if require_paper_signal:
+            raise PromotionNeedsAgentRefactor(
+                "hosted paper rewrite report must include paperSignal"
+            )
+        return
+    implemented = paper_signal.get("implemented")
+    incremental_ready = paper_signal.get("incrementalReady")
+    if require_paper_signal and implemented is not True:
+        raise PromotionNeedsAgentRefactor(
+            "hosted paper rewrite must set paperSignal.implemented=true"
+        )
+    if require_paper_signal and incremental_ready is not True:
+        raise PromotionNeedsAgentRefactor(
+            "hosted paper rewrite must set paperSignal.incrementalReady=true"
+        )
+    if implemented is True and not _source_overrides_get_paper_signal(source):
+        raise PromotionNeedsAgentRefactor(
+            "paperSignal.implemented=true but promoted source does not define get_paper_signal"
+        )
+
+
+def _validate_promoted_source_static(source_path: Path) -> None:
+    source = source_path.read_text(encoding="utf-8")
+    local_literals = [
+        literal for literal in _source_string_literals(source) if _is_local_absolute_path(literal)
+    ]
+    if local_literals:
+        sample = ", ".join(sorted(local_literals)[:3])
+        raise PromotionNeedsAgentRefactor(
+            f"promoted source still contains developer-local absolute path(s): {sample}"
+        )
+
+
+def _state_dependency_signals(
     branch: Path,
     *,
     strategy_source_path: Path,
@@ -423,7 +846,6 @@ def _state_intent_self_check_signals(
                     kind="runtime_state_file",
                     value=(LOCAL_RUNTIME_STATE_DIR / runtime_relative).as_posix(),
                     reason="file already exists under .abel-runtime/state",
-                    suggested_path=runtime_relative,
                 )
 
     for path in sorted(branch.rglob("*")):
@@ -443,7 +865,6 @@ def _state_intent_self_check_signals(
                 kind="state_like_file",
                 value=relative.as_posix(),
                 reason=f"state-like file suffix {suffix}",
-                suggested_path=relative.as_posix(),
             )
         elif (
             lower_parts & STATE_SELF_CHECK_DIRECTORY_PARTS
@@ -455,7 +876,6 @@ def _state_intent_self_check_signals(
                 kind="state_like_branch_file",
                 value=relative.as_posix(),
                 reason="file is under a model/checkpoint/cache/state directory",
-                suggested_path=relative.as_posix(),
             )
 
     if strategy_source_path.is_file():
@@ -470,7 +890,6 @@ def _state_intent_self_check_signals(
                 kind="source_state_reference",
                 value=literal,
                 reason=signal,
-                suggested_path="",
             )
     return signals
 
@@ -497,7 +916,7 @@ def _skip_state_self_check_file(relative: Path) -> bool:
         "branch_state.json",
         "engine.py",
         "results.tsv",
-        STATE_INTENT_FILENAME,
+        "state_intent.json",
     }
 
 
@@ -508,16 +927,141 @@ def _append_self_check_signal(
     kind: str,
     value: str,
     reason: str,
-    suggested_path: str,
 ) -> None:
     key = (kind, value)
     if key in seen:
         return
     seen.add(key)
     payload = {"kind": kind, "value": value, "reason": reason}
-    if suggested_path:
-        payload["suggestedStateIntentPath"] = suggested_path
     signals.append(payload)
+
+
+def _source_import_facts(tree: ast.AST | None) -> list[dict[str, str]]:
+    if tree is None:
+        return []
+    modules: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                module = _top_level_module(alias.name)
+                if module:
+                    modules.add(module)
+        elif isinstance(node, ast.ImportFrom):
+            module = _top_level_module(node.module or "")
+            if module:
+                modules.add(module)
+    return [
+        {"module": module, "classification": _import_classification(module)}
+        for module in sorted(modules)
+    ]
+
+
+def _top_level_module(value: str) -> str:
+    return str(value or "").split(".", 1)[0].strip()
+
+
+def _import_classification(module: str) -> str:
+    if module == "__future__" or module in sys.stdlib_module_names:
+        return "stdlib"
+    if module in PROMOTION_ALLOWED_RUNTIME_IMPORTS:
+        return "allowed_runtime"
+    return "nonstandard"
+
+
+def _source_file_access_facts(tree: ast.AST | None) -> list[dict[str, Any]]:
+    if tree is None:
+        return []
+    constants = _string_constants(tree)
+    facts: list[dict[str, Any]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        call_name = _call_name(node.func)
+        access = _file_access_kind(call_name)
+        if access is None:
+            continue
+        path_value = ""
+        if node.args:
+            path_value = _string_expr_value(node.args[0], constants)
+        facts.append(
+            {
+                "function": call_name,
+                "access": access,
+                "path": path_value,
+                "line": getattr(node, "lineno", 0),
+            }
+        )
+    return facts
+
+
+def _file_access_kind(call_name: str) -> str | None:
+    if (
+        call_name in PROMOTION_FILE_READ_FUNCTIONS
+        or call_name in {"read_text", "read_bytes"}
+        or call_name.endswith(".read_text")
+        or call_name.endswith(".read_bytes")
+    ):
+        return "read"
+    if (
+        call_name in PROMOTION_FILE_WRITE_FUNCTIONS
+        or call_name in {"write_text", "write_bytes"}
+        or call_name.endswith(".write_text")
+        or call_name.endswith(".write_bytes")
+    ):
+        return "write"
+    return None
+
+
+def _call_name(node: ast.AST) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        parent = _call_name(node.value)
+        return f"{parent}.{node.attr}" if parent else node.attr
+    return ""
+
+
+def _string_expr_value(node: ast.AST, constants: dict[str, str]) -> str:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.Name):
+        return constants.get(node.id, "")
+    return ""
+
+
+def _display_source_path(branch: Path, source_path: Path) -> str:
+    try:
+        return source_path.relative_to(branch).as_posix()
+    except ValueError:
+        if source_path.name == "engine.py" and source_path.parent.name == "promoted":
+            return "promoted/engine.py"
+        return source_path.name
+
+
+def _is_local_absolute_path(value: str) -> bool:
+    text = str(value or "").replace("\\", "/").strip()
+    if not text:
+        return False
+    if any(text.startswith(prefix) for prefix in ("http://", "https://", "s3://", "efs://")):
+        return False
+    return Path(text).is_absolute()
+
+
+def _source_overrides_get_paper_signal(source: str) -> bool:
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return False
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        if any(
+            isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and item.name == "get_paper_signal"
+            for item in node.body
+        ):
+            return True
+    return False
 
 
 def _source_string_literals(source: str) -> list[str]:
@@ -553,79 +1097,6 @@ def _source_state_reference_signal(value: str) -> str | None:
     return None
 
 
-def _validate_state_intent_relative_path(
-    value: Any,
-    *,
-    is_denylisted_source: Callable[[Path], bool],
-) -> str:
-    text = str(value or "").replace("\\", "/").strip()
-    path = Path(text)
-    if not text or path.is_absolute() or ".." in path.parts:
-        raise RuntimeError(f"invalid state intent path: {text!r}")
-    if is_denylisted_source(path):
-        raise RuntimeError(f"denylisted state intent path: {text}")
-    return path.as_posix()
-
-
-def _adapt_state_path_literal(source: str, relative_path: str) -> tuple[str, bool]:
-    escaped = re.escape(relative_path)
-    changed = False
-
-    def replace_path_call(match: re.Match[str]) -> str:
-        nonlocal changed
-        changed = True
-        quote = match.group("quote")
-        return f'(ctx.state_dir / {quote}{relative_path}{quote})'
-
-    source = re.sub(
-        rf"Path\(\s*(?P<quote>['\"]){escaped}(?P=quote)\s*\)",
-        replace_path_call,
-        source,
-    )
-
-    def replace_load_dump(match: re.Match[str]) -> str:
-        nonlocal changed
-        changed = True
-        prefix = match.group("prefix")
-        quote = match.group("quote")
-        return f"{prefix}ctx.state_dir / {quote}{relative_path}{quote}"
-
-    source = re.sub(
-        rf"(?P<prefix>\b(?:joblib|pickle)\.(?:load|dump)\([^,\n]*?)"
-        rf"(?P<quote>['\"]){escaped}(?P=quote)",
-        replace_load_dump,
-        source,
-    )
-    return source, changed
-
-
-def _source_uses_state_path(source: str, relative_path: str) -> bool:
-    if _source_uses_state_path_ast(source, relative_path):
-        return True
-    escaped = re.escape(relative_path)
-    checks = (
-        rf"\bctx\.state_dir\s*/\s*['\"]{escaped}['\"]",
-        rf"\bctx\.state_dir\.joinpath\(\s*['\"]{escaped}['\"]\s*\)",
-        rf"\b_runtime_paths\b.*['\"]{escaped}['\"]",
-        rf"\bABEL_STATE_DIR\b.*['\"]{escaped}['\"]",
-    )
-    return any(re.search(pattern, source, flags=re.DOTALL) for pattern in checks)
-
-
-def _source_uses_state_path_ast(source: str, relative_path: str) -> bool:
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return False
-    constants = _string_constants(tree)
-    target = Path(relative_path).as_posix()
-    for node in ast.walk(tree):
-        parts = _ctx_state_path_parts(node, constants)
-        if parts and Path("/".join(parts)).as_posix() == target:
-            return True
-    return False
-
-
 def _string_constants(tree: ast.AST) -> dict[str, str]:
     values: dict[str, str] = {}
     for node in ast.walk(tree):
@@ -639,41 +1110,6 @@ def _string_constants(tree: ast.AST) -> dict[str, str]:
     return values
 
 
-def _ctx_state_path_parts(node: ast.AST, constants: dict[str, str]) -> list[str] | None:
-    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
-        left = _ctx_state_path_parts(node.left, constants)
-        right = _path_part(node.right, constants)
-        if left is not None and right:
-            return left + [right]
-    if (
-        isinstance(node, ast.Attribute)
-        and node.attr == "state_dir"
-        and isinstance(node.value, ast.Name)
-        and node.value.id == "ctx"
-    ):
-        return []
-    if (
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "joinpath"
-    ):
-        base = _ctx_state_path_parts(node.func.value, constants)
-        if base is None:
-            return None
-        parts = [_path_part(arg, constants) for arg in node.args]
-        if all(parts):
-            return base + [part for part in parts if part]
-    return None
-
-
-def _path_part(node: ast.AST, constants: dict[str, str]) -> str:
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return node.value.strip("/")
-    if isinstance(node, ast.Name):
-        return constants.get(node.id, "").strip("/")
-    return ""
-
-
 def _default_behavior_equivalence(
     *,
     mode: str,
@@ -681,9 +1117,7 @@ def _default_behavior_equivalence(
 ) -> dict[str, Any]:
     return {
         "status": "passed",
-        "method": "state_path_adapter_static_scope"
-        if mode == PROMOTION_MODE_AUTO_ADAPTER
-        else "agent_refactor_state_path_scope"
+        "method": "agent_hosted_paper_rewrite_scope"
         if mode == PROMOTION_MODE_AGENT_REFACTOR
         else "source_hash_identity",
         "replacements": replacements,
@@ -694,7 +1128,7 @@ def _simple_patch_summary(
     source_path: Path,
     replacements: list[dict[str, str]],
     *,
-    scope: str = "state_path_normalization",
+    scope: str = PROMOTION_HOSTED_REWRITE_SCOPE,
 ) -> str:
     lines = [
         f"source: {source_path}",
@@ -708,120 +1142,19 @@ def _simple_patch_summary(
     return "\n".join(lines) + "\n"
 
 
-def _write_agent_refactor_request(
-    promoted_dir: Path,
-    *,
-    source_path: Path,
-    missing_state_paths: list[str],
-) -> Path:
-    request_path = promoted_dir / PROMOTION_REFACTOR_REQUEST_FILENAME
-    request_path.write_text(
-        json.dumps(
-            {
-                "schema": "abel-invest.agent-refactor-request/v1",
-                "kind": "agent_assisted",
-                "sourcePath": str(source_path),
-                "scope": "state_path_normalization",
-                "missingStatePaths": missing_state_paths,
-                "requiredReportTemplate": {
-                    "schema": "abel-invest.agent-refactor-report/v1",
-                    "kind": "agent_assisted",
-                    "summary": "<brief summary of state path normalization>",
-                    "scope": "state_path_normalization",
-                    "replacements": [
-                        {
-                            "path": missing_state_paths[0] if missing_state_paths else "",
-                            "replacement": "ctx.state_dir / \"<same relative path>\"",
-                        }
-                    ],
-                },
-                "instructions": (
-                    "Refactor only the promoted copy so each missing state path "
-                    "is read or written through ctx.state_dir. Then write "
-                    f"{PROMOTION_REFACTOR_REPORT_FILENAME} beside this request. "
-                    "Use requiredReportTemplate exactly, replacing the placeholder "
-                    "values. The report replacements must describe the actual "
-                    "state path normalizations made by the agent."
-                ),
-            },
-            indent=2,
-            sort_keys=True,
-        ),
-        encoding="utf-8",
-    )
-    return request_path
-
-
-def _write_state_intent_self_check_request(
-    promoted_dir: Path,
-    *,
-    branch: Path,
-    source_path: Path,
-    signals: list[dict[str, str]],
-) -> Path:
-    request_path = promoted_dir / PROMOTION_REFACTOR_REQUEST_FILENAME
-    state_intent_path = branch / STATE_INTENT_FILENAME
-    request_path.write_text(
-        json.dumps(
-            {
-                "schema": "abel-invest.agent-refactor-request/v1",
-                "kind": "state_intent_self_check",
-                "sourcePath": str(source_path),
-                "stateIntentPath": str(state_intent_path),
-                "scope": "state_intent_classification",
-                "signals": signals,
-                "requiredStateIntentTemplate": {
-                    "schema": STATE_INTENT_SCHEMA,
-                    "selfCheck": {
-                        "status": "durable_state_classified",
-                        "summary": "<brief summary of files reviewed>",
-                    },
-                    "entries": [
-                        {
-                            "path": "<relative path used by strategy>",
-                            "role": "initial_state",
-                            "mutableInPaper": True,
-                            "requiredForSignal": True,
-                            "producedBy": "agent_state_intent_self_check",
-                        }
-                    ],
-                },
-                "statelessStateIntentTemplate": {
-                    "schema": STATE_INTENT_SCHEMA,
-                    "selfCheck": {
-                        "status": "no_durable_state",
-                        "summary": "<why the detected signals are not required durable state>",
-                    },
-                    "entries": [],
-                },
-                "instructions": (
-                    "Before publishing, review the selected branch source, nearby "
-                    "model/checkpoint/cache files, and runtime evidence. If any "
-                    f"durable state is required for paper startup, write {state_intent_path} "
-                    "using requiredStateIntentTemplate and classify every required file. "
-                    "If the strategy is stateless or the detected files are not durable "
-                    "paper startup state, write the statelessStateIntentTemplate with a "
-                    "specific summary. Then rerun the same publish or promote command."
-                ),
-            },
-            indent=2,
-            sort_keys=True,
-        ),
-        encoding="utf-8",
-    )
-    return request_path
-
-
 def _load_agent_refactor_report(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise RuntimeError(f"{PROMOTION_REFACTOR_REPORT_FILENAME} must be an object")
-    if payload.get("schema") != "abel-invest.agent-refactor-report/v1":
+    if payload.get("schema") != PROMOTION_AGENT_REPORT_SCHEMA:
         raise RuntimeError(
             f"{PROMOTION_REFACTOR_REPORT_FILENAME} has unsupported schema"
         )
-    if payload.get("kind") != "agent_assisted":
-        raise RuntimeError(f"{PROMOTION_REFACTOR_REPORT_FILENAME} kind must be agent_assisted")
+    if payload.get("kind") != PROMOTION_HOSTED_REWRITE_SCOPE:
+        raise RuntimeError(
+            f"{PROMOTION_REFACTOR_REPORT_FILENAME} kind must be "
+            f"{PROMOTION_HOSTED_REWRITE_SCOPE}"
+        )
     return payload
 
 

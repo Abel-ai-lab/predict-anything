@@ -246,15 +246,12 @@ drawdown, and validation pass-rate, and does not require every gate to pass.
 Use `visualize-session --without-strategy-artifact` only when the user explicitly
 asks for a session view without strategy artifact upload. If the command reports
 `needs_agent_refactor`, read the emitted `refactor-request.json` and handle it
-in the current skill loop. If `kind` is `state_intent_self_check`, inspect the
-selected branch source and nearby model/checkpoint/cache files, then write
-`state_intent.json`: either classify every durable state file required for
-paper startup, or explicitly write an empty `entries` list with a `selfCheck`
-summary explaining why the detected files are not durable paper state. If
-`kind` is `agent_assisted`, edit only the promoted copy named there, write
-`refactor-report.json`, and rerun the same command. Do not start a separate
-agent process. The agent should not hand-assemble the payload or choose a
-router URL.
+in the current skill loop. For `kind=hosted_paper_rewrite`, inspect the selected
+branch source, dependency scan, nearby assets, and state-like files; edit only
+the promoted copy named there; declare required immutable assets or initial
+runtime state in `refactor-report.json`; and rerun the same command. Do not
+start a separate agent process. The agent should not hand-assemble the payload
+or choose a router URL.
 
 Default router base URL: `https://api.abel.ai/router/`.
 `abel-auth` is the canonical owner for API key setup. Maintainers should update

@@ -20,7 +20,7 @@ def verify_promotion_replay(
     promotion_mode: str,
     promoted_source_path: Path,
     replacements: list[dict[str, str]],
-    state_entries: tuple[Any, ...],
+    packaged_files: tuple[Any, ...],
     destination: Path,
     python_bin: str,
     runner: Callable[..., Any],
@@ -59,7 +59,7 @@ def verify_promotion_replay(
             ignore=shutil.ignore_patterns(".abel-runtime", "promotions", "__pycache__"),
         )
         shutil.copyfile(promoted_source_path, replay_branch / "engine.py")
-        _bootstrap_replay_state(replay_branch, state_entries)
+        _bootstrap_replay_state(replay_branch, packaged_files)
         replay_candidate = replace(candidate, branch=replay_branch)
         try:
             replay_result = run_edge_metric_input_export(
@@ -133,15 +133,16 @@ def _clean_reason(exc: Exception) -> str:
     return " ".join(str(exc).split())[:500] or exc.__class__.__name__
 
 
-def _bootstrap_replay_state(replay_branch: Path, state_entries: tuple[Any, ...]) -> None:
+def _bootstrap_replay_state(replay_branch: Path, packaged_files: tuple[Any, ...]) -> None:
     state_root = replay_branch / ".abel-runtime" / "state"
-    for entry in state_entries:
-        if getattr(entry, "role", "") != "initial_state":
+    for item in packaged_files:
+        artifact_path = str(getattr(item, "artifact_path", "") or "")
+        if not artifact_path.startswith("runtime/initial-state/"):
             continue
-        relative = Path(getattr(entry, "path", ""))
+        relative = Path(artifact_path.removeprefix("runtime/initial-state/"))
         if not relative.as_posix():
             continue
-        source = Path(getattr(entry, "source_path"))
+        source = Path(getattr(item, "source_path"))
         target = state_root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)

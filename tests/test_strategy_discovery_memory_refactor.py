@@ -169,6 +169,15 @@ def _write_strategy_artifact_inputs(
         "feeds": [],
     }
     ni.data_manifest_path(branch).write_text(json.dumps(data_manifest), encoding="utf-8")
+    (branch / "engine.py").write_text(
+        "from abel_edge.engine.base import StrategyEngine\n"
+        "class BranchEngine(StrategyEngine):\n"
+        "    def compute_decisions(self, ctx):\n"
+        "        return ctx.decisions(1)\n"
+        "    def get_paper_signal(self, *, as_of=None):\n"
+        "        return {'next_position': 1.0, 'date': str(as_of)}\n",
+        encoding="utf-8",
+    )
 
     trade_log_path = branch / "outputs" / "round-006-trade-log.csv"
     trade_log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1559,7 +1568,7 @@ def test_promote_branch_strategy_requires_round_when_branch_has_multiple_passes(
     assert result["selectedRoundId"] is None
 
 
-def test_export_selected_strategy_artifact_state_path_adapter(
+def test_export_selected_strategy_artifact_agent_packages_initial_state(
     tmp_path: Path,
 ) -> None:
     session = ni.init_session_dir("TSLA", "tsla-v1", tmp_path / "research")
@@ -1574,23 +1583,6 @@ def test_export_selected_strategy_artifact_state_path_adapter(
         "    def compute_decisions(self, ctx):\n"
         "        model_path = Path(\"model/latest.joblib\")\n"
         "        return ctx.decisions(1)\n",
-        encoding="utf-8",
-    )
-    (branch / "state_intent.json").write_text(
-        json.dumps(
-            {
-                "schema": "abel-invest.state-intent/v1",
-                "entries": [
-                    {
-                        "path": "model/latest.joblib",
-                        "role": "initial_state",
-                        "mutableInPaper": True,
-                        "requiredForSignal": True,
-                        "producedBy": "pytest",
-                    }
-                ],
-            }
-        ),
         encoding="utf-8",
     )
     _write_strategy_result_row(
@@ -1641,6 +1633,61 @@ def test_export_selected_strategy_artifact_state_path_adapter(
             )
         raise AssertionError(f"unexpected command: {command}")
 
+    first_result = ni.export_selected_strategy_artifact(
+        session,
+        output_dir=output_dir,
+        python_bin="python-test",
+        runner=fake_runner,
+    )
+
+    assert first_result["artifactExported"] is False
+    assert first_result["skipReason"] == "needs_agent_refactor"
+    request_path = Path(first_result["promotionReport"]["requestPath"])
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    assert request["kind"] == "hosted_paper_rewrite"
+    assert any(signal["kind"] == "state_like_file" for signal in request["signals"])
+    promoted_dir = request_path.parent
+    (promoted_dir / "engine.py").write_text(
+        "from abel_edge.engine.base import StrategyEngine\n"
+        "class BranchEngine(StrategyEngine):\n"
+        "    def compute_decisions(self, ctx):\n"
+        "        model_path = ctx.state_dir / \"strategy/model/latest.joblib\"\n"
+        "        return ctx.decisions(1)\n"
+        "    def get_paper_signal(self, *, as_of=None):\n"
+        "        model_path = self.context['_runtime_paths']['state']\n"
+        "        return {'next_position': 1.0, 'state_root': model_path, 'date': str(as_of)}\n",
+        encoding="utf-8",
+    )
+    (promoted_dir / "refactor-report.json").write_text(
+        json.dumps(
+            {
+                "schema": "abel-invest.agent-refactor-report/v1",
+                "kind": "hosted_paper_rewrite",
+                "summary": "Agent rewrote model access and packaged startup state.",
+                "scope": "hosted_paper_rewrite",
+                "paths": {
+                    "packagedFiles": [],
+                    "initialStateFiles": [
+                        {
+                            "artifactPath": "runtime/initial-state/strategy/model/latest.joblib",
+                            "sourcePath": "model/latest.joblib",
+                            "purpose": "model seed required by hosted paper signal",
+                        }
+                    ],
+                },
+                "paperSignal": {"implemented": True, "incrementalReady": True},
+                "limitations": [],
+                "replacements": [
+                    {
+                        "path": "model/latest.joblib",
+                        "replacement": "ctx.state_dir / \"strategy/model/latest.joblib\"",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
     result = ni.export_selected_strategy_artifact(
         session,
         output_dir=output_dir,
@@ -1649,33 +1696,30 @@ def test_export_selected_strategy_artifact_state_path_adapter(
     )
 
     manifest = json.loads(Path(result["manifestPath"]).read_text(encoding="utf-8"))
-    assert result["promotionMode"] == "auto_adapter"
+    assert result["promotionMode"] == "agent_refactor"
     assert manifest["runtime"]["state"]["bootstrap"] == {
         "mode": "copy_from_base",
         "path": "runtime/initial-state/",
     }
-    assert manifest["promotion"]["mode"] == "auto_adapter"
-    assert manifest["promotion"]["adapter"] == {
-        "kind": "state_path_adapter",
-        "scope": "state_path_normalization",
-    }
+    assert manifest["promotion"]["mode"] == "agent_refactor"
     assert manifest["promotion"]["gate"] == {
         "status": "passed",
         "evidencePath": "edge/promotion-gate.json",
     }
     file_paths = [item["path"] for item in manifest["files"]]
-    assert "runtime/initial-state/model/latest.joblib" in file_paths
+    assert "runtime/initial-state/strategy/model/latest.joblib" in file_paths
     assert "edge/promotion-gate.json" in file_paths
     assert "edge/promotion.patch" in file_paths
+    assert "edge/refactor-report.json" in file_paths
     promoted_engine = output_dir / "promoted" / "engine.py"
-    assert 'ctx.state_dir / "model/latest.joblib"' in promoted_engine.read_text(
+    assert 'ctx.state_dir / "strategy/model/latest.joblib"' in promoted_engine.read_text(
         encoding="utf-8"
     )
     export_command = next(command for command in commands_seen if "export-artifact" in command)
     assert "--extra-source-map" in export_command
 
 
-def test_export_selected_strategy_artifact_requires_state_intent_self_check_for_runtime_state(
+def test_export_selected_strategy_artifact_requires_hosted_rewrite_for_runtime_state(
     tmp_path: Path,
 ) -> None:
     session = ni.init_session_dir("TSLA", "tsla-v1", tmp_path / "research")
@@ -1707,16 +1751,18 @@ def test_export_selected_strategy_artifact_requires_state_intent_self_check_for_
     assert result["skipReason"] == "needs_agent_refactor"
     report = result["promotionReport"]
     assert report["mode"] == "needs_agent_refactor"
-    assert "state intent self-check required" in report["reason"]
+    assert "hosted paper rewrite required" in report["reason"]
     request = json.loads(Path(report["requestPath"]).read_text(encoding="utf-8"))
-    assert request["kind"] == "state_intent_self_check"
-    assert request["scope"] == "state_intent_classification"
-    assert request["signals"][0]["kind"] == "runtime_state_file"
-    assert request["signals"][0]["suggestedStateIntentPath"] == "model/latest.json"
-    assert request["statelessStateIntentTemplate"]["entries"] == []
+    assert request["kind"] == "hosted_paper_rewrite"
+    assert request["scope"] == "hosted_paper_rewrite"
+    assert any(signal["kind"] == "runtime_state_file" for signal in request["signals"])
+    assert any(
+        item["kind"] == "runtime_state_file"
+        for item in request["facts"]["stateDependencies"]
+    )
 
 
-def test_export_selected_strategy_artifact_requires_state_intent_self_check_for_ad_hoc_paths(
+def test_export_selected_strategy_artifact_requires_hosted_rewrite_for_ad_hoc_paths(
     tmp_path: Path,
 ) -> None:
     session = ni.init_session_dir("TSLA", "tsla-v1", tmp_path / "research")
@@ -1753,15 +1799,310 @@ def test_export_selected_strategy_artifact_requires_state_intent_self_check_for_
     request = json.loads(
         Path(result["promotionReport"]["requestPath"]).read_text(encoding="utf-8")
     )
-    assert request["kind"] == "state_intent_self_check"
+    assert request["kind"] == "hosted_paper_rewrite"
     assert any(signal["kind"] == "source_state_reference" for signal in request["signals"])
 
 
-def test_export_selected_strategy_artifact_allows_explicit_stateless_self_check(
+def test_export_selected_strategy_artifact_requires_hosted_rewrite_for_absolute_asset_path(
+    tmp_path: Path,
+) -> None:
+    session = ni.init_session_dir("ETHUSD", "eth-v1", tmp_path / "research")
+    branch = ni.init_branch_dir(session, "absolute_asset_path")
+    _write_strategy_artifact_inputs(branch, target="ETHUSD")
+    external_asset = tmp_path / "trading-internal" / "data" / "trade_log_dual_resonance.csv"
+    external_asset.parent.mkdir(parents=True)
+    external_asset.write_text("date,position\n2020-01-01,1\n", encoding="utf-8")
+    (branch / "engine.py").write_text(
+        "import pandas as pd\n"
+        "from abel_edge.engine.base import StrategyEngine\n"
+        f"_LOG = \"{external_asset}\"\n"
+        "class BranchEngine(StrategyEngine):\n"
+        "    def compute_decisions(self, ctx):\n"
+        "        df = pd.read_csv(_LOG)\n"
+        "        return ctx.decisions(float(df['position'].iloc[-1]))\n",
+        encoding="utf-8",
+    )
+    _write_strategy_result_row(
+        session,
+        branch,
+        round_id="round-006",
+        verdict="PASS",
+        sharpe=0.967,
+        lo_adj=1.056,
+        max_dd=-0.1278,
+    )
+    _write_metric_input(branch, round_id="round-006")
+
+    result = ni.export_selected_strategy_artifact(
+        session,
+        output_dir=tmp_path / "exported-artifact",
+        python_bin="python-test",
+        runner=_fake_artifact_export_runner,
+    )
+
+    assert result["artifactExported"] is False
+    assert result["skipReason"] == "needs_agent_refactor"
+    request = json.loads(
+        Path(result["promotionReport"]["requestPath"]).read_text(encoding="utf-8")
+    )
+    assert request["kind"] == "hosted_paper_rewrite"
+    assert request["scope"] == "hosted_paper_rewrite"
+    assert request["facts"]["paperSignal"]["implemented"] is False
+    assert any(
+        signal["kind"] == "developer_local_absolute_path"
+        for signal in request["signals"]
+    )
+    assert (Path(result["promotionReport"]["requestPath"]).parent / "engine.py").is_file()
+
+
+def test_export_selected_strategy_artifact_agent_packages_external_base_asset(
+    tmp_path: Path,
+) -> None:
+    session = ni.init_session_dir("ETHUSD", "eth-v1", tmp_path / "research")
+    branch = ni.init_branch_dir(session, "agent_packaged_asset")
+    _write_strategy_artifact_inputs(branch, target="ETHUSD")
+    external_asset = tmp_path / "trading-internal" / "data" / "trade_log_dual_resonance.csv"
+    external_asset.parent.mkdir(parents=True)
+    external_asset.write_text("date,position\n2020-01-01,1\n", encoding="utf-8")
+    (branch / "engine.py").write_text(
+        "import pandas as pd\n"
+        "from abel_edge.engine.base import StrategyEngine\n"
+        f"_LOG = \"{external_asset}\"\n"
+        "class BranchEngine(StrategyEngine):\n"
+        "    def compute_decisions(self, ctx):\n"
+        "        df = pd.read_csv(_LOG)\n"
+        "        return ctx.decisions(float(df['position'].iloc[-1]))\n",
+        encoding="utf-8",
+    )
+    _write_strategy_result_row(
+        session,
+        branch,
+        round_id="round-006",
+        verdict="PASS",
+        sharpe=0.967,
+        lo_adj=1.056,
+        max_dd=-0.1278,
+    )
+    _write_metric_input(branch, round_id="round-006")
+    output_dir = tmp_path / "exported-artifact"
+
+    first_result = ni.export_selected_strategy_artifact(
+        session,
+        output_dir=output_dir,
+        python_bin="python-test",
+        runner=_fake_artifact_export_runner,
+    )
+    request_path = Path(first_result["promotionReport"]["requestPath"])
+    promoted_dir = request_path.parent
+    (promoted_dir / "engine.py").write_text(
+        "import pandas as pd\n"
+        "from abel_edge.engine.base import StrategyEngine\n"
+        "class BranchEngine(StrategyEngine):\n"
+        "    def compute_decisions(self, ctx):\n"
+        "        log_path = ctx.paths.base_strategy / \"assets/trade_log_dual_resonance.csv\"\n"
+        "        df = pd.read_csv(log_path)\n"
+        "        return ctx.decisions(float(df['position'].iloc[-1]))\n"
+        "    def get_paper_signal(self, *, as_of=None):\n"
+        "        date = str(as_of) if as_of is not None else 'not-run'\n"
+        "        return {'next_position': 1.0, 'date': date}\n",
+        encoding="utf-8",
+    )
+    (promoted_dir / "refactor-report.json").write_text(
+        json.dumps(
+            {
+                "schema": "abel-invest.agent-refactor-report/v1",
+                "kind": "hosted_paper_rewrite",
+                "summary": "Agent packaged external replay log as read-only base asset.",
+                "scope": "hosted_paper_rewrite",
+                "paths": {
+                    "packagedFiles": [
+                        {
+                            "artifactPath": "strategy/assets/trade_log_dual_resonance.csv",
+                            "sourcePath": str(external_asset),
+                            "purpose": "read-only replay log used by the promoted strategy",
+                        }
+                    ],
+                },
+                "paperSignal": {
+                    "implemented": True,
+                    "incrementalReady": True,
+                    "notes": "simple one-row paper signal for hosted smoke coverage",
+                },
+                "limitations": [],
+                "replacements": [
+                    {
+                        "path": "external replay log",
+                        "replacement": (
+                            "ctx.paths.base_strategy / "
+                            "\"assets/trade_log_dual_resonance.csv\""
+                        ),
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = ni.export_selected_strategy_artifact(
+        session,
+        output_dir=output_dir,
+        python_bin="python-test",
+        runner=_fake_artifact_export_runner,
+    )
+
+    assert result["artifactExported"] is True
+    assert result["promotionMode"] == "agent_refactor"
+    manifest = json.loads(Path(result["manifestPath"]).read_text(encoding="utf-8"))
+    file_paths = [item["path"] for item in manifest["files"]]
+    assert "strategy/assets/trade_log_dual_resonance.csv" in file_paths
+    assert "edge/dependency-scan.json" in file_paths
+    assert "edge/packaging-plan.json" in file_paths
+    assert "edge/refactor-report.json" in file_paths
+    promoted_source = (output_dir / "promoted" / "engine.py").read_text(encoding="utf-8")
+    assert str(external_asset) not in promoted_source
+    artifact_report = json.loads(
+        (output_dir / "promoted" / "refactor-report.artifact.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert str(external_asset) not in json.dumps(artifact_report)
+    artifact_packaged_file = artifact_report["paths"]["packagedFiles"][0]
+    assert "sourcePath" not in artifact_packaged_file
+
+
+def test_export_selected_strategy_artifact_requires_hosted_rewrite_for_nonstandard_import(
+    tmp_path: Path,
+) -> None:
+    session = ni.init_session_dir("GNRC", "gnrc-v1", tmp_path / "research")
+    branch = ni.init_branch_dir(session, "ml_walk_forward")
+    _write_strategy_artifact_inputs(branch, target="GNRC", selected_inputs=["RTX"])
+    (branch / "engine.py").write_text(
+        "from sklearn.ensemble import RandomForestClassifier\n"
+        "from abel_edge.engine.base import StrategyEngine\n"
+        "class BranchEngine(StrategyEngine):\n"
+        "    def compute_decisions(self, ctx):\n"
+        "        _ = RandomForestClassifier(n_estimators=2)\n"
+        "        return ctx.decisions(1)\n",
+        encoding="utf-8",
+    )
+    _write_strategy_result_row(
+        session,
+        branch,
+        round_id="round-006",
+        verdict="PASS",
+        sharpe=0.967,
+        lo_adj=1.056,
+        max_dd=-0.1278,
+    )
+    _write_metric_input(branch, round_id="round-006")
+
+    result = ni.export_selected_strategy_artifact(
+        session,
+        output_dir=tmp_path / "exported-artifact",
+        python_bin="python-test",
+        runner=_fake_artifact_export_runner,
+    )
+
+    assert result["artifactExported"] is False
+    assert result["skipReason"] == "needs_agent_refactor"
+    request = json.loads(
+        Path(result["promotionReport"]["requestPath"]).read_text(encoding="utf-8")
+    )
+    assert request["kind"] == "hosted_paper_rewrite"
+    assert any(signal["kind"] == "nonstandard_import" for signal in request["signals"])
+    imports = request["facts"]["imports"]
+    assert {"module": "sklearn", "classification": "nonstandard"} in imports
+
+
+def test_export_selected_strategy_artifact_agent_adds_stateful_paper_signal(
+    tmp_path: Path,
+) -> None:
+    session = ni.init_session_dir("GNRC", "gnrc-v1", tmp_path / "research")
+    branch = ni.init_branch_dir(session, "agent_stateful_ml")
+    _write_strategy_artifact_inputs(branch, target="GNRC", selected_inputs=["RTX"])
+    (branch / "engine.py").write_text(
+        "from sklearn.ensemble import RandomForestClassifier\n"
+        "from abel_edge.engine.base import StrategyEngine\n"
+        "class BranchEngine(StrategyEngine):\n"
+        "    def compute_decisions(self, ctx):\n"
+        "        _ = RandomForestClassifier(n_estimators=2)\n"
+        "        return ctx.decisions(1)\n",
+        encoding="utf-8",
+    )
+    _write_strategy_result_row(
+        session,
+        branch,
+        round_id="round-006",
+        verdict="PASS",
+        sharpe=0.967,
+        lo_adj=1.056,
+        max_dd=-0.1278,
+    )
+    _write_metric_input(branch, round_id="round-006")
+    output_dir = tmp_path / "exported-artifact"
+
+    first_result = ni.export_selected_strategy_artifact(
+        session,
+        output_dir=output_dir,
+        python_bin="python-test",
+        runner=_fake_artifact_export_runner,
+    )
+    promoted_dir = Path(first_result["promotionReport"]["requestPath"]).parent
+    (promoted_dir / "engine.py").write_text(
+        "from sklearn.ensemble import RandomForestClassifier\n"
+        "from abel_edge.engine.base import StrategyEngine\n"
+        "class BranchEngine(StrategyEngine):\n"
+        "    def compute_decisions(self, ctx):\n"
+        "        _ = RandomForestClassifier(n_estimators=2)\n"
+        "        return ctx.decisions(1)\n"
+        "    def get_paper_signal(self, *, as_of=None):\n"
+        "        state_root = self.context['_runtime_paths']['state']\n"
+        "        return {'next_position': 1.0, 'date': str(as_of), 'state_root': state_root}\n",
+        encoding="utf-8",
+    )
+    (promoted_dir / "refactor-report.json").write_text(
+        json.dumps(
+            {
+                "schema": "abel-invest.agent-refactor-report/v1",
+                "kind": "hosted_paper_rewrite",
+                "summary": "Agent added stateful paper signal entrypoint.",
+                "scope": "hosted_paper_rewrite",
+                "paths": {
+                    "packagedFiles": [],
+                },
+                "paperSignal": {
+                    "implemented": True,
+                    "incrementalReady": True,
+                    "notes": "uses runtime state path and returns scalar audit fields",
+                },
+                "limitations": [],
+                "replacements": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = ni.export_selected_strategy_artifact(
+        session,
+        output_dir=output_dir,
+        python_bin="python-test",
+        runner=_fake_artifact_export_runner,
+    )
+
+    assert result["artifactExported"] is True
+    assert result["promotionMode"] == "agent_refactor"
+    manifest = json.loads(Path(result["manifestPath"]).read_text(encoding="utf-8"))
+    file_paths = [item["path"] for item in manifest["files"]]
+    assert "edge/dependency-scan.json" in file_paths
+    assert "edge/packaging-plan.json" in file_paths
+    assert "edge/refactor-report.json" in file_paths
+
+
+def test_export_selected_strategy_artifact_ignores_legacy_state_intent(
     tmp_path: Path,
 ) -> None:
     session = ni.init_session_dir("TSLA", "tsla-v1", tmp_path / "research")
-    branch = ni.init_branch_dir(session, "stateless_after_self_check")
+    branch = ni.init_branch_dir(session, "legacy_state_intent")
     _write_strategy_artifact_inputs(branch)
     runtime_state = branch / ".abel-runtime" / "state" / "model" / "debug.json"
     runtime_state.parent.mkdir(parents=True)
@@ -1797,10 +2138,14 @@ def test_export_selected_strategy_artifact_allows_explicit_stateless_self_check(
         runner=_fake_artifact_export_runner,
     )
 
-    assert result["artifactExported"] is True
-    manifest = json.loads(Path(result["manifestPath"]).read_text(encoding="utf-8"))
-    assert manifest["promotion"]["mode"] == "zero_change"
-    assert manifest["stateIntent"]["selfCheck"]["status"] == "no_durable_state"
+    assert result["artifactExported"] is False
+    assert result["skipReason"] == "needs_agent_refactor"
+    request = json.loads(
+        Path(result["promotionReport"]["requestPath"]).read_text(encoding="utf-8")
+    )
+    assert request["kind"] == "hosted_paper_rewrite"
+    assert "stateIntentPath" not in request
+    assert "requiredStateIntentTemplate" not in request
 
 
 def test_export_selected_strategy_artifact_normalizes_relative_python_bin(
@@ -1881,23 +2226,6 @@ def test_export_selected_strategy_artifact_returns_gate_evidence_on_replay_failu
         "        return ctx.decisions(1)\n",
         encoding="utf-8",
     )
-    (branch / "state_intent.json").write_text(
-        json.dumps(
-            {
-                "schema": "abel-invest.state-intent/v1",
-                "entries": [
-                    {
-                        "path": "model/latest.joblib",
-                        "role": "initial_state",
-                        "mutableInPaper": True,
-                        "requiredForSignal": True,
-                        "producedBy": "pytest",
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
     _write_strategy_result_row(
         session,
         branch,
@@ -1933,6 +2261,51 @@ def test_export_selected_strategy_artifact_returns_gate_evidence_on_replay_failu
             )
         raise AssertionError(f"unexpected command: {command}")
 
+    first_result = ni.export_selected_strategy_artifact(
+        session,
+        output_dir=output_dir,
+        python_bin="python-test",
+        runner=fake_runner,
+    )
+
+    assert first_result["artifactExported"] is False
+    request_path = Path(first_result["promotionReport"]["requestPath"])
+    promoted_dir = request_path.parent
+    (promoted_dir / "engine.py").write_text(
+        "from abel_edge.engine.base import StrategyEngine\n"
+        "class BranchEngine(StrategyEngine):\n"
+        "    def compute_decisions(self, ctx):\n"
+        "        model_path = ctx.state_dir / \"strategy/model/latest.joblib\"\n"
+        "        return ctx.decisions(1)\n"
+        "    def get_paper_signal(self, *, as_of=None):\n"
+        "        return {'next_position': 1.0, 'date': str(as_of)}\n",
+        encoding="utf-8",
+    )
+    (promoted_dir / "refactor-report.json").write_text(
+        json.dumps(
+            {
+                "schema": "abel-invest.agent-refactor-report/v1",
+                "kind": "hosted_paper_rewrite",
+                "summary": "Agent rewrote state path for hosted paper.",
+                "scope": "hosted_paper_rewrite",
+                "paths": {
+                    "packagedFiles": [],
+                    "initialStateFiles": [
+                        {
+                            "artifactPath": "runtime/initial-state/strategy/model/latest.joblib",
+                            "sourcePath": "model/latest.joblib",
+                            "purpose": "model seed required for hosted paper",
+                        }
+                    ],
+                },
+                "paperSignal": {"implemented": True, "incrementalReady": True},
+                "limitations": [],
+                "replacements": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
     result = ni.export_selected_strategy_artifact(
         session,
         output_dir=output_dir,
@@ -1952,7 +2325,7 @@ def test_export_selected_strategy_artifact_returns_gate_evidence_on_replay_failu
     assert "promoted replay failed" in behavior_gate["details"]["reason"]
 
 
-def test_export_selected_strategy_artifact_state_aware_zero_change(
+def test_export_selected_strategy_artifact_requires_hosted_rewrite_for_stateful_branch(
     tmp_path: Path,
 ) -> None:
     session = ni.init_session_dir("TSLA", "tsla-v1", tmp_path / "research")
@@ -1968,23 +2341,6 @@ def test_export_selected_strategy_artifact_state_aware_zero_change(
         "        return ctx.decisions(1)\n",
         encoding="utf-8",
     )
-    (branch / "state_intent.json").write_text(
-        json.dumps(
-            {
-                "schema": "abel-invest.state-intent/v1",
-                "entries": [
-                    {
-                        "path": "model/latest.joblib",
-                        "role": "initial_state",
-                        "mutableInPaper": True,
-                        "requiredForSignal": True,
-                        "producedBy": "pytest",
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
     _write_strategy_result_row(
         session,
         branch,
@@ -1995,60 +2351,21 @@ def test_export_selected_strategy_artifact_state_aware_zero_change(
         max_dd=-0.1278,
     )
     _write_metric_input(branch, round_id="round-006")
-    output_dir = tmp_path / "exported-artifact"
-
-    def fake_runner(command, cwd=None, capture_output=None, text=None, env=None):
-        evaluated = _fake_evaluate_command(command)
-        if evaluated is not None:
-            return evaluated
-        if "-c" in command:
-            trade_log_path = Path(command[-1])
-            trade_log_path.write_text(
-                "date,asset_return,pnl,position,cum_return,source\n"
-                "2020-01-01,0,0,0,0,backfill\n",
-                encoding="utf-8",
-            )
-            return subprocess.CompletedProcess(
-                command,
-                0,
-                stdout=json.dumps({"tradeLogPath": str(trade_log_path)}),
-                stderr="",
-            )
-        if "export-artifact" in command:
-            artifact_path = Path(command[command.index("--output-zip") + 1])
-            artifact_path.write_bytes(b"artifact zip")
-            return subprocess.CompletedProcess(
-                command,
-                0,
-                stdout=json.dumps(
-                    {
-                        "artifactSha256": "abc123",
-                        "artifactBytes": artifact_path.stat().st_size,
-                        "fileCount": 10,
-                    }
-                ),
-                stderr="",
-            )
-        raise AssertionError(f"unexpected command: {command}")
 
     result = ni.export_selected_strategy_artifact(
         session,
-        output_dir=output_dir,
+        output_dir=tmp_path / "exported-artifact",
         python_bin="python-test",
-        runner=fake_runner,
+        runner=_fake_artifact_export_runner,
     )
 
-    manifest = json.loads(Path(result["manifestPath"]).read_text(encoding="utf-8"))
-    assert result["promotionMode"] == "zero_change"
-    assert manifest["runtime"]["state"]["bootstrap"] == {
-        "mode": "copy_from_base",
-        "path": "runtime/initial-state/",
-    }
-    assert manifest["promotion"]["mode"] == "zero_change"
-    assert manifest["promotion"]["gate"]["evidencePath"] == "edge/promotion-gate.json"
-    file_paths = [item["path"] for item in manifest["files"]]
-    assert "runtime/initial-state/model/latest.joblib" in file_paths
-    assert "edge/promotion-gate.json" in file_paths
+    assert result["artifactExported"] is False
+    assert result["skipReason"] == "needs_agent_refactor"
+    request = json.loads(
+        Path(result["promotionReport"]["requestPath"]).read_text(encoding="utf-8")
+    )
+    assert request["kind"] == "hosted_paper_rewrite"
+    assert any(signal["kind"] == "state_like_file" for signal in request["signals"])
 
 
 def test_export_selected_strategy_artifact_uses_local_runtime_state_source(
@@ -2072,23 +2389,6 @@ def test_export_selected_strategy_artifact_uses_local_runtime_state_source(
         "        return ctx.decisions(1)\n",
         encoding="utf-8",
     )
-    (branch / "state_intent.json").write_text(
-        json.dumps(
-            {
-                "schema": "abel-invest.state-intent/v1",
-                "entries": [
-                    {
-                        "path": "model/latest.joblib",
-                        "role": "initial_state",
-                        "mutableInPaper": True,
-                        "requiredForSignal": True,
-                        "producedBy": "pytest",
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
     _write_strategy_result_row(
         session,
         branch,
@@ -2135,6 +2435,50 @@ def test_export_selected_strategy_artifact_uses_local_runtime_state_source(
             )
         raise AssertionError(f"unexpected command: {command}")
 
+    first_result = ni.export_selected_strategy_artifact(
+        session,
+        output_dir=output_dir,
+        python_bin="python-test",
+        runner=fake_runner,
+    )
+
+    assert first_result["artifactExported"] is False
+    promoted_dir = Path(first_result["promotionReport"]["requestPath"]).parent
+    (promoted_dir / "engine.py").write_text(
+        "from abel_edge.engine.base import StrategyEngine\n"
+        "class BranchEngine(StrategyEngine):\n"
+        "    def compute_decisions(self, ctx):\n"
+        "        model_path = ctx.state_dir / \"strategy/model/latest.joblib\"\n"
+        "        return ctx.decisions(1)\n"
+        "    def get_paper_signal(self, *, as_of=None):\n"
+        "        return {'next_position': 1.0, 'date': str(as_of)}\n",
+        encoding="utf-8",
+    )
+    (promoted_dir / "refactor-report.json").write_text(
+        json.dumps(
+            {
+                "schema": "abel-invest.agent-refactor-report/v1",
+                "kind": "hosted_paper_rewrite",
+                "summary": "Agent packaged runtime state seed.",
+                "scope": "hosted_paper_rewrite",
+                "paths": {
+                    "packagedFiles": [],
+                    "initialStateFiles": [
+                        {
+                            "artifactPath": "runtime/initial-state/strategy/model/latest.joblib",
+                            "sourcePath": str(state_file),
+                            "purpose": "latest runtime model seed",
+                        }
+                    ],
+                },
+                "paperSignal": {"implemented": True, "incrementalReady": True},
+                "limitations": [],
+                "replacements": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
     result = ni.export_selected_strategy_artifact(
         session,
         output_dir=output_dir,
@@ -2144,8 +2488,8 @@ def test_export_selected_strategy_artifact_uses_local_runtime_state_source(
 
     manifest = json.loads(Path(result["manifestPath"]).read_text(encoding="utf-8"))
     file_paths = [item["path"] for item in manifest["files"]]
-    assert result["promotionMode"] == "zero_change"
-    assert "runtime/initial-state/model/latest.joblib" in file_paths
+    assert result["promotionMode"] == "agent_refactor"
+    assert "runtime/initial-state/strategy/model/latest.joblib" in file_paths
     assert not any(path.startswith("strategy/.abel-runtime/") for path in file_paths)
 
 
@@ -2166,30 +2510,6 @@ def test_export_selected_strategy_artifact_agent_refactors_dynamic_state_path(
         "        model_path = Path(\"model/latest.joblib\")\n"
         "        scaler_path = Path(\"model\") / \"feature_scaler.json\"\n"
         "        return ctx.decisions(1)\n",
-        encoding="utf-8",
-    )
-    (branch / "state_intent.json").write_text(
-        json.dumps(
-            {
-                "schema": "abel-invest.state-intent/v1",
-                "entries": [
-                    {
-                        "path": "model/latest.joblib",
-                        "role": "initial_state",
-                        "mutableInPaper": True,
-                        "requiredForSignal": True,
-                        "producedBy": "pytest",
-                    },
-                    {
-                        "path": "model/feature_scaler.json",
-                        "role": "initial_state",
-                        "mutableInPaper": True,
-                        "requiredForSignal": True,
-                        "producedBy": "pytest",
-                    }
-                ],
-            }
-        ),
         encoding="utf-8",
     )
     _write_strategy_result_row(
@@ -2256,26 +2576,45 @@ def test_export_selected_strategy_artifact_agent_refactors_dynamic_state_path(
         "from abel_edge.engine.base import StrategyEngine\n"
         "class BranchEngine(StrategyEngine):\n"
         "    def compute_decisions(self, ctx):\n"
-        "        model_path = ctx.state_dir / \"model/latest.joblib\"\n"
-        "        scaler_path = ctx.state_dir / \"model/feature_scaler.json\"\n"
-        "        return ctx.decisions(1)\n",
+        "        model_path = ctx.state_dir / \"strategy/model/latest.joblib\"\n"
+        "        scaler_path = ctx.state_dir / \"strategy/model/feature_scaler.json\"\n"
+        "        return ctx.decisions(1)\n"
+        "    def get_paper_signal(self, *, as_of=None):\n"
+        "        return {'next_position': 1.0, 'date': str(as_of)}\n",
         encoding="utf-8",
     )
     (promoted_dir / "refactor-report.json").write_text(
         json.dumps(
             {
                 "schema": "abel-invest.agent-refactor-report/v1",
-                "kind": "agent_assisted",
+                "kind": "hosted_paper_rewrite",
                 "summary": "Agent moved model paths onto ctx.state_dir.",
-                "scope": "state_path_normalization",
+                "scope": "hosted_paper_rewrite",
+                "paths": {
+                    "packagedFiles": [],
+                    "initialStateFiles": [
+                        {
+                            "artifactPath": "runtime/initial-state/strategy/model/latest.joblib",
+                            "sourcePath": "model/latest.joblib",
+                            "purpose": "latest model seed",
+                        },
+                        {
+                            "artifactPath": "runtime/initial-state/strategy/model/feature_scaler.json",
+                            "sourcePath": "model/feature_scaler.json",
+                            "purpose": "feature scaler seed",
+                        },
+                    ],
+                },
+                "paperSignal": {"implemented": True, "incrementalReady": True},
+                "limitations": [],
                 "replacements": [
                     {
                         "path": "model/latest.joblib",
-                        "replacement": "ctx.state_dir / \"model/latest.joblib\"",
+                        "replacement": "ctx.state_dir / \"strategy/model/latest.joblib\"",
                     },
                     {
                         "path": "model/feature_scaler.json",
-                        "replacement": "ctx.state_dir / \"model/feature_scaler.json\"",
+                        "replacement": "ctx.state_dir / \"strategy/model/feature_scaler.json\"",
                     },
                 ],
             }
@@ -2295,7 +2634,7 @@ def test_export_selected_strategy_artifact_agent_refactors_dynamic_state_path(
     assert result["promotionMode"] == "agent_refactor"
     manifest = json.loads(Path(result["manifestPath"]).read_text(encoding="utf-8"))
     assert manifest["promotion"]["mode"] == "agent_refactor"
-    assert manifest["promotion"]["refactor"]["kind"] == "agent_assisted"
+    assert manifest["promotion"]["refactor"]["kind"] == "hosted_paper_rewrite"
     assert manifest["promotion"]["gate"] == {
         "status": "passed",
         "evidencePath": "edge/promotion-gate.json",
@@ -2304,38 +2643,38 @@ def test_export_selected_strategy_artifact_agent_refactors_dynamic_state_path(
     assert "edge/promotion-gate.json" in file_paths
     assert "edge/promotion.patch" in file_paths
     assert "edge/refactor-report.json" in file_paths
-    assert "runtime/initial-state/model/latest.joblib" in file_paths
-    assert "runtime/initial-state/model/feature_scaler.json" in file_paths
+    assert "runtime/initial-state/strategy/model/latest.joblib" in file_paths
+    assert "runtime/initial-state/strategy/model/feature_scaler.json" in file_paths
     promoted_engine = output_dir / "promoted" / "engine.py"
     promoted_source = promoted_engine.read_text(encoding="utf-8")
-    assert 'ctx.state_dir / "model/latest.joblib"' in promoted_source
-    assert 'ctx.state_dir / "model/feature_scaler.json"' in promoted_source
+    assert 'ctx.state_dir / "strategy/model/latest.joblib"' in promoted_source
+    assert 'ctx.state_dir / "strategy/model/feature_scaler.json"' in promoted_source
 
 
-def test_promotion_state_path_detection_is_path_specific() -> None:
-    source = (
-        "model_path = ctx.state_dir / \"model/latest.joblib\"\n"
-        "scaler_path = Path(\"model\") / \"feature_scaler.json\"\n"
+def test_promotion_state_dependency_scan_records_state_like_facts(tmp_path: Path) -> None:
+    branch = tmp_path / "branch"
+    branch.mkdir()
+    runtime_state = branch / ".abel-runtime" / "state" / "strategy" / "model.joblib"
+    runtime_state.parent.mkdir(parents=True)
+    runtime_state.write_text("state\n", encoding="utf-8")
+    source_path = branch / "engine.py"
+    source_path.write_text(
+        "MODEL_PATH = 'models/AAPL/registry.json'\n"
+        "class BranchEngine:\n"
+        "    def compute_decisions(self, ctx):\n"
+        "        return MODEL_PATH\n",
+        encoding="utf-8",
     )
 
-    assert promotion_helpers._source_uses_state_path(source, "model/latest.joblib")
-    assert not promotion_helpers._source_uses_state_path(
-        source,
-        "model/feature_scaler.json",
+    scan = promotion_helpers._collect_hosted_paper_dependency_scan(
+        branch,
+        strategy_source_path=source_path,
+        is_denylisted_source=lambda path: False,
     )
-    dynamic_source = (
-        "symbol = \"AAPL\"\n"
-        "registry_path = ctx.state_dir / \"models\" / symbol / \"registry.json\"\n"
-        "checkpoint_path = ctx.state_dir.joinpath(\"models\", symbol, \"checkpoints/regime_latest.npz\")\n"
-    )
-    assert promotion_helpers._source_uses_state_path(
-        dynamic_source,
-        "models/AAPL/registry.json",
-    )
-    assert promotion_helpers._source_uses_state_path(
-        dynamic_source,
-        "models/AAPL/checkpoints/regime_latest.npz",
-    )
+
+    signals = scan["stateDependencies"]
+    assert any(signal["kind"] == "runtime_state_file" for signal in signals)
+    assert any(signal["kind"] == "source_state_reference" for signal in signals)
 
 
 def test_export_selected_strategy_artifact_regenerates_missing_metric_input(
