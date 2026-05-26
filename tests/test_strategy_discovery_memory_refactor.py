@@ -3365,55 +3365,89 @@ def test_refactor_report_rejects_full_replay_cutover_mode() -> None:
         )
 
 
-def test_paper_smoke_rejects_mutating_tail_dates_covered_by_cutover_state(
+def test_paper_smoke_bootstraps_state_before_holdout_tail(
     tmp_path: Path,
 ) -> None:
     session = ni.init_session_dir("TSLA", "tsla-v1", tmp_path / "research")
-    branch = ni.init_branch_dir(session, "mutating_tail_state")
+    branch = ni.init_branch_dir(session, "stateful_holdout")
     _write_strategy_artifact_inputs(branch)
     promoted_dir = branch / "promoted"
     promoted_dir.mkdir()
+    seed_state = branch / "paper-state.json"
+    seed_state.write_text("{}", encoding="utf-8")
     promoted_source = promoted_dir / "engine.py"
     promoted_source.write_text(
-        "from pathlib import Path\n"
+        "import json\n"
         "from abel_edge.engine.base import StrategyEngine\n"
         "class BranchEngine(StrategyEngine):\n"
-        "    def get_paper_signal(self, *, as_of=None):\n"
-        "        path = Path(self.context['_runtime_paths']['state']) / 'strategy/cursor.json'\n"
+        "    def _state_path(self):\n"
+        "        from pathlib import Path\n"
+        "        return Path(self.context['_runtime_paths']['state']) / 'strategy/paper-state.json'\n"
+        "    def build_paper_initial_state(self, *, cutover_as_of=None):\n"
+        "        path = self._state_path()\n"
         "        path.parent.mkdir(parents=True, exist_ok=True)\n"
-        "        path.write_text(str(as_of), encoding='utf-8')\n"
+        "        state = {'cutover': str(cutover_as_of), 'seen': []}\n"
+        "        path.write_text(json.dumps(state), encoding='utf-8')\n"
+        "        return state\n"
+        "    def get_paper_signal(self, *, as_of=None):\n"
+        "        path = self._state_path()\n"
+        "        state = json.loads(path.read_text(encoding='utf-8'))\n"
+        "        if str(as_of) not in state['seen']:\n"
+        "            state['seen'].append(str(as_of))\n"
+        "            path.write_text(json.dumps(state), encoding='utf-8')\n"
         "        return {'next_position': 1.0, 'date': str(as_of)}\n",
         encoding="utf-8",
     )
     destination = tmp_path / "artifact"
     destination.mkdir()
     (destination / "trade-log.csv").write_text(
-        "date,next_position\n2020-01-02,1\n",
+        "date,next_position\n"
+        "2020-01-01,0\n"
+        "2020-01-02,1\n"
+        "2020-01-03,1\n"
+        "2020-01-04,1\n",
         encoding="utf-8",
     )
     candidate = Namespace(
         branch=branch,
         strategy_source_path=branch / "engine.py",
-        branch_id="mutating_tail_state",
+        branch_id="stateful_holdout",
         ticker="TSLA",
-        edge_result={"effective_window": {"end": "2020-01-02"}},
+        edge_result={"effective_window": {"end": "2020-01-04"}},
     )
     report = {
+        "paths": {
+            "initialStateFiles": [
+                {
+                    "artifactPath": "runtime/initial-state/strategy/paper-state.json",
+                    "sourcePath": str(seed_state),
+                    "purpose": "production startup state seed",
+                }
+            ]
+        },
         "paperSignal": {
+            "continuation": _paper_continuation("stateful_continuation"),
             "design": _paper_design(
                 uses_state=True,
                 cutover_state_required=True,
-            )
-        }
+            ),
+        },
     }
     report["paperSignal"]["design"]["cutover"][
         "stateEnd"
-    ] = "2020-01-02"
+    ] = "2020-01-04"
 
     smoke = promotion_helpers._run_artifact_paper_signal_smoke(
         candidate,
         strategy_source_path=promoted_source,
-        packaged_files=(),
+        packaged_files=(
+            promotion_helpers.PromotionPackagedFile(
+                artifact_path="runtime/initial-state/strategy/paper-state.json",
+                source_path=seed_state,
+                purpose="production startup state seed",
+                role="initial_state",
+            ),
+        ),
         destination=destination,
         strategy_entrypoint="strategy.py",
         runtime_env={},
@@ -3421,8 +3455,13 @@ def test_paper_smoke_rejects_mutating_tail_dates_covered_by_cutover_state(
         report=report,
     )
 
-    assert smoke["status"] == "failed"
-    assert "historical tail date already covered" in smoke["reason"]
+    assert smoke["status"] == "passed"
+    assert smoke["validationBootstrap"]["status"] == "passed"
+    assert smoke["validationBootstrap"]["cutoverAsOf"] == "2020-01-01"
+    assert smoke["tailConsistency"]["validationCutoverAsOf"] == "2020-01-01"
+    assert smoke["tailConsistency"]["sampleSize"] == 3
+    assert smoke["stateChangedFirstCall"] is True
+    assert smoke["stateChangedSecondCall"] is False
 
 
 def test_paper_signal_design_facts_detects_runtime_path_helper_state() -> None:

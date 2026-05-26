@@ -1512,6 +1512,7 @@ def _promotion_gate_failure_request_payload(gate_report: dict[str, Any]) -> dict
             if isinstance(tail, dict):
                 compact_smoke["tailConsistency"] = _redacted_tail_failure_payload(tail)
             for key in (
+                "validationBootstrap",
                 "warmStart",
                 "elapsedSeconds",
                 "firstElapsedSeconds",
@@ -2130,7 +2131,7 @@ def _validate_paper_signal_design_contract(
     if not isinstance(daily_step, dict) or not _clean(daily_step.get("reason")):
         raise PromotionNeedsAgentRefactor(
             "paperSignal.design.dailyStep.reason must explain how one future as_of "
-            "advances without full replay"
+            "runs and how state advances if any"
         )
 
 
@@ -2783,7 +2784,9 @@ def _run_artifact_paper_signal_smoke(
                 "trade-log.csv must contain date and next_position columns"
             ),
         }
-    state_end_covers_tail = _report_state_end_covers_tail(report, oracle_rows)
+    requires_validation_bootstrap = (
+        _report_continuation_method(report) == "stateful_continuation"
+    )
     try:
         with tempfile.TemporaryDirectory(prefix="abel-paper-smoke-") as temp_name:
             root = Path(temp_name)
@@ -2803,6 +2806,8 @@ def _run_artifact_paper_signal_smoke(
                 strategy_entrypoint=strategy_entrypoint,
                 is_denylisted_source=is_denylisted_source,
             )
+            if requires_validation_bootstrap:
+                _clear_directory(state_dir)
             context = _paper_smoke_context(
                 candidate,
                 strategy_dir=strategy_dir,
@@ -2810,12 +2815,25 @@ def _run_artifact_paper_signal_smoke(
                 state_dir=state_dir,
                 workspace_dir=root,
             )
-            before_state = _snapshot_tree(state_dir)
             with _temporary_environ(runtime_env or {}), _temporary_sys_path(
                 [strategy_dir, strategy_dir.parent]
             ):
                 cls = _load_smoke_strategy_class(strategy_dir / "strategy.py")
                 engine = cls(context)
+                bootstrap = _run_paper_validation_state_bootstrap(
+                    engine,
+                    state_dir=state_dir,
+                    oracle_rows=oracle_rows,
+                    required=requires_validation_bootstrap,
+                )
+                if bootstrap.get("status") == "failed":
+                    return {
+                        "status": "failed",
+                        "reason": _clean(bootstrap.get("reason"))
+                        or "paper validation state bootstrap failed",
+                        "validationBootstrap": bootstrap,
+                    }
+                before_state = _snapshot_tree(state_dir)
                 tail_comparisons: list[dict[str, Any]] = []
                 previous_state = before_state
                 latest_result: Any = None
@@ -2843,23 +2861,6 @@ def _run_artifact_paper_signal_smoke(
                         "stateChanged": after_call_state != previous_state,
                     }
                     tail_comparisons.append(comparison)
-                    if state_end_covers_tail and after_call_state != previous_state:
-                        return {
-                            "status": "failed",
-                            "reason": (
-                                "get_paper_signal mutated strategy state for a "
-                                "historical tail date already covered by "
-                                "paperSignal.design.cutover.stateEnd; initial state must be "
-                                "cutover state, not a replay cursor that advances "
-                                "through validation oracle dates"
-                            ),
-                            "tailConsistency": _tail_consistency_payload(
-                                oracle_rows,
-                                tail_comparisons,
-                                status="failed",
-                            ),
-                            "result": _json_safe(latest_result),
-                        }
                     if latest_position is None:
                         return {
                             "status": "failed",
@@ -2963,6 +2964,7 @@ def _run_artifact_paper_signal_smoke(
                     tail_comparisons,
                     status="passed",
                 ),
+                "validationBootstrap": bootstrap,
                 "warmStart": warm_start,
                 "warnings": warnings,
                 "result": _json_safe(latest_result),
@@ -3022,6 +3024,72 @@ def _stage_paper_smoke_files(
             state_target = state_dir / relative
             state_target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(item.source_path, state_target)
+
+
+def _clear_directory(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    for child in path.iterdir():
+        if child.is_dir():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
+
+
+def _run_paper_validation_state_bootstrap(
+    engine: Any,
+    *,
+    state_dir: Path,
+    oracle_rows: list[dict[str, Any]],
+    required: bool,
+) -> dict[str, Any]:
+    if not required:
+        return {"required": False, "status": "skipped"}
+    cutover_as_of = _clean(oracle_rows[0].get("validationCutoverAsOf")) if oracle_rows else ""
+    if not cutover_as_of:
+        return {
+            "required": True,
+            "status": "failed",
+            "reason": (
+                "stateful_continuation validation needs at least one trade-log "
+                "row before the holdout sample to choose cutover_as_of"
+            ),
+        }
+    hook = getattr(engine, "build_paper_initial_state", None)
+    if not callable(hook):
+        return {
+            "required": True,
+            "status": "failed",
+            "reason": (
+                "stateful_continuation requires BranchEngine.build_paper_initial_state"
+            ),
+            "cutoverAsOf": cutover_as_of,
+        }
+
+    before = _snapshot_tree(state_dir)
+    started_at = time.monotonic()
+    result = hook(cutover_as_of=cutover_as_of)
+    elapsed = time.monotonic() - started_at
+    after = _snapshot_tree(state_dir)
+    wrote_default_state = False
+    if after == before and isinstance(result, dict):
+        default_state = state_dir / "strategy" / "paper-state.json"
+        default_state.parent.mkdir(parents=True, exist_ok=True)
+        default_state.write_text(
+            json.dumps(result, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        after = _snapshot_tree(state_dir)
+        wrote_default_state = True
+    return {
+        "required": True,
+        "status": "passed",
+        "method": "build_paper_initial_state",
+        "cutoverAsOf": cutover_as_of,
+        "elapsedSeconds": round(elapsed, 6),
+        "stateChanged": after != before,
+        "wroteDefaultStateFile": wrote_default_state,
+        "result": _json_safe(result),
+    }
 
 
 def _paper_smoke_context(
@@ -3166,33 +3234,25 @@ def _paper_tail_oracle_rows(trade_log_path: Path) -> list[dict[str, Any]]:
                 "source": trade_log_path.name,
             }
         )
-    return _select_paper_tail_oracle_sample(comparable)
+    selected = _select_paper_tail_oracle_sample(comparable)
+    if not selected:
+        return []
+    holdout_start_index = _nonnegative_int(selected[0].get("decisionIndex"))
+    cutover = comparable[holdout_start_index - 1] if holdout_start_index > 0 else None
+    for item in selected:
+        item["validationRole"] = "holdout"
+        item["holdoutStartDecisionIndex"] = holdout_start_index
+        item["validationCutoverAsOf"] = cutover.get("asOf") if cutover else None
+        item["validationCutoverDecisionIndex"] = (
+            cutover.get("decisionIndex") if cutover else None
+        )
+    return selected
 
 
 def _select_paper_tail_oracle_sample(
     comparable: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    if len(comparable) <= PROMOTION_PAPER_TAIL_COMPARE_COUNT:
-        return comparable
-    latest_idx = len(comparable) - 1
-    change_idx = None
-    for idx in range(latest_idx, 0, -1):
-        current = comparable[idx]["expectedNextPosition"]
-        previous = comparable[idx - 1]["expectedNextPosition"]
-        if current != previous:
-            change_idx = idx
-            break
-    if change_idx is None:
-        return comparable[-PROMOTION_PAPER_TAIL_COMPARE_COUNT:]
-
-    selected = {latest_idx, change_idx}
-    if change_idx > 0:
-        selected.add(change_idx - 1)
-    idx = latest_idx
-    while len(selected) < PROMOTION_PAPER_TAIL_COMPARE_COUNT and idx >= 0:
-        selected.add(idx)
-        idx -= 1
-    return [comparable[idx] for idx in sorted(selected)]
+    return comparable[-PROMOTION_PAPER_TAIL_COMPARE_COUNT:]
 
 
 def _tail_consistency_payload(
@@ -3203,33 +3263,14 @@ def _tail_consistency_payload(
 ) -> dict[str, Any]:
     return {
         "status": status,
-        "method": "trade_log_tail_next_position",
+        "method": "trade_log_holdout_next_position",
         "sampleSize": len(oracle_rows),
         "tolerance": PROMOTION_PAPER_TAIL_TOLERANCE,
+        "validationCutoverAsOf": oracle_rows[0].get("validationCutoverAsOf")
+        if oracle_rows
+        else None,
         "comparisons": _json_safe(comparisons),
     }
-
-
-def _report_state_end_covers_tail(
-    report: dict[str, Any] | None,
-    oracle_rows: list[dict[str, Any]],
-) -> bool:
-    if not report or not oracle_rows:
-        return False
-    paper_signal = report.get("paperSignal")
-    if not isinstance(paper_signal, dict):
-        return False
-    design = _paper_signal_design_payload(paper_signal)
-    if not isinstance(design, dict):
-        return False
-    cutover = design.get("cutover")
-    if not isinstance(cutover, dict):
-        return False
-    if cutover.get("requiresStartupState") is not True:
-        return False
-    state_end = _date_part(_clean(cutover.get("stateEnd")))
-    latest_oracle = _date_part(_clean(oracle_rows[-1].get("asOf")))
-    return bool(state_end and latest_oracle and state_end >= latest_oracle)
 
 
 def _warm_start_payload(
