@@ -20,6 +20,8 @@ from typing import Any, Callable
 
 from abel_edge.research.promotion_gate import build_promotion_gate_report
 
+from . import promotion_source
+
 
 LOCAL_RUNTIME_STATE_DIR = Path(".abel-runtime") / "state"
 PROMOTION_MODE_ZERO_CHANGE = "zero_change"
@@ -1683,8 +1685,8 @@ def _validate_packaged_research_evidence_sources(
         "generated research evidence or export output cannot be packaged as a live "
         "strategy asset "
         f"while paperSignal.incrementalReady=true: {sample}. Package the original "
-        "external dependency instead, or report the strategy as finite replay / "
-        "not safely hostable for continuing paper."
+        "external dependency instead, or use the fallback/not_hostable path only "
+        "when attemptPolicy allows it."
     )
 
 
@@ -2561,20 +2563,7 @@ def _is_local_absolute_path(value: str) -> bool:
 
 
 def _source_overrides_get_paper_signal(source: str) -> bool:
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return False
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.ClassDef):
-            continue
-        if any(
-            isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and item.name == "get_paper_signal"
-            for item in node.body
-        ):
-            return True
-    return False
+    return promotion_source.source_overrides_get_paper_signal(source)
 
 
 def _source_string_literals(source: str) -> list[str]:
@@ -3426,141 +3415,15 @@ def _json_safe(value: Any) -> Any:
 
 
 def _paper_signal_design_facts(source: str) -> dict[str, Any]:
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return {
-            "trainingCalls": [],
-            "sourceTrainingCalls": [],
-            "usesStateDir": False,
-            "writesState": False,
-        }
-    function = _find_function(tree, "get_paper_signal")
-    if function is None:
-        return {
-            "trainingCalls": [],
-            "sourceTrainingCalls": _training_call_facts(tree),
-            "usesStateDir": False,
-            "writesState": False,
-        }
-    return {
-        "trainingCalls": _training_call_facts(function),
-        "sourceTrainingCalls": _training_call_facts(tree),
-        "usesStateDir": _function_uses_state_dir(function),
-        "writesState": _function_writes_state_like_files(function, tree),
-    }
-
-
-def _find_function(tree: ast.AST, name: str) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
-            return node
-    return None
-
-
-TRAINING_CALL_LEAF_NAMES = {
-    "calibrate",
-    "fit",
-    "fit_transform",
-    "partial_fit",
-    "refit",
-    "retrain",
-    "train",
-    "update_model",
-}
+    return promotion_source.paper_signal_design_facts(source)
 
 
 def _training_call_facts(function: ast.AST | None) -> list[str]:
-    if function is None:
-        return []
-    calls: list[str] = []
-    for node in ast.walk(function):
-        if not isinstance(node, ast.Call):
-            continue
-        callee = _call_name(node.func)
-        leaf = callee.rsplit(".", 1)[-1].lower()
-        if leaf in TRAINING_CALL_LEAF_NAMES:
-            if callee not in calls:
-                calls.append(callee)
-    return calls[:20]
-
-
-def _function_uses_state_dir(function: ast.AST) -> bool:
-    for node in ast.walk(function):
-        if isinstance(node, ast.Call):
-            callee = _call_name(node.func)
-            if callee == "context_runtime_paths" or callee.endswith(".context_runtime_paths"):
-                return True
-        if isinstance(node, ast.Attribute) and node.attr == "state_dir":
-            return True
-        if isinstance(node, ast.Attribute) and node.attr == "state":
-            return True
-        if isinstance(node, ast.Constant) and node.value == "_runtime_paths":
-            return True
-        if isinstance(node, ast.Constant) and isinstance(node.value, str):
-            if "state_dir" in node.value or "/state/" in node.value:
-                return True
-    return False
-
-
-def _function_writes_state_like_files(
-    function: ast.AST,
-    tree: ast.AST | None = None,
-    *,
-    _visited: set[str] | None = None,
-) -> bool:
-    helper_functions: dict[str, ast.AST] = {}
-    if tree is not None:
-        helper_functions = {
-            node.name: node
-            for node in ast.walk(tree)
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-        }
-    visited = _visited or set()
-    for node in ast.walk(function):
-        if not isinstance(node, ast.Call):
-            continue
-        callee = _call_name(node.func)
-        if callee in PROMOTION_FILE_WRITE_FUNCTIONS or callee.endswith(
-            (".write_text", ".write_bytes")
-        ):
-            return True
-        lowered = callee.lower()
-        if ("write" in lowered or "save" in lowered or "dump" in lowered) and (
-            "state" in lowered
-            or "checkpoint" in lowered
-            or "model" in lowered
-            or "scaler" in lowered
-        ):
-            return True
-        helper_name = callee.rsplit(".", 1)[-1]
-        helper = helper_functions.get(helper_name)
-        if helper is not None and helper_name not in visited:
-            visited.add(helper_name)
-            if _function_writes_state_like_files(helper, tree, _visited=visited):
-                return True
-    return False
+    return promotion_source.training_call_facts(function)
 
 
 def _paper_signal_uses_full_runtime_compute(source: str) -> bool:
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return False
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        if node.name != "get_paper_signal":
-            continue
-        for child in ast.walk(node):
-            if not isinstance(child, ast.Call):
-                continue
-            callee = _call_name(child.func)
-            if callee == "compute_runtime_output" or callee.endswith(
-                ".compute_runtime_output"
-            ):
-                return True
-    return False
+    return promotion_source.paper_signal_uses_full_runtime_compute(source)
 
 
 def _simple_patch_summary(

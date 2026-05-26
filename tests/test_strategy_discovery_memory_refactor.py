@@ -1683,7 +1683,10 @@ def test_export_selected_strategy_artifact_agent_packages_initial_state(
             trade_log_path = Path(command[-1])
             trade_log_path.write_text(
                 "date,asset_return,pnl,position,cum_return,source,next_position\n"
-                "2020-01-02,0,0,1,0,backfill,1\n",
+                "2020-01-01,0,0,1,0,backfill,1\n"
+                "2020-01-02,0,0,1,0,backfill,1\n"
+                "2020-01-03,0,0,1,0,backfill,1\n"
+                "2020-01-04,0,0,1,0,backfill,1\n",
                 encoding="utf-8",
             )
             return subprocess.CompletedProcess(
@@ -1729,6 +1732,8 @@ def test_export_selected_strategy_artifact_agent_packages_initial_state(
         "    def compute_decisions(self, ctx):\n"
         "        model_path = ctx.state_dir / \"strategy/model/latest.joblib\"\n"
         "        return ctx.decisions(1)\n"
+        "    def build_paper_initial_state(self, *, cutover_as_of=None):\n"
+        "        return {'cutover_as_of': str(cutover_as_of)}\n"
         "    def get_paper_signal(self, *, as_of=None):\n"
         "        model_path = self.context['_runtime_paths']['state']\n"
         "        return {'next_position': 1.0, 'state_root': model_path, 'date': str(as_of)}\n",
@@ -3615,7 +3620,10 @@ def test_export_selected_strategy_artifact_uses_local_runtime_state_source(
             trade_log_path = Path(command[-1])
             trade_log_path.write_text(
                 "date,asset_return,pnl,position,cum_return,source,next_position\n"
-                "2020-01-02,0,0,1,0,backfill,1\n",
+                "2020-01-01,0,0,1,0,backfill,1\n"
+                "2020-01-02,0,0,1,0,backfill,1\n"
+                "2020-01-03,0,0,1,0,backfill,1\n"
+                "2020-01-04,0,0,1,0,backfill,1\n",
                 encoding="utf-8",
             )
             return subprocess.CompletedProcess(
@@ -3656,6 +3664,8 @@ def test_export_selected_strategy_artifact_uses_local_runtime_state_source(
         "    def compute_decisions(self, ctx):\n"
         "        model_path = ctx.state_dir / \"strategy/model/latest.joblib\"\n"
         "        return ctx.decisions(1)\n"
+        "    def build_paper_initial_state(self, *, cutover_as_of=None):\n"
+        "        return {'cutover_as_of': str(cutover_as_of)}\n"
         "    def get_paper_signal(self, *, as_of=None):\n"
         "        return {'next_position': 1.0, 'date': str(as_of)}\n",
         encoding="utf-8",
@@ -3743,7 +3753,10 @@ def test_export_selected_strategy_artifact_agent_refactors_dynamic_state_path(
             trade_log_path = Path(command[-1])
             trade_log_path.write_text(
                 "date,asset_return,pnl,position,cum_return,source,next_position\n"
-                "2020-01-02,0,0,1,0,backfill,1\n",
+                "2020-01-01,0,0,1,0,backfill,1\n"
+                "2020-01-02,0,0,1,0,backfill,1\n"
+                "2020-01-03,0,0,1,0,backfill,1\n"
+                "2020-01-04,0,0,1,0,backfill,1\n",
                 encoding="utf-8",
             )
             return subprocess.CompletedProcess(
@@ -3791,6 +3804,8 @@ def test_export_selected_strategy_artifact_agent_refactors_dynamic_state_path(
         "        model_path = ctx.state_dir / \"strategy/model/latest.joblib\"\n"
         "        scaler_path = ctx.state_dir / \"strategy/model/feature_scaler.json\"\n"
         "        return ctx.decisions(1)\n"
+        "    def build_paper_initial_state(self, *, cutover_as_of=None):\n"
+        "        return {'cutover_as_of': str(cutover_as_of)}\n"
         "    def get_paper_signal(self, *, as_of=None):\n"
         "        return {'next_position': 1.0, 'date': str(as_of)}\n",
         encoding="utf-8",
