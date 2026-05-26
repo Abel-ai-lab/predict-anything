@@ -78,7 +78,9 @@ def _paper_design(
 ) -> dict:
     return {
         "history": {
+            "boundary": "state_only" if cutover_state_required else "fixed_lookback",
             "minBars": min_bars,
+            "origin": "2020-01-01" if uses_ordinal or cutover_state_required else None,
             "feeds": ["TSLA"],
             "reason": "test strategy needs a bounded paper history declaration",
         },
@@ -97,17 +99,48 @@ def _paper_design(
             "mode": "minimal_cutover_state" if cutover_state_required else "none",
             "dataHistoryStart": "2020-01-01" if cutover_state_required else None,
             "stateEnd": "2020-12-31" if cutover_state_required else None,
+            "bootstrapHook": (
+                "build_paper_initial_state" if cutover_state_required else None
+            ),
             "reason": "test cutover declaration",
         },
         "dailyStep": {
             "reason": "test daily step declaration",
         },
-        "probe": {
-            "mode": "not_needed",
-            "whySufficient": "test source reading is sufficient",
-            "canonicalTimelineSource": None,
-            "observations": ["test observation"],
-        },
+    }
+
+
+def _paper_continuation(method: str = "stateless_recompute") -> dict:
+    return {
+        "method": method,
+        "reason": "test continuation preserves research decision semantics",
+        "futureDailyFlow": "test future as_of flow",
+    }
+
+
+def _paper_evidence(probe_mode: str = "not_needed") -> dict:
+    return {
+        "probeMode": probe_mode,
+        "canonicalTimelineSource": None,
+        "observations": ["test source reading observation"],
+        "semanticChecks": ["test cutover state semantic check"],
+        "whySufficient": "test evidence supports the continuation method",
+    }
+
+
+def _paper_signal(
+    *,
+    design: dict | None = None,
+    method: str = "stateless_recompute",
+    live_readiness: str = "continuing paper signal from bounded live history",
+) -> dict:
+    return {
+        "implemented": True,
+        "incrementalReady": True,
+        "continuation": _paper_continuation(method),
+        "design": design if design is not None else _paper_design(),
+        "evidence": _paper_evidence(),
+        "liveReadiness": live_readiness,
     }
 
 
@@ -1719,14 +1752,13 @@ def test_export_selected_strategy_artifact_agent_packages_initial_state(
                         }
                     ],
                 },
-                "paperSignal": {
-                    "implemented": True,
-                    "incrementalReady": True,
-                    "design": _paper_design(
+                "paperSignal": _paper_signal(
+                    method="stateful_continuation",
+                    design=_paper_design(
                         uses_state=True,
                         cutover_state_required=True,
                     ),
-                },
+                ),
                 "limitations": [],
                 "replacements": [
                     {
@@ -1979,12 +2011,9 @@ def test_export_selected_strategy_artifact_agent_packages_external_base_asset(
                         }
                     ],
                 },
-                "paperSignal": {
-                    "implemented": True,
-                    "incrementalReady": True,
-                    "design": _paper_design(),
-                    "notes": "simple one-row paper signal for hosted smoke coverage",
-                },
+                "paperSignal": _paper_signal(
+                    live_readiness="simple one-row paper signal for hosted smoke coverage",
+                ),
                 "limitations": [],
                 "replacements": [
                     {
@@ -2141,12 +2170,10 @@ def test_export_selected_strategy_artifact_agent_adds_stateful_paper_signal(
                 "paths": {
                     "packagedFiles": [],
                 },
-                "paperSignal": {
-                    "implemented": True,
-                    "incrementalReady": True,
-                    "design": _paper_design(uses_state=True),
-                    "notes": "uses runtime state path and returns scalar audit fields",
-                },
+                "paperSignal": _paper_signal(
+                    design=_paper_design(uses_state=True),
+                    live_readiness="uses runtime state path and returns scalar audit fields",
+                ),
                 "limitations": [],
                 "replacements": [],
             }
@@ -2371,14 +2398,13 @@ def test_export_selected_strategy_artifact_rejects_full_compute_paper_signal(
                         }
                     ],
                 },
-                "paperSignal": {
-                    "implemented": True,
-                    "incrementalReady": True,
-                    "design": _paper_design(
+                "paperSignal": _paper_signal(
+                    method="stateful_continuation",
+                    design=_paper_design(
                         uses_state=True,
                         cutover_state_required=True,
                     ),
-                },
+                ),
                 "limitations": [],
                 "replacements": [],
             }
@@ -2471,12 +2497,9 @@ def test_export_selected_strategy_artifact_rejects_tail_signal_mismatch(
                 "summary": "Agent added a paper signal that drifts from oracle.",
                 "scope": "hosted_paper_rewrite",
                 "paths": {"packagedFiles": []},
-                "paperSignal": {
-                    "implemented": True,
-                    "incrementalReady": True,
-                    "design": _paper_design(),
-                    "notes": "intentionally mismatched for gate coverage",
-                },
+                "paperSignal": _paper_signal(
+                    live_readiness="intentionally mismatched for gate coverage",
+                ),
                 "limitations": [],
                 "replacements": [],
             }
@@ -2504,14 +2527,16 @@ def test_export_selected_strategy_artifact_rejects_tail_signal_mismatch(
     request = json.loads(Path(result["promotionReport"]["requestPath"]).read_text(encoding="utf-8"))
     assert request["signals"][-1]["kind"] == "promotion_gate_failed"
     assert request["validation"]["lastGateFailure"]["failedGates"][0]["name"] == "paper_dry_run"
-    assert (
-        request["validation"]["lastGateFailure"]["failedGates"][0]["smoke"][
-            "tailConsistency"
-        ]["status"]
-        == "failed"
-    )
+    request_tail = request["validation"]["lastGateFailure"]["failedGates"][0]["smoke"][
+        "tailConsistency"
+    ]
+    assert request_tail["status"] == "failed"
+    assert "comparisons" not in request_tail
+    assert request_tail["failedSampleDates"][0]["asOf"] == "2020-12-31"
+    assert "expectedNextPosition" not in json.dumps(request_tail)
+    assert "actualNextPosition" not in json.dumps(request_tail)
     assert "Tail consistency diagnostics" in "\n".join(request["workOrder"])
-    assert "compiled next_position" in "\n".join(request["workOrder"])
+    assert "continuation design" in "\n".join(request["workOrder"])
 
 
 def test_export_selected_strategy_artifact_records_slow_training_diagnostics(
@@ -2609,12 +2634,9 @@ def test_export_selected_strategy_artifact_records_slow_training_diagnostics(
                 "summary": "Agent added a matching but cold-start paper signal.",
                 "scope": "hosted_paper_rewrite",
                 "paths": {"packagedFiles": []},
-                "paperSignal": {
-                    "implemented": True,
-                    "incrementalReady": True,
-                    "design": _paper_design(),
-                    "notes": "tail output matches but no reusable warm-start state",
-                },
+                "paperSignal": _paper_signal(
+                    live_readiness="tail output matches but no reusable warm-start state",
+                ),
                 "limitations": [],
                 "replacements": [],
             }
@@ -2684,9 +2706,7 @@ def test_refactor_report_rejects_research_evidence_as_live_asset(
     evidence = branch / "promotions" / "round-001" / "trade-log.csv"
     evidence.parent.mkdir(parents=True)
     evidence.write_text("date,next_position\n2020-01-01,1\n", encoding="utf-8")
-    report = {
-        "paperSignal": {"implemented": True, "incrementalReady": True},
-    }
+    report = {"paperSignal": _paper_signal()}
     packaged = (
         promotion_helpers.PromotionPackagedFile(
             artifact_path="strategy/assets/trade-log.csv",
@@ -2715,9 +2735,7 @@ def test_refactor_report_rejects_temp_generated_asset_as_live_asset(
     generated = tmp_path / "tmp" / "hosted-paper" / "next_positions.csv"
     generated.parent.mkdir(parents=True)
     generated.write_text("date,next_position\n2020-01-01,1\n", encoding="utf-8")
-    report = {
-        "paperSignal": {"implemented": True, "incrementalReady": True},
-    }
+    report = {"paperSignal": _paper_signal()}
     packaged = (
         promotion_helpers.PromotionPackagedFile(
             artifact_path="strategy/assets/next_positions.csv",
@@ -2747,9 +2765,7 @@ def test_refactor_report_rejects_export_trade_log_as_live_asset(
     destination.mkdir()
     generated = destination / "trade-log.csv"
     generated.write_text("date,next_position\n2020-01-01,1\n", encoding="utf-8")
-    report = {
-        "paperSignal": {"implemented": True, "incrementalReady": True},
-    }
+    report = {"paperSignal": _paper_signal()}
     packaged = (
         promotion_helpers.PromotionPackagedFile(
             artifact_path="strategy/assets/trade-log.csv",
@@ -2781,9 +2797,7 @@ def test_refactor_report_allows_external_trade_log_named_asset(
     external = tmp_path / "trading-internal" / "data" / "trade-log.csv"
     external.parent.mkdir(parents=True)
     external.write_text("date,next_position\n2020-01-01,1\n", encoding="utf-8")
-    report = {
-        "paperSignal": {"implemented": True, "incrementalReady": True},
-    }
+    report = {"paperSignal": _paper_signal()}
     packaged = (
         promotion_helpers.PromotionPackagedFile(
             artifact_path="strategy/assets/trade-log.csv",
@@ -2818,9 +2832,7 @@ def test_refactor_report_rejects_oracle_answers_as_initial_state(
         ),
         encoding="utf-8",
     )
-    report = {
-        "paperSignal": {"implemented": True, "incrementalReady": True},
-    }
+    report = {"paperSignal": _paper_signal()}
     packaged = (
         promotion_helpers.PromotionPackagedFile(
             artifact_path="runtime/initial-state/strategy/paper-seed.json",
@@ -2859,9 +2871,7 @@ def test_refactor_report_allows_strategy_owned_initial_state(
         ),
         encoding="utf-8",
     )
-    report = {
-        "paperSignal": {"implemented": True, "incrementalReady": True},
-    }
+    report = {"paperSignal": _paper_signal()}
     packaged = (
         promotion_helpers.PromotionPackagedFile(
             artifact_path="runtime/initial-state/strategy/paper-state.json",
@@ -2886,11 +2896,9 @@ def test_refactor_report_rejects_incremental_ready_contradiction() -> None:
         "        return {'next_position': 1.0}\n"
     )
     report = {
-        "paperSignal": {
-            "implemented": True,
-            "incrementalReady": True,
-            "liveReadiness": "finite replay after the packaged log returns neutral",
-        },
+        "paperSignal": _paper_signal(
+            live_readiness="finite replay after the packaged log returns neutral",
+        ),
         "limitations": [],
     }
 
@@ -2913,15 +2921,13 @@ def test_refactor_report_allows_negated_replay_language() -> None:
         "        return {'next_position': 1.0}\n"
     )
     report = {
-        "paperSignal": {
-            "implemented": True,
-            "incrementalReady": True,
-            "design": _paper_design(uses_state=True),
-            "liveReadiness": (
+        "paperSignal": _paper_signal(
+            design=_paper_design(uses_state=True),
+            live_readiness=(
                 "get_paper_signal reads live feeds and persisted state for future "
                 "paper days; this is not a replay of research evidence."
             ),
-        },
+        ),
         "limitations": [],
     }
 
@@ -2943,6 +2949,8 @@ def test_refactor_report_requires_paper_signal_design_contract() -> None:
         "paperSignal": {
             "implemented": True,
             "incrementalReady": True,
+            "continuation": _paper_continuation(),
+            "evidence": _paper_evidence(),
             "liveReadiness": "continuing paper signal from bounded live history",
         },
         "limitations": [],
@@ -2951,6 +2959,64 @@ def test_refactor_report_requires_paper_signal_design_contract() -> None:
     with pytest.raises(
         promotion_helpers.PromotionNeedsAgentRefactor,
         match="paperSignal.design",
+    ):
+        promotion_helpers._validate_agent_paper_signal_contract(
+            report,
+            source,
+            require_paper_signal=True,
+        )
+
+
+def test_refactor_report_requires_continuation_contract() -> None:
+    source = (
+        "from abel_edge.engine.base import StrategyEngine\n"
+        "class BranchEngine(StrategyEngine):\n"
+        "    def get_paper_signal(self, *, as_of=None):\n"
+        "        return {'next_position': 1.0}\n"
+    )
+    report = {
+        "paperSignal": {
+            "implemented": True,
+            "incrementalReady": True,
+            "design": _paper_design(),
+            "evidence": _paper_evidence(),
+            "liveReadiness": "continuing paper signal from bounded live history",
+        },
+        "limitations": [],
+    }
+
+    with pytest.raises(
+        promotion_helpers.PromotionNeedsAgentRefactor,
+        match="paperSignal.continuation",
+    ):
+        promotion_helpers._validate_agent_paper_signal_contract(
+            report,
+            source,
+            require_paper_signal=True,
+        )
+
+
+def test_refactor_report_requires_evidence_contract() -> None:
+    source = (
+        "from abel_edge.engine.base import StrategyEngine\n"
+        "class BranchEngine(StrategyEngine):\n"
+        "    def get_paper_signal(self, *, as_of=None):\n"
+        "        return {'next_position': 1.0}\n"
+    )
+    report = {
+        "paperSignal": {
+            "implemented": True,
+            "incrementalReady": True,
+            "continuation": _paper_continuation(),
+            "design": _paper_design(),
+            "liveReadiness": "continuing paper signal from bounded live history",
+        },
+        "limitations": [],
+    }
+
+    with pytest.raises(
+        promotion_helpers.PromotionNeedsAgentRefactor,
+        match="paperSignal.evidence",
     ):
         promotion_helpers._validate_agent_paper_signal_contract(
             report,
@@ -2995,7 +3061,9 @@ def test_hosted_paper_request_is_actionable_for_training_like_source(
     work_order = "\n".join(request["workOrder"])
     assert "context_runtime_paths" in work_order
     assert "strategy-type classification" in work_order
+    assert "not to repair the promotion gate" in work_order
     assert request["mission"]["agentRole"].startswith("The agent decides")
+    assert "notGateRepair" in request["mission"]
     assert request["facts"]["paperSignal"]["sourceTrainingCalls"] == ["model.fit"]
     assert request["runtimeApiFacts"]["paperSignalSignature"].startswith(
         "def get_paper_signal"
@@ -3009,11 +3077,13 @@ def test_hosted_paper_request_is_actionable_for_training_like_source(
     assert "windowed_semantic" in request["probeCapability"]["modes"]
     assert "promotion.py" in request["avoidBeforeFirstEdit"][0]
     assert request["reportContract"]["paperSignal"]["incrementalReady"] is not True
+    assert "continuation" in request["reportContract"]["paperSignal"]
     assert "design" in request["reportContract"]["paperSignal"]
+    assert "evidence" in request["reportContract"]["paperSignal"]
     cutover = request["reportContract"]["paperSignal"]["design"]["cutover"]
     assert "minimal_cutover_state" in cutover["mode"]
-    probe = request["reportContract"]["paperSignal"]["design"]["probe"]
-    assert "full_path" in probe["mode"]
+    evidence = request["reportContract"]["paperSignal"]["evidence"]
+    assert "full_path" in evidence["probeMode"]
     assert "gateContract" in request
     assert "probeEvidence" in request["gateContract"]
     assert "acceptanceCriteria" not in request
@@ -3048,15 +3118,14 @@ def test_refactor_report_rejects_cutover_state_without_initial_state() -> None:
     )
     report = {
         "paths": {"packagedFiles": [], "initialStateFiles": []},
-        "paperSignal": {
-            "implemented": True,
-            "incrementalReady": True,
-            "design": _paper_design(
+        "paperSignal": _paper_signal(
+            method="stateful_continuation",
+            design=_paper_design(
                 uses_state=True,
                 cutover_state_required=True,
             ),
-            "liveReadiness": "continuing paper signal from startup state",
-        },
+            live_readiness="continuing paper signal from startup state",
+        ),
         "limitations": [],
     }
 
@@ -3092,12 +3161,11 @@ def test_refactor_report_rejects_cutover_state_before_selected_round_end() -> No
                 }
             ]
         },
-        "paperSignal": {
-            "implemented": True,
-            "incrementalReady": True,
-            "design": design,
-            "liveReadiness": "continuing paper signal from startup state",
-        },
+        "paperSignal": _paper_signal(
+            method="stateful_continuation",
+            design=design,
+            live_readiness="continuing paper signal from startup state",
+        ),
         "limitations": [],
     }
     candidate = Namespace(edge_result={"effective_window": {"end": "2020-12-31"}})
@@ -3125,7 +3193,7 @@ def test_refactor_report_rejects_full_replay_cutover_mode() -> None:
         uses_state=True,
         cutover_state_required=True,
     )
-    design["cutover"]["mode"] = "full_replay_required"
+    design["cutover"]["mode"] = "full_replay"
     report = {
         "paths": {
             "initialStateFiles": [
@@ -3135,18 +3203,17 @@ def test_refactor_report_rejects_full_replay_cutover_mode() -> None:
                 }
             ]
         },
-        "paperSignal": {
-            "implemented": True,
-            "incrementalReady": True,
-            "design": design,
-            "liveReadiness": "continuing paper signal from startup state",
-        },
+        "paperSignal": _paper_signal(
+            method="stateful_continuation",
+            design=design,
+            live_readiness="continuing paper signal from startup state",
+        ),
         "limitations": [],
     }
 
     with pytest.raises(
         promotion_helpers.PromotionNeedsAgentRefactor,
-        match="full_replay_required",
+        match="full_replay",
     ):
         promotion_helpers._validate_agent_paper_signal_contract(
             report,
@@ -3428,14 +3495,13 @@ def test_export_selected_strategy_artifact_uses_local_runtime_state_source(
                         }
                     ],
                 },
-                "paperSignal": {
-                    "implemented": True,
-                    "incrementalReady": True,
-                    "design": _paper_design(
+                "paperSignal": _paper_signal(
+                    method="stateful_continuation",
+                    design=_paper_design(
                         uses_state=True,
                         cutover_state_required=True,
                     ),
-                },
+                ),
                 "limitations": [],
                 "replacements": [],
             }
@@ -3569,14 +3635,13 @@ def test_export_selected_strategy_artifact_agent_refactors_dynamic_state_path(
                         },
                     ],
                 },
-                "paperSignal": {
-                    "implemented": True,
-                    "incrementalReady": True,
-                    "design": _paper_design(
+                "paperSignal": _paper_signal(
+                    method="stateful_continuation",
+                    design=_paper_design(
                         uses_state=True,
                         cutover_state_required=True,
                     ),
-                },
+                ),
                 "limitations": [],
                 "replacements": [
                     {

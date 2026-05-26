@@ -72,7 +72,13 @@ PROMOTION_LEGACY_DESTINATION_DIRS = (
 PROMOTION_RECONSTRUCTION_MODES = {
     "none",
     "minimal_cutover_state",
-    "full_replay_required",
+    "full_replay",
+}
+PROMOTION_CONTINUATION_METHODS = {
+    "stateless_recompute",
+    "stateful_continuation",
+    "full_replay_fallback",
+    "not_hostable",
 }
 PROMOTION_PROBE_EVIDENCE_MODES = {
     "not_needed",
@@ -993,13 +999,20 @@ def _hosted_paper_rewrite_work_order(
         "Edit only sourcePath and leave the original research branch source unchanged.",
         (
             "Use this request and references/hosted-paper-rewrite.md as the task "
-            "model. Treat facts as evidence for your own strategy understanding, "
-            "not as a strategy-type classification."
+            "model. Your task is to design a live-paper continuation, not to "
+            "repair the promotion gate. Treat facts as evidence for your own "
+            "strategy understanding, not as a strategy-type classification."
         ),
         (
-            "Implement BranchEngine.get_paper_signal(as_of=...) as one hosted "
-            "daily paper step that preserves the research decision semantics and "
-            "returns compiled absolute target next_position for as_of."
+            "Before coding, choose the continuation method: stateless_recompute, "
+            "stateful_continuation, full_replay_fallback, or not_hostable. The "
+            "method must explain how the strategy naturally continues after the "
+            "selected research cutover."
+        ),
+        (
+            "Implement BranchEngine.get_paper_signal(as_of=...) as one future "
+            "hosted paper day that returns compiled absolute target "
+            "next_position for as_of."
         ),
         (
             "Resolve hosted paths with "
@@ -1007,8 +1020,9 @@ def _hosted_paper_rewrite_work_order(
             "paths = context_runtime_paths(self.context)."
         ),
         (
-            "Write refactor-report.json with paperSignal.design explaining the "
-            "history, state, calendar, cutover, and dailyStep choices you made."
+            "Write refactor-report.json with paperSignal.continuation, "
+            "paperSignal.design, and paperSignal.evidence. The evidence should "
+            "support the continuation design, not just describe gate output."
         ),
         (
             "If timeline or state semantics are uncertain, choose the lightest "
@@ -1033,15 +1047,16 @@ def _hosted_paper_rewrite_work_order(
         )
     if validation_failure:
         order.append(
-            "Use validation.lastGateFailure as diagnostics for the next edit; do "
-            "not copy oracle answers into strategy assets or startup state."
+            "Use validation.lastGateFailure as diagnostics for the continuation "
+            "design and evidence. Do not treat it as a public unit test to patch "
+            "date-by-date."
         )
         if _validation_failure_has_tail_consistency(validation_failure):
             order.append(
-                "Tail consistency diagnostics compare selected-round compiled "
-                "next_position with get_paper_signal(as_of); a mismatch means the "
-                "paper step or declared strategy state does not yet preserve the "
-                "research decision semantics."
+                "Tail consistency diagnostics mean the continuation design, "
+                "state/cutover evidence, or stateless recompute proof is not yet "
+                "strong enough. Revisit the design/evidence before changing "
+                "individual dates."
             )
     if "developer_local_absolute_path" in signal_kinds or "developer_local_file_access" in signal_kinds:
         order.append(
@@ -1103,21 +1118,27 @@ def _write_hosted_paper_rewrite_request(
                 "sourcePath": str(source_path),
                 "branchPath": str(branch),
                 "mission": {
-                    "preserve": (
-                        "Preserve the selected research strategy's decision semantics."
+                    "design": (
+                        "Design a live-paper continuation for the selected research "
+                        "strategy after the selected round cutover."
                     ),
-                    "convert": (
-                        "Convert the promoted copy into a hosted daily paper step "
-                        "that can run for one as_of without full historical replay."
+                    "implement": (
+                        "Implement get_paper_signal(as_of=...) so one future hosted "
+                        "paper day can return a compiled absolute target exposure "
+                        "without full historical replay."
                     ),
                     "prove": (
-                        "Use refactor-report.json and the promotion gates to prove "
-                        "path safety, package inputs, parity on sampled selected-round "
-                        "dates, idempotence, and live-paper readiness."
+                        "Use refactor-report.json to declare the continuation method, "
+                        "runtime design, and evidence chain. The gate verifies that "
+                        "evidence and behavior are consistent."
                     ),
                     "agentRole": (
-                        "The agent decides the strategy-specific rewrite design from "
-                        "the facts; the request does not classify the strategy type."
+                        "The agent decides the strategy-specific continuation design "
+                        "from the facts; the request does not classify the strategy type."
+                    ),
+                    "notGateRepair": (
+                        "Gate feedback is diagnostics. Do not patch individual "
+                        "validation dates or oracle answers to make the gate pass."
                     ),
                 },
                 "workOrder": work_order,
@@ -1126,8 +1147,8 @@ def _write_hosted_paper_rewrite_request(
                 "probeCapability": {
                     "purpose": (
                         "Use probes as agent-owned evidence tools when reading "
-                        "the source is not enough to determine calendar, cutover, "
-                        "state, or parity semantics."
+                        "the source is not enough to prove continuation calendar, "
+                        "cutover, state, or parity semantics."
                     ),
                     "selectionPolicy": (
                         "The agent chooses the suitable probe mode from strategy "
@@ -1139,7 +1160,7 @@ def _write_hosted_paper_rewrite_request(
                         "facts.validationOracle.canonicalDecisionTimeline, when "
                         "present, is the selected-round canonical decision index "
                         "derived from trade-log.csv row order. Use it for ordinal "
-                        "anchoring and tail parity evidence; never package it as "
+                        "anchoring and semantic evidence; never package it as "
                         "a live strategy dependency."
                     ),
                     "modes": {
@@ -1238,6 +1259,19 @@ def _write_hosted_paper_rewrite_request(
                             "<true only if the promoted source can continue future "
                             "daily paper signals; otherwise false>"
                         ),
+                        "continuation": {
+                            "method": (
+                                "<stateless_recompute | stateful_continuation | "
+                                "full_replay_fallback | not_hostable>"
+                            ),
+                            "reason": (
+                                "<why this continuation shape preserves the "
+                                "research decision semantics>"
+                            ),
+                            "futureDailyFlow": (
+                                "<how future as_of calls continue after cutover>"
+                            ),
+                        },
                         "design": {
                             "history": {
                                 "minBars": "<integer minimum bars needed, or null if state-only>",
@@ -1263,7 +1297,7 @@ def _write_hosted_paper_rewrite_request(
                                 ),
                                 "mode": (
                                     "<none | minimal_cutover_state | "
-                                    "full_replay_required>"
+                                    "full_replay>"
                                 ),
                                 "dataHistoryStart": "<date used to rebuild current state, or null>",
                                 "stateEnd": (
@@ -1281,23 +1315,26 @@ def _write_hosted_paper_rewrite_request(
                                     "and what expensive work is avoided>"
                                 )
                             },
-                            "probe": {
-                                "mode": (
-                                    "<not_needed | calendar_only | "
-                                    "windowed_semantic | full_path>"
-                                ),
-                                "whySufficient": (
-                                    "<why this evidence mode is enough for the "
-                                    "history/state/calendar/cutover design>"
-                                ),
-                                "canonicalTimelineSource": (
-                                    "<facts.validationOracle.canonicalDecisionTimeline "
-                                    "or null>"
-                                ),
-                                "observations": [
-                                    "<facts learned from code reading or probes>"
-                                ],
-                            },
+                        },
+                        "evidence": {
+                            "probeMode": (
+                                "<not_needed | calendar_only | "
+                                "windowed_semantic | full_path>"
+                            ),
+                            "canonicalTimelineSource": (
+                                "<facts.validationOracle.canonicalDecisionTimeline "
+                                "or null>"
+                            ),
+                            "observations": [
+                                "<facts learned from source reading or probes>"
+                            ],
+                            "semanticChecks": [
+                                "<calendar/state/cutover/parity checks that support the design>"
+                            ],
+                            "whySufficient": (
+                                "<why this evidence is enough for the chosen "
+                                "continuation method>"
+                            ),
                         },
                         "liveReadiness": (
                             "<future signal source, state transition, idempotence, "
@@ -1312,19 +1349,19 @@ def _write_hosted_paper_rewrite_request(
                         "no developer-local absolute paths in promoted source",
                         "package entries are valid and not denylisted",
                         "generated research/promotion evidence is not packaged as live strategy input",
-                        "continuing-ready reports declare paperSignal.design",
+                        "continuing-ready reports declare paperSignal.continuation, paperSignal.design, and paperSignal.evidence",
                         "startup state declarations include paths.initialStateFiles",
                     ],
                     "paperSmoke": [
                         "stage strategy/runtime/state like the artifact runner",
-                        "compare get_paper_signal(as_of) to selected-round compiled trade-log next_position on a small tail sample",
+                        "walk forward over held-out selected-round paper dates and compare get_paper_signal(as_of) to compiled trade-log next_position",
                         "repeat the latest sampled as_of and require idempotence",
                         "record elapsed time, state changes, and warm-start diagnostics",
                     ],
                     "probeEvidence": [
                         "agent chooses probe mode from source analysis, not from strategy-type classification",
                         "canonical decision indexes come from selected-round trade-log row order when available",
-                        "full_path probe is fallback-only and must be justified in paperSignal.design.probe",
+                        "full replay fallback is available only after the fallback policy opens it",
                     ],
                     "diagnosticsPolicy": (
                         "expected values in validation.lastGateFailure are diagnostics "
@@ -1358,8 +1395,10 @@ def _promotion_gate_failure_request_payload(gate_report: dict[str, Any]) -> dict
         smoke = details.get("smoke")
         if isinstance(smoke, dict):
             compact_smoke: dict[str, Any] = {}
+            tail = smoke.get("tailConsistency")
+            if isinstance(tail, dict):
+                compact_smoke["tailConsistency"] = _redacted_tail_failure_payload(tail)
             for key in (
-                "tailConsistency",
                 "warmStart",
                 "elapsedSeconds",
                 "firstElapsedSeconds",
@@ -1367,17 +1406,52 @@ def _promotion_gate_failure_request_payload(gate_report: dict[str, Any]) -> dict
                 "warnings",
             ):
                 if key in smoke:
-                    compact_smoke[key] = smoke[key]
+                    compact_smoke[key] = _json_safe(smoke[key])
             if compact_smoke:
                 failure["smoke"] = _json_safe(compact_smoke)
                 failure["oraclePolicy"] = (
-                    "expected values in gate failures are diagnostics only; do not "
-                    "encode them in strategy assets or initial state"
+                    "gate failures are semantic diagnostics only; exact oracle "
+                    "answers are not part of the rewrite request and must not be "
+                    "patched into strategy code, assets, or initial state"
                 )
         failed_gates.append(failure)
     return {
         "status": _clean(gate_report.get("status")),
         "failedGates": failed_gates,
+    }
+
+
+def _redacted_tail_failure_payload(tail: dict[str, Any]) -> dict[str, Any]:
+    comparisons = tail.get("comparisons")
+    failed: list[dict[str, Any]] = []
+    checked = 0
+    if isinstance(comparisons, list):
+        for item in comparisons:
+            if not isinstance(item, dict):
+                continue
+            checked += 1
+            abs_diff = _finite_float(item.get("absDiff"))
+            if abs_diff is not None and abs_diff <= PROMOTION_PAPER_TAIL_TOLERANCE:
+                continue
+            failed.append(
+                {
+                    "asOf": _clean(item.get("asOf")),
+                    "decisionIndex": item.get("decisionIndex"),
+                    "absDiffPresent": abs_diff is not None,
+                    "stateChanged": item.get("stateChanged") is True,
+                }
+            )
+    return {
+        "status": _clean(tail.get("status")),
+        "method": _clean(tail.get("method")),
+        "sampleSize": tail.get("sampleSize"),
+        "checkedCount": checked or None,
+        "failedSampleDates": failed,
+        "diagnostic": (
+            "sampled behavior diverged from the selected-round continuation "
+            "oracle; revisit paperSignal.continuation and paperSignal.evidence "
+            "instead of patching individual expected values"
+        ),
     }
 
 
@@ -1670,21 +1744,43 @@ def _validate_agent_paper_signal_contract(
         raise PromotionNeedsAgentRefactor(
             "hosted paper rewrite must set paperSignal.implemented=true"
         )
+    continuation = _paper_signal_continuation_payload(paper_signal)
+    continuation_method = _clean(continuation.get("method")) if continuation else ""
     if require_paper_signal and incremental_ready is not True:
+        if continuation_method == "not_hostable":
+            raise PromotionNeedsAgentRefactor(
+                "refactor report declares paperSignal.continuation.method=not_hostable; "
+                "promotion cannot export a continuing hosted paper artifact"
+            )
         raise PromotionNeedsAgentRefactor(
             "hosted paper rewrite must set paperSignal.incrementalReady=true"
         )
     if incremental_ready is True:
         _validate_live_readiness_claim(report)
+        _validate_paper_signal_continuation_contract(paper_signal)
         _validate_paper_signal_design_contract(
             report,
             paper_signal,
             cutover_end=_candidate_cutover_end(candidate),
+            continuation_method=continuation_method,
+        )
+        _validate_paper_signal_evidence_contract(
+            paper_signal,
+            continuation_method=continuation_method,
         )
     if implemented is True and not _source_overrides_get_paper_signal(source):
         raise PromotionNeedsAgentRefactor(
             "paperSignal.implemented=true but promoted source does not define get_paper_signal"
         )
+
+
+def _paper_signal_continuation_payload(
+    paper_signal: dict[str, Any],
+) -> dict[str, Any] | None:
+    continuation = paper_signal.get("continuation")
+    if isinstance(continuation, dict):
+        return continuation
+    return None
 
 
 def _paper_signal_design_payload(paper_signal: dict[str, Any]) -> dict[str, Any] | None:
@@ -1694,11 +1790,54 @@ def _paper_signal_design_payload(paper_signal: dict[str, Any]) -> dict[str, Any]
     return None
 
 
+def _paper_signal_evidence_payload(
+    paper_signal: dict[str, Any],
+) -> dict[str, Any] | None:
+    evidence = paper_signal.get("evidence")
+    if isinstance(evidence, dict):
+        return evidence
+    return None
+
+
+def _validate_paper_signal_continuation_contract(
+    paper_signal: dict[str, Any],
+) -> None:
+    continuation = _paper_signal_continuation_payload(paper_signal)
+    if not isinstance(continuation, dict):
+        raise PromotionNeedsAgentRefactor(
+            "continuing hosted paper reports must declare "
+            "paperSignal.continuation"
+        )
+    method = _clean(continuation.get("method"))
+    if method not in PROMOTION_CONTINUATION_METHODS:
+        raise PromotionNeedsAgentRefactor(
+            "paperSignal.continuation.method must be one of "
+            "stateless_recompute, stateful_continuation, "
+            "full_replay_fallback, or not_hostable"
+        )
+    if method == "not_hostable":
+        raise PromotionNeedsAgentRefactor(
+            "paperSignal.incrementalReady=true conflicts with "
+            "paperSignal.continuation.method=not_hostable"
+        )
+    if not _clean(continuation.get("reason")):
+        raise PromotionNeedsAgentRefactor(
+            "paperSignal.continuation.reason must explain why the chosen "
+            "continuation shape preserves research decision semantics"
+        )
+    if not _clean(continuation.get("futureDailyFlow")):
+        raise PromotionNeedsAgentRefactor(
+            "paperSignal.continuation.futureDailyFlow must explain how future "
+            "hosted paper as_of calls continue after cutover"
+        )
+
+
 def _validate_paper_signal_design_contract(
     report: dict[str, Any],
     paper_signal: dict[str, Any],
     *,
     cutover_end: str = "",
+    continuation_method: str = "",
 ) -> None:
     design = _paper_signal_design_payload(paper_signal)
     if not isinstance(design, dict):
@@ -1723,6 +1862,17 @@ def _validate_paper_signal_design_contract(
         raise PromotionNeedsAgentRefactor(
             "paperSignal.design.history.reason must explain the "
             "lookback/history requirement"
+        )
+    boundary = _clean(history.get("boundary"))
+    if boundary and boundary not in {
+        "fixed_lookback",
+        "origin_anchored",
+        "state_only",
+        "full_replay",
+    }:
+        raise PromotionNeedsAgentRefactor(
+            "paperSignal.design.history.boundary must be one of "
+            "fixed_lookback, origin_anchored, state_only, or full_replay"
         )
 
     state = design.get("state")
@@ -1768,29 +1918,29 @@ def _validate_paper_signal_design_contract(
     if not mode:
         raise PromotionNeedsAgentRefactor(
             "paperSignal.design.cutover.mode must be one of "
-            "none, minimal_cutover_state, or full_replay_required"
+            "none, minimal_cutover_state, or full_replay"
         )
     if mode not in PROMOTION_RECONSTRUCTION_MODES:
         raise PromotionNeedsAgentRefactor(
             "paperSignal.design.cutover.mode must be one of "
-            "none, minimal_cutover_state, or full_replay_required"
+            "none, minimal_cutover_state, or full_replay"
         )
     required = cutover.get("requiresStartupState") is True
     if required and mode == "none":
         raise PromotionNeedsAgentRefactor(
             "paperSignal.design.cutover.requiresStartupState=true must use "
-            "cutover.mode=minimal_cutover_state or full_replay_required"
+            "cutover.mode=minimal_cutover_state or full_replay"
         )
     if not required and mode != "none":
         raise PromotionNeedsAgentRefactor(
             "paperSignal.design.cutover.requiresStartupState=false must use "
             "cutover.mode=none"
         )
-    if mode == "full_replay_required":
+    if mode == "full_replay" and continuation_method != "full_replay_fallback":
         raise PromotionNeedsAgentRefactor(
             "paperSignal.incrementalReady=true conflicts with "
-            "cutover.mode=full_replay_required; report the limitation "
-            "instead of claiming continuing hosted-paper readiness"
+            "cutover.mode=full_replay unless continuation.method is "
+            "full_replay_fallback"
         )
     if required:
         state_end = _date_part(_clean(cutover.get("stateEnd")))
@@ -1814,6 +1964,37 @@ def _validate_paper_signal_design_contract(
                 "set requiresStartupState=false and explain the bounded on-demand path"
             )
 
+    if continuation_method == "stateless_recompute" and required:
+        raise PromotionNeedsAgentRefactor(
+            "paperSignal.continuation.method=stateless_recompute must not "
+            "require startup cutover state; use stateful_continuation when "
+            "startup state is required"
+        )
+    if continuation_method == "stateful_continuation":
+        if not required or mode != "minimal_cutover_state":
+            raise PromotionNeedsAgentRefactor(
+                "paperSignal.continuation.method=stateful_continuation requires "
+                "paperSignal.design.cutover.requiresStartupState=true and "
+                "cutover.mode=minimal_cutover_state"
+            )
+        if state.get("usesPersistentState") is not True:
+            raise PromotionNeedsAgentRefactor(
+                "paperSignal.continuation.method=stateful_continuation requires "
+                "paperSignal.design.state.usesPersistentState=true"
+            )
+        if _clean(cutover.get("bootstrapHook")) != "build_paper_initial_state":
+            raise PromotionNeedsAgentRefactor(
+                "paperSignal.design.cutover.bootstrapHook must be "
+                "build_paper_initial_state for stateful_continuation"
+            )
+
+    if continuation_method == "full_replay_fallback":
+        if boundary != "full_replay" or mode != "full_replay":
+            raise PromotionNeedsAgentRefactor(
+                "paperSignal.continuation.method=full_replay_fallback requires "
+                "history.boundary=full_replay and cutover.mode=full_replay"
+            )
+
     daily_step = design.get("dailyStep")
     if not isinstance(daily_step, dict) or not _clean(daily_step.get("reason")):
         raise PromotionNeedsAgentRefactor(
@@ -1821,29 +2002,55 @@ def _validate_paper_signal_design_contract(
             "advances without full replay"
         )
 
-    probe = design.get("probe")
-    if not isinstance(probe, dict):
+
+def _validate_paper_signal_evidence_contract(
+    paper_signal: dict[str, Any],
+    *,
+    continuation_method: str,
+) -> None:
+    evidence = _paper_signal_evidence_payload(paper_signal)
+    if not isinstance(evidence, dict):
         raise PromotionNeedsAgentRefactor(
-            "paperSignal.design.probe must describe the evidence mode used "
-            "for the history/state/calendar/cutover design"
+            "continuing hosted paper reports must declare paperSignal.evidence"
         )
-    probe_mode = _clean(probe.get("mode"))
+    probe_mode = _clean(evidence.get("probeMode") or evidence.get("mode"))
     if probe_mode not in PROMOTION_PROBE_EVIDENCE_MODES:
         raise PromotionNeedsAgentRefactor(
-            "paperSignal.design.probe.mode must be one of "
+            "paperSignal.evidence.probeMode must be one of "
             "not_needed, calendar_only, windowed_semantic, or full_path"
         )
-    if not _clean(probe.get("whySufficient")):
+    observations = evidence.get("observations")
+    if not isinstance(observations, list) or not any(
+        _clean(item) for item in observations
+    ):
         raise PromotionNeedsAgentRefactor(
-            "paperSignal.design.probe.whySufficient must explain why the "
-            "chosen evidence mode is enough"
+            "paperSignal.evidence.observations must include at least one "
+            "source/probe fact supporting the continuation design"
+        )
+    if not isinstance(evidence.get("semanticChecks", []), list):
+        raise PromotionNeedsAgentRefactor(
+            "paperSignal.evidence.semanticChecks must be a list"
+        )
+    if not _clean(evidence.get("whySufficient")):
+        raise PromotionNeedsAgentRefactor(
+            "paperSignal.evidence.whySufficient must explain why the evidence "
+            "supports the chosen continuation method"
         )
     if probe_mode == "full_path":
-        reason = _clean(probe.get("whySufficient")).lower()
+        reason = _clean(evidence.get("whySufficient")).lower()
         if not any(term in reason for term in ("fallback", "insufficient", "failed")):
             raise PromotionNeedsAgentRefactor(
-                "paperSignal.design.probe.mode=full_path must explain why "
+                "paperSignal.evidence.probeMode=full_path must explain why "
                 "calendar_only/windowed_semantic probing was insufficient or failed"
+            )
+    if continuation_method == "stateful_continuation":
+        checks = " ".join(
+            _clean(item).lower() for item in evidence.get("semanticChecks") or []
+        )
+        if "state" not in checks and "cutover" not in checks:
+            raise PromotionNeedsAgentRefactor(
+                "paperSignal.continuation.method=stateful_continuation requires "
+                "paperSignal.evidence.semanticChecks to support cutover state validity"
             )
 
 
@@ -2305,6 +2512,12 @@ def _fast_paper_validation(
             design = _paper_signal_design_payload(paper_signal)
             if isinstance(design, dict):
                 details["agentDesign"] = _json_safe(design)
+            continuation = _paper_signal_continuation_payload(paper_signal)
+            if isinstance(continuation, dict):
+                details["agentContinuation"] = _json_safe(continuation)
+            evidence = _paper_signal_evidence_payload(paper_signal)
+            if isinstance(evidence, dict):
+                details["agentEvidence"] = _json_safe(evidence)
 
     smoke = _run_artifact_paper_signal_smoke(
         candidate,
@@ -2406,6 +2619,7 @@ def _run_artifact_paper_signal_smoke(
                     )
                     comparison = {
                         "asOf": oracle["asOf"],
+                        "decisionIndex": oracle.get("decisionIndex"),
                         "expectedNextPosition": expected_position,
                         "actualNextPosition": latest_position,
                         "absDiff": abs_diff,

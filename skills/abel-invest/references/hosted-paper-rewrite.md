@@ -7,31 +7,39 @@ execution.
 
 ## Goal
 
-Rewrite the promoted copy so it preserves the selected research strategy's
-decision semantics while running as one hosted daily paper step.
-
-Think in this timeline:
+Rewrite the promoted copy into a live-paper continuation of the selected
+research strategy:
 
 ```text
-research backtest timeline -> selected round cutover -> future hosted paper days
+research backtest semantics -> selected round cutover -> future daily paper calls
 ```
 
-The system provides facts and gates. You decide the strategy-specific rewrite.
-Do not force the source into a fixed category such as ML, indicator, replay, or
-hybrid. Read the strategy and explain the design you choose.
+Your task is not to repair the promotion gate. The gate is a verifier. First
+understand how the strategy naturally continues after the selected round
+cutover, then implement that continuation and provide evidence.
+
+Harness facts are observations, not complete semantic truth. Empty observed
+lists such as no observed fit calls or no observed state writes are not proof of
+absence. Read the source and report semantic dependencies the scan missed.
 
 ## Loop
 
 1. Read `refactor-request.json`.
-2. Edit only the promoted source named by `sourcePath`.
-3. Use request `facts` as evidence: feeds, selected window, lookback hints,
-   training calls, ordinal hints, branch files, and validation sample dates.
-4. Implement `BranchEngine.get_paper_signal(as_of=...)`.
-5. Write `refactor-report.json` beside the request.
-6. Rerun the same `visualize-session`, `export-strategy-artifact`, or
+2. Choose the continuation method: `stateless_recompute`,
+   `stateful_continuation`, `full_replay_fallback`, or `not_hostable`.
+3. Use request facts as evidence: feeds, selected window, source observations,
+   calendar anchors, imports, branch files, and validation date/index anchors.
+4. Edit only the promoted source named by `sourcePath`.
+5. Implement `BranchEngine.get_paper_signal(as_of=...)`.
+6. For `stateful_continuation`, also implement
+   `BranchEngine.build_paper_initial_state(cutover_as_of=...)`.
+7. Write `refactor-report.json` beside the request.
+8. Rerun the same `visualize-session`, `export-strategy-artifact`, or
    `promote-strategy` command.
-7. If the gate returns another request, treat `validation.lastGateFailure` as
-   diagnostics for the next edit.
+
+If the gate returns another request, treat `validation.lastGateFailure` as a
+semantic diagnostic. Revisit continuation design, state, or evidence; do not
+patch individual validation dates.
 
 Do not edit the original branch. Do not start by reading Abel-skills promotion
 internals or Edge promotion-gate internals; the request is the workbench. Inspect
@@ -39,7 +47,7 @@ internals only after a refreshed request cannot explain a failure.
 
 ## Runtime Paths
 
-Inside `get_paper_signal`, use the hosted path helper:
+Inside hosted paper code, use the path helper:
 
 ```python
 from abel_edge.runtime_paths import context_runtime_paths
@@ -57,59 +65,55 @@ Rules:
 - write mutable strategy state only under `paths.state / "strategy"`;
 - preserve `compute_decisions(ctx)` as the research/backtest authority unless
   the source is semantically unusable;
-- do not implement `get_paper_signal` as a wrapper around full
-  `compute_runtime_output(...)` or a full historical replay.
+- do not use selected-round `trade-log.csv`, gate answers, or promotion outputs
+  as live strategy inputs.
 
 `get_paper_signal` returns a dict with finite numeric `next_position`.
 `next_position` is the compiled absolute target exposure for `as_of`, matching
 the selected round trade-log meaning. It is not an order delta, order size, or
 only-on-change event.
 
-## Design Questions
+## Continuation Methods
 
-Answer these before coding:
+Choose one runtime shape:
 
-- What market data is available on the next hosted paper day?
-- What history is needed to compute one signal?
-- What strategy-owned state, if any, must survive across paper runs?
-- Does row order, `iloc`, `range`, modulo, retraining cadence, or signal holding
-  require a calendar origin anchored to the research window?
-- If startup state is needed, what state must exist at selected-round cutover so
-  the next hosted paper day can continue?
-- How does a repeated same-`as_of` call stay idempotent?
-- What expensive work is avoided during daily hosted paper?
+- `stateless_recompute`: each paper call computes the current signal from legal
+  market data, immutable assets, source parameters, and an explicit history
+  boundary. It writes no strategy state.
+- `stateful_continuation`: promotion builds strategy-owned cutover state, and
+  future paper calls load, advance, and persist that state.
+- `full_replay_fallback`: last-resort fallback only when the request says it is
+  eligible. It may call the original full path and must pass the fallback
+  performance gate.
+- `not_hostable`: non-uploadable failure result. Use it only when the request
+  says fallback is eligible and full replay fallback cannot safely run.
 
-Simple bounded-history strategies often need no startup state. Walking-forward
-or retraining strategies often need a real cutover state such as model, scaler,
-feature window, retrain cursor, calendar ordinal, or latest strategy-owned
-checkpoint. A same-day cache is useful for idempotence, but it is not by itself
-cutover state.
+Any fitted object that participates in the signal makes the strategy stateful:
+models, scalers, encoders, calibrators, feature selectors, online learners, and
+similar objects should be continued as state instead of refit from scratch on
+each daily paper call.
 
-If the strategy can only continue by replaying the full historical timeline,
-declare that limitation instead of claiming hosted fast-paper readiness.
+For expanding, ranking, cumulative, or ordinal logic, declare the calendar or
+history origin. Fixed-window indicators may use a recent lookback; origin-based
+statistics usually cannot.
 
-## Probe Evidence
+## Stateful Bootstrap
 
-The request may include `facts.validationOracle.canonicalDecisionTimeline`.
-When present, it is the selected-round canonical decision index derived from
-`trade-log.csv` row order. Use it to align dates, row ordinals, retrain cadence,
-and tail parity. It is validation evidence only; do not package it as a live
-strategy dependency.
+Stateful strategies must expose:
 
-Use probes only when source reading and request facts are not enough. Choose the
-probe mode from your own strategy analysis:
+```python
+def build_paper_initial_state(self, *, cutover_as_of=None) -> dict:
+    ...
+```
 
-- `calendar_only`: inspect dates, canonical decision indexes, lookback
-  boundaries, and retrain/cutover calendars without running the expensive
-  strategy path.
-- `windowed_semantic`: run or instrument the original semantics over a bounded
-  window while preserving canonical indexes and dates.
-- `full_path`: fallback only when lighter probes cannot establish the facts
-  needed for a safe rewrite, or when those probes have already failed.
+The hook builds state valid through `cutover_as_of` using the same state schema
+that `get_paper_signal` consumes. It may return JSON-serializable state or a
+manifest of files written under the staged state directory when fitted objects
+need file serialization.
 
-Probe scripts and probe outputs are temporary evidence. They should not be
-listed in `packagedFiles` or `initialStateFiles` unless the file is genuine
-strategy-owned startup state needed by hosted paper.
+The harness calls the hook for validation cutover and production cutover. Do not
+hand-write separate validation state. Do not encode expected positions or gate
+answers in state.
 
 ## Report
 
@@ -122,58 +126,55 @@ Write `refactor-report.json` with this shape:
   "scope": "hosted_paper_rewrite",
   "summary": "brief rewrite summary",
   "paths": {
-    "packagedFiles": [
-      {
-        "sourcePath": "branch/or/absolute/source.csv",
-        "artifactPath": "strategy/assets/source.csv",
-        "purpose": "read-only strategy asset"
-      }
-    ],
-    "initialStateFiles": [
-      {
-        "sourcePath": "state/paper-state.json",
-        "artifactPath": "runtime/initial-state/strategy/paper-state.json",
-        "purpose": "startup strategy state seed"
-      }
-    ]
+    "packagedFiles": [],
+    "initialStateFiles": []
   },
   "paperSignal": {
     "implemented": true,
     "incrementalReady": true,
+    "continuation": {
+      "method": "stateless_recompute",
+      "reason": "why this method preserves selected strategy semantics",
+      "futureDailyFlow": "how future as_of calls run"
+    },
     "design": {
       "history": {
+        "boundary": "fixed_lookback",
         "minBars": 120,
+        "origin": null,
         "feeds": ["AAPL"],
         "reason": "history required for one paper signal"
       },
       "state": {
         "usesPersistentState": false,
         "stateFiles": [],
-        "reason": "no strategy-owned state is needed"
+        "schema": null,
+        "validThrough": null,
+        "reason": "what survives across paper calls"
       },
       "calendar": {
         "usesAbsoluteDecisionOrdinal": false,
         "origin": null,
-        "reason": "logic is date/lookback based"
+        "decisionIndexSource": null,
+        "nextAdvanceRule": null,
+        "reason": "calendar and ordinal semantics"
       },
       "cutover": {
         "requiresStartupState": false,
         "mode": "none",
-        "dataHistoryStart": null,
         "stateEnd": null,
-        "reason": "first paper day can compute from bounded history"
+        "bootstrapHook": null,
+        "reason": "why startup state is or is not needed"
       },
       "dailyStep": {
-        "reason": "load data through as_of, compute one absolute target exposure, persist strategy state only if needed"
-      },
-      "probe": {
-        "mode": "not_needed",
-        "whySufficient": "source reading and canonical timeline facts are enough for this rewrite",
-        "canonicalTimelineSource": "facts.validationOracle.canonicalDecisionTimeline",
-        "observations": [
-          "decision index is date-based and no retrain state is required"
-        ]
+        "reason": "one future as_of flow, state update behavior, and expensive work avoided"
       }
+    },
+    "evidence": {
+      "observations": ["source or probe facts supporting the method"],
+      "agentOverrides": [],
+      "semanticChecks": [],
+      "whySufficient": "why evidence supports this method"
     },
     "liveReadiness": "how future hosted paper days continue"
   },
@@ -186,20 +187,6 @@ Write `refactor-report.json` with this shape:
 `initialStateFiles` are mutable startup seeds copied under
 `runtime/initial-state/**` and hydrated into state by the hosted runner.
 Do not list the same source file in both lists.
-
-Generated research or promotion evidence is not a live strategy dependency.
-Files under `outputs/**`, `promotions/**`, `edge/**`, and the current export
-destination, including generated `trade-log.csv`, are validation evidence.
-Gate failure expected values are diagnostics only; never encode them in assets
-or initial state.
-
-Use `paperSignal.design.cutover.mode` as follows:
-
-- `none`: no startup state is needed.
-- `minimal_cutover_state`: startup state is built once and is valid through the
-  selected round end.
-- `full_replay_required`: the strategy cannot be made continuing-ready for the
-  current hosted fast-paper contract.
 
 Set `paperSignal.incrementalReady=true` only when future hosted paper days can
 continue beyond the selected research result.
