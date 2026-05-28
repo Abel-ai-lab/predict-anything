@@ -10,12 +10,14 @@ from abel_invest.narrative_core.contracts.constants import EVENTS_HEADER, RESULT
 from abel_invest.narrative_core.io import write_tsv_rows
 from abel_invest.narrative_core.promotion import (
     PromotionHostedPaperContractRequired,
-    _paper_smoke_context,
+)
+from abel_invest.narrative_core.promotion import source_scan
+from abel_invest.narrative_core.promotion.orchestrator import (
     _validate_agent_paper_signal_contract,
     _write_hosted_paper_contract_request,
 )
-from abel_invest.narrative_core import promotion_source
-from abel_invest.narrative_core.promotion_tail import (
+from abel_invest.narrative_core.promotion.paper.smoke import _paper_smoke_context
+from abel_invest.narrative_core.promotion.tail_oracle import (
     paper_tail_position_change_count,
     paper_tail_selection_reason,
     select_paper_tail_oracle_sample,
@@ -645,12 +647,12 @@ def test_paper_signal_full_runtime_path_follows_self_helper():
         "        return {'next_position': float(compiled.next_position[-1])}\n"
     )
 
-    assert promotion_source.paper_signal_full_runtime_compute_path(source) == [
+    assert source_scan.paper_signal_full_runtime_compute_path(source) == [
         "BranchEngine.get_paper_signal",
         "BranchEngine._paper_runtime_output",
         "compute_runtime_output",
     ]
-    assert promotion_source.paper_signal_uses_full_runtime_compute(source) is True
+    assert source_scan.paper_signal_uses_full_runtime_compute(source) is True
 
 
 def test_paper_signal_full_runtime_path_follows_top_level_helper():
@@ -663,7 +665,7 @@ def test_paper_signal_full_runtime_path_follows_top_level_helper():
         "        return {'next_position': float(positions[-1])}\n"
     )
 
-    assert promotion_source.paper_signal_full_runtime_compute_path(source) == [
+    assert source_scan.paper_signal_full_runtime_compute_path(source) == [
         "BranchEngine.get_paper_signal",
         "paper_runtime",
         "compute_signals",

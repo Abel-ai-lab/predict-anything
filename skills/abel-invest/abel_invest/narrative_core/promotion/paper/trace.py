@@ -7,7 +7,7 @@ import math
 from pathlib import Path
 from typing import Any
 
-from abel_invest.narrative_core import promotion_tail
+from .. import tail_oracle
 
 
 PROMOTION_TAIL_TRACE_FILENAME = "promotion-tail-trace.json"
@@ -187,7 +187,7 @@ def _tail_consistency_summary(tail: dict[str, Any]) -> dict[str, Any]:
         item
         for item in comparison_rows
         if _finite_float(item.get("absDiff")) is None
-        or float(item.get("absDiff")) > promotion_tail.PROMOTION_PAPER_TAIL_TOLERANCE
+        or float(item.get("absDiff")) > tail_oracle.PROMOTION_PAPER_TAIL_TOLERANCE
     ]
     summary = {
         key: _json_safe(tail.get(key))

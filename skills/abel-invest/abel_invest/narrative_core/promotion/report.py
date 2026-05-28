@@ -5,13 +5,13 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from .promotion_constants import (
+from .constants import (
     PROMOTION_AGENT_REPORT_SCHEMA,
     PROMOTION_CONTRACT_REPORT_FILENAME,
     PROMOTION_HOSTED_CONTRACT_SCOPE,
 )
-from .promotion_models import PromotionHostedPaperContractRequired
-from .promotion_utils import _clean
+from .models import PromotionHostedPaperContractRequired
+from .utils import _clean
 
 def _report_has_hosted_paper_contract(report: dict[str, Any]) -> bool:
     return (

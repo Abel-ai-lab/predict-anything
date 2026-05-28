@@ -22,24 +22,24 @@ import pandas as pd
 from abel_edge.engine.ledger import read_trade_log
 from abel_edge.engine.trader import paper_run_one
 
-from . import promotion_source, promotion_tail
-from .promotion_constants import (
+from .. import source_scan, tail_oracle
+from ..constants import (
     PROMOTION_FULL_REPLAY_FALLBACK_MAX_SECONDS,
     PROMOTION_HOSTED_PAPER_TIMEOUT_SECONDS,
     PROMOTION_MODE_AGENT_PAPER_CONTRACT,
     PROMOTION_PAPER_SMOKE_MAX_TRAINING_SECONDS,
     PROMOTION_PAPER_TAIL_TOLERANCE,
 )
-from .promotion_contract import (
+from ..report import (
     _paper_signal_continuation_payload,
     _paper_signal_design_payload,
     _paper_signal_evidence_payload,
     _report_continuation_method,
     _report_paper_execution_profile,
 )
-from .promotion_models import PromotionPackagedFile
-from .promotion_packaging import _validate_packaged_artifact_path
-from .promotion_utils import (
+from ..models import PromotionPackagedFile
+from ..packaging import _validate_packaged_artifact_path
+from ..utils import (
     _clean,
     _copy_if_exists,
     _date_part,
@@ -54,12 +54,12 @@ from .promotion_utils import (
     _temporary_sys_path,
 )
 
-_paper_signal_design_facts = promotion_source.paper_signal_design_facts
-_paper_signal_full_runtime_compute_path = promotion_source.paper_signal_full_runtime_compute_path
-_paper_signal_uses_full_runtime_compute = promotion_source.paper_signal_uses_full_runtime_compute
-_source_overrides_get_paper_signal = promotion_source.source_overrides_get_paper_signal
-_paper_tail_oracle_rows = promotion_tail.paper_tail_oracle_rows
-_tail_consistency_payload = promotion_tail.tail_consistency_payload
+_paper_signal_design_facts = source_scan.paper_signal_design_facts
+_paper_signal_full_runtime_compute_path = source_scan.paper_signal_full_runtime_compute_path
+_paper_signal_uses_full_runtime_compute = source_scan.paper_signal_uses_full_runtime_compute
+_source_overrides_get_paper_signal = source_scan.source_overrides_get_paper_signal
+_paper_tail_oracle_rows = tail_oracle.paper_tail_oracle_rows
+_tail_consistency_payload = tail_oracle.tail_consistency_payload
 
 def _paper_smoke_max_call_elapsed(smoke: dict[str, Any]) -> float:
     values: list[float] = []

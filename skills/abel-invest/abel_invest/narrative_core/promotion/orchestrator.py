@@ -9,9 +9,9 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
-from . import promotion_source, promotion_tail
-from .promotion_constants import *  # noqa: F403 - facade re-exports promotion constants.
-from .promotion_contract import (
+from . import source_scan, tail_oracle
+from .constants import *  # noqa: F403 - facade re-exports promotion constants.
+from .report import (
     _load_agent_contract_report,
     _paper_signal_continuation_payload,
     _paper_signal_design_payload,
@@ -21,35 +21,35 @@ from .promotion_contract import (
     _report_paper_execution_profile,
     _report_replacements,
 )
-from .promotion_gate import (
+from .gate import (
     _build_contract_promotion_gate_report,
     _promotion_gate_failure_request_payload,
 )
-from .promotion_models import (
+from .models import (
     PromotionHostedPaperContractRequired,
     PromotionHostedPaperRewriteRequired,
     PromotionPackagedFile,
     PromotionResult,
 )
-from .promotion_legacy import cleanup_legacy_promotion_outputs as _cleanup_legacy_promotion_outputs
-from .promotion_packaging import (
+from .cleanup import cleanup_legacy_promotion_outputs as _cleanup_legacy_promotion_outputs
+from .packaging import (
     _report_packaged_files,
     _validate_packaged_artifact_path,
     _validate_packaged_research_evidence_sources,
 )
-from .promotion_paper_smoke import (
+from .paper.smoke import (
     _fast_paper_validation,
     _generated_replay_initial_state_files,
     _paper_smoke_context,
     _run_edge_paper_run_one_smoke,
     _run_edge_paper_run_one_smoke_unbounded,
 )
-from .promotion_paper_trace import (
+from .paper.trace import (
     PROMOTION_TAIL_TRACE_FILENAME,
     paper_dry_run_gate_summary as _paper_dry_run_gate_summary,
     write_paper_tail_trace as _write_paper_tail_trace,
 )
-from .promotion_utils import (
+from .utils import (
     _clean,
     _date_part,
     _finite_float,
@@ -57,31 +57,31 @@ from .promotion_utils import (
 )
 
 
-_call_name = promotion_source.call_name
-_paper_signal_design_facts = promotion_source.paper_signal_design_facts
+_call_name = source_scan.call_name
+_paper_signal_design_facts = source_scan.paper_signal_design_facts
 _paper_signal_full_runtime_compute_path = (
-    promotion_source.paper_signal_full_runtime_compute_path
+    source_scan.paper_signal_full_runtime_compute_path
 )
 _paper_signal_uses_full_runtime_compute = (
-    promotion_source.paper_signal_uses_full_runtime_compute
+    source_scan.paper_signal_uses_full_runtime_compute
 )
-_source_file_access_facts = promotion_source.source_file_access_facts
-_source_import_facts = promotion_source.source_import_facts
-_source_overrides_get_paper_signal = promotion_source.source_overrides_get_paper_signal
-_source_scan_observations = promotion_source.source_scan_observations
-_source_temporal_dependency_facts = promotion_source.source_temporal_dependency_facts
-_training_call_facts = promotion_source.training_call_facts
-PROMOTION_PAPER_TAIL_MAX_COUNT = promotion_tail.PROMOTION_PAPER_TAIL_MAX_COUNT
-PROMOTION_PAPER_TAIL_TARGET_COUNT = promotion_tail.PROMOTION_PAPER_TAIL_TARGET_COUNT
-PROMOTION_PAPER_TAIL_TOLERANCE = promotion_tail.PROMOTION_PAPER_TAIL_TOLERANCE
-_paper_tail_oracle_rows = promotion_tail.paper_tail_oracle_rows
-_paper_tail_position_change_count = promotion_tail.paper_tail_position_change_count
-_paper_tail_prior_row = promotion_tail.paper_tail_prior_row
-_paper_tail_selection_reason = promotion_tail.paper_tail_selection_reason
-_redacted_timeline_row = promotion_tail.redacted_timeline_row
-_redacted_trade_log_oracle_sample = promotion_tail.redacted_trade_log_oracle_sample
-_select_paper_tail_oracle_sample = promotion_tail.select_paper_tail_oracle_sample
-_tail_consistency_payload = promotion_tail.tail_consistency_payload
+_source_file_access_facts = source_scan.source_file_access_facts
+_source_import_facts = source_scan.source_import_facts
+_source_overrides_get_paper_signal = source_scan.source_overrides_get_paper_signal
+_source_scan_observations = source_scan.source_scan_observations
+_source_temporal_dependency_facts = source_scan.source_temporal_dependency_facts
+_training_call_facts = source_scan.training_call_facts
+PROMOTION_PAPER_TAIL_MAX_COUNT = tail_oracle.PROMOTION_PAPER_TAIL_MAX_COUNT
+PROMOTION_PAPER_TAIL_TARGET_COUNT = tail_oracle.PROMOTION_PAPER_TAIL_TARGET_COUNT
+PROMOTION_PAPER_TAIL_TOLERANCE = tail_oracle.PROMOTION_PAPER_TAIL_TOLERANCE
+_paper_tail_oracle_rows = tail_oracle.paper_tail_oracle_rows
+_paper_tail_position_change_count = tail_oracle.paper_tail_position_change_count
+_paper_tail_prior_row = tail_oracle.paper_tail_prior_row
+_paper_tail_selection_reason = tail_oracle.paper_tail_selection_reason
+_redacted_timeline_row = tail_oracle.redacted_timeline_row
+_redacted_trade_log_oracle_sample = tail_oracle.redacted_trade_log_oracle_sample
+_select_paper_tail_oracle_sample = tail_oracle.select_paper_tail_oracle_sample
+_tail_consistency_payload = tail_oracle.tail_consistency_payload
 
 
 

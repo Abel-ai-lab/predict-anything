@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .promotion_constants import PROMOTION_MODE_AGENT_PAPER_CONTRACT
+from .constants import PROMOTION_MODE_AGENT_PAPER_CONTRACT
 
 @dataclass(frozen=True)
 class PromotionPackagedFile:

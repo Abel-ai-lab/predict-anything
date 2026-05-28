@@ -6,8 +6,8 @@ from typing import Any
 
 from abel_edge.research.promotion_gate import build_promotion_gate_report
 
-from .promotion_paper_trace import tail_parity_failure_diagnosis as _tail_parity_failure_diagnosis
-from .promotion_utils import _clean, _json_safe
+from .paper.trace import tail_parity_failure_diagnosis as _tail_parity_failure_diagnosis
+from .utils import _clean, _json_safe
 
 def _promotion_gate_failure_request_payload(
     gate_report: dict[str, Any],

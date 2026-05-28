@@ -5,9 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
-from .promotion_constants import PROMOTION_INITIAL_STATE_ORACLE_PHRASES
-from .promotion_models import PromotionHostedPaperContractRequired, PromotionPackagedFile
-from .promotion_utils import _clean
+from .constants import PROMOTION_INITIAL_STATE_ORACLE_PHRASES
+from .models import PromotionHostedPaperContractRequired, PromotionPackagedFile
+from .utils import _clean
 
 def _report_packaged_files(
     report: dict[str, Any],

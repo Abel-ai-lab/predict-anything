@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import shutil
 
-from .promotion_constants import (
+from .constants import (
     PROMOTION_LEGACY_DESTINATION_DIRS,
     PROMOTION_LEGACY_PROMOTED_FILES,
 )
