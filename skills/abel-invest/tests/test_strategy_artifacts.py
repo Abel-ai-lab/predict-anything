@@ -12,15 +12,17 @@ from abel_invest.narrative_core.promotion import (
     PromotionHostedPaperContractRequired,
 )
 from abel_invest.narrative_core.promotion import source_scan
-from abel_invest.narrative_core.promotion.orchestrator import (
-    _validate_agent_paper_signal_contract,
+from abel_invest.narrative_core.promotion.paper.smoke import _paper_smoke_context
+from abel_invest.narrative_core.promotion.request import (
     _write_hosted_paper_contract_request,
 )
-from abel_invest.narrative_core.promotion.paper.smoke import _paper_smoke_context
 from abel_invest.narrative_core.promotion.tail_oracle import (
     paper_tail_position_change_count,
     paper_tail_selection_reason,
     select_paper_tail_oracle_sample,
+)
+from abel_invest.narrative_core.promotion.validation import (
+    _validate_agent_paper_signal_contract,
 )
 from abel_invest.narrative_core.strategy_artifact_upload import (
     render_strategy_artifact_upload_lines,

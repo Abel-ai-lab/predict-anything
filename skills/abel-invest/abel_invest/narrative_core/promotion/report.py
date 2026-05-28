@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from .constants import (
@@ -13,11 +14,14 @@ from .constants import (
 from .models import PromotionHostedPaperContractRequired
 from .utils import _clean
 
+
 def _report_has_hosted_paper_contract(report: dict[str, Any]) -> bool:
     return (
         _clean(report.get("kind")) == PROMOTION_HOSTED_CONTRACT_SCOPE
         and _clean(report.get("scope")) == PROMOTION_HOSTED_CONTRACT_SCOPE
     )
+
+
 def _paper_signal_continuation_payload(
     paper_signal: dict[str, Any],
 ) -> dict[str, Any] | None:
@@ -41,6 +45,8 @@ def _paper_signal_evidence_payload(
     if isinstance(evidence, dict):
         return evidence
     return None
+
+
 def _report_continuation_method(report: dict[str, Any] | None) -> str:
     if not isinstance(report, dict):
         return ""
@@ -100,6 +106,8 @@ def _report_paper_execution_profile(report: dict[str, Any] | None) -> dict[str, 
         "schema": "abel.paper-execution-profile/v1",
         "history": profile_history,
     }
+
+
 def _load_agent_contract_report(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -133,3 +141,42 @@ def _report_replacements(report: dict[str, Any]) -> list[dict[str, str]]:
                 payload["reason"] = reason
             replacements.append(payload)
     return replacements
+
+
+def _write_artifact_contract_report(
+    promoted_dir: Path,
+    report: dict[str, Any],
+) -> Path:
+    path = promoted_dir / "paper-contract-report.artifact.json"
+    payload = json.loads(json.dumps(report))
+    paths = payload.get("paths")
+    if isinstance(paths, dict):
+        paths["packagedFiles"] = [
+            _sanitized_packaged_file_entry(item)
+            for item in paths.get("packagedFiles") or []
+            if isinstance(item, dict)
+        ]
+        paths["initialStateFiles"] = [
+            _sanitized_packaged_file_entry(item)
+            for item in paths.get("initialStateFiles") or []
+            if isinstance(item, dict)
+        ]
+    if isinstance(payload.get("packagedFiles"), list):
+        payload["packagedFiles"] = [
+            _sanitized_packaged_file_entry(item)
+            for item in payload.get("packagedFiles") or []
+            if isinstance(item, dict)
+        ]
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _sanitized_packaged_file_entry(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in item.items()
+        if key not in {"source", "sourcePath", "localSourcePath"}
+    }
