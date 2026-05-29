@@ -242,19 +242,27 @@ session folder to the command:
 The command builds the online view from local session evidence. By default it
 also attaches the automatically selected best hostable validation strategy
 artifact when one is available; this attachment is selected by Sharpe, return,
-drawdown, and validation pass-rate, and does not require every gate to pass.
+drawdown, and validation pass-rate. Research validation gates and hosted-paper
+promotion gates are separate; a missing strategy artifact should not block
+session visualization.
+
+Use the entrypoint that matches the user's request. For session visualization
+or upload, keep using `visualize-session --session <session>` so the default
+strategy artifact export/upload path stays attached. For local artifact export
+or validation probes, use `export-strategy-artifact --session <session>`. For a
+user-specified branch/round, use `promote-strategy --branch <branch> --round
+<round>`. Do not manually traverse `results.tsv` or branch directories to choose
+the best session strategy; the session-level commands own that selection.
+
 Use `visualize-session --without-strategy-artifact` only when the user explicitly
-asks for a session view without strategy artifact upload. If the command reports
-`needs_agent_refactor`, read the emitted `refactor-request.json` and handle it
-in the current skill loop. If `kind` is `state_intent_self_check`, inspect the
-selected branch source and nearby model/checkpoint/cache files, then write
-`state_intent.json`: either classify every durable state file required for
-paper startup, or explicitly write an empty `entries` list with a `selfCheck`
-summary explaining why the detected files are not durable paper state. If
-`kind` is `agent_assisted`, edit only the promoted copy named there, write
-`refactor-report.json`, and rerun the same command. Do not start a separate
-agent process. The agent should not hand-assemble the payload or choose a
-router URL.
+asks for a session view without strategy artifact upload. If the command emits a
+hosted paper `paper-contract-request.json`, read the request first and use its
+`reportTemplate`. Open `contractGuide.referencePath` from the active Abel Invest
+skill when the request requires stateful continuation, source edits, or deeper
+gate diagnosis. Edit source only when `sourceEditPolicy` requires or genuinely
+allows it, write `paper-contract-report.json`, and rerun the same command. Do
+not start a separate agent process. The agent should not hand-assemble the
+payload or choose a router URL.
 
 Default router base URL: `https://api.abel.ai/router/`.
 `abel-auth` is the canonical owner for API key setup. Maintainers should update

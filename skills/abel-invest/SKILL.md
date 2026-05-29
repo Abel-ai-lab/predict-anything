@@ -72,6 +72,12 @@ Always start by resolving workspace state before strategy work.
 - Writing `engine.py`, handling semantic/runtime failures, or checking
   temporal legality:
   read `references/constraints.md`.
+- Handling hosted paper contract requests, promoted strategy
+  source edits, `paper-contract-report.json`, packaged strategy assets, or hosted
+  paper state:
+  read the emitted `paper-contract-request.json` first; read
+  `contractGuide.referencePath` from this active skill when the request requires
+  stateful continuation, source edits, or deeper gate diagnosis.
 - Explaining why the workflow is data-led, graph-informed, or evidence-boundary oriented:
   optionally read `references/methodology.md`.
 - Choosing concrete constructions while writing the engine:
@@ -226,15 +232,25 @@ Visualization and promotion:
 - If the user agrees or explicitly asks, run
   `<command_prefix> visualize-session --session <session>`
   yourself and share the returned Markdown link.
+- If the user asks to export the best strategy artifact for an existing
+  session, start with
+  `<command_prefix> export-strategy-artifact --session <session>`. The CLI
+  selects the best hostable validation strategy; do not manually rank
+  `results.tsv`, `frontier.json`, or branch outputs first. If the user names a
+  branch or round explicitly, use that explicit selection instead.
 - Visualization is for reviewing the whole session. A strategy artifact is an
   optional attachment selected from hostable validation evidence; a missing
-  attachment should not block visual review.
+  attachment should not block visual review. Research validation gates and
+  hosted-paper promotion gates are separate.
 - Use `visualize-session --without-strategy-artifact` only when the user
   explicitly asks for a session view without strategy artifact upload.
-- If visualization reports `needs_agent_refactor`, handle the emitted
-  `refactor-request.json` in this same skill loop. For `state_intent_self_check`,
-  write `state_intent.json`. For `agent_assisted`, edit only the promoted copy,
-  write `refactor-report.json`, and rerun the same command.
+- If visualization or artifact export emits a hosted paper
+  `paper-contract-request.json`, handle it in this same skill loop. Read the
+  request first and use its `reportTemplate`. Read
+  `contractGuide.referencePath` from this active skill only when the request
+  calls for stateful continuation, source edits, or deeper gate diagnosis. Edit
+  only the promoted copy when the request's source-edit policy requires it,
+  write the requested `paper-contract-report.json`, and rerun the same command.
 - The default Abel router base URL is `https://api.abel.ai/router/`. `abel-auth`
   owns API key setup; do not ask for a router URL unless the user is testing a
   non-default router.
