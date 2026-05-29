@@ -95,7 +95,7 @@ Rules:
 - read immutable packaged assets through `paths.base_strategy`;
 - write mutable strategy state only under `paths.state / "strategy"`;
 - prefer `PaperStateStore` for hosted paper state paths, JSON/pickle state,
-  daily `as_of` keys, idempotence checks, and small `get_paper_signal` extras;
+  daily `as_of` keys, idempotence checks, and bootstrap summaries;
 - preserve `compute_decisions(ctx)` as the research/backtest authority unless
   the source is semantically unusable;
 - do not use selected-round `trade-log.csv`, gate answers, or promotion outputs
@@ -193,9 +193,10 @@ state.
 ## Stateful PaperStateStore Scaffold
 
 For `stateful_continuation`, adapt this shape. The helper owns state paths,
-serialization, daily keys, idempotence checks, and return extras. The strategy
-still owns feature construction, fitting, retrain calendars, prediction, and
-the exact state schema.
+serialization, daily keys, idempotence checks, and bootstrap summaries. The
+strategy still owns feature construction, fitting, retrain calendars,
+prediction, and the exact state schema. `get_paper_signal` should return the
+decision only; do not add state bookkeeping fields to the paper ledger.
 
 ```python
 from abel_edge.paper_state import PaperStateStore
