@@ -114,7 +114,8 @@ Choose one runtime shape:
 - `full_replay_fallback`: last-resort fallback only when the request says it is
   eligible. It may call the original full path and must pass the fallback
   performance gate. If that cannot pass, report the export as failed rather than
-  uploading a hosted paper artifact.
+  uploading a hosted paper artifact. Full replay is a continuation/cutover
+  shape, not a `history.boundary` value.
 
 Any fitted object that participates in the signal makes the strategy stateful:
 models, scalers, encoders, calibrators, feature selectors, online learners, and
@@ -204,7 +205,7 @@ class BranchEngine(StrategyEngine):
         store = self._paper_store()
         state = self._build_cutover_state(cutover_as_of)
         state["schema"] = STATE_SCHEMA
-        state["last_as_of"] = store.as_of_key(cutover_as_of)
+            state = store.mark_current(state, cutover_as_of)
         store.save(state)
         return store.summary(state, as_of=cutover_as_of)
 
@@ -302,9 +303,9 @@ state, cutover, calendar, daily-step, and evidence fields:
         "reason": "market-data window needed by future daily paper execution"
       },
       "state": {
-        "usesPersistentState": false,
-        "stateFiles": [],
-        "reason": "what survives across paper calls"
+        "usesPersistentState": true,
+        "stateFiles": ["strategy/paper_state.pkl"],
+        "reason": "models/scalers/cursors/cache that survive across paper calls"
       },
       "calendar": {
         "usesAbsoluteDecisionOrdinal": false,
@@ -314,11 +315,11 @@ state, cutover, calendar, daily-step, and evidence fields:
         "reason": "retrain/refit cadence, row ordinals, and calendar anchor"
       },
       "cutover": {
-        "requiresStartupState": false,
-        "mode": "none",
-        "stateEnd": null,
-        "bootstrapHook": null,
-        "reason": "why startup state is or is not needed"
+        "requiresStartupState": true,
+        "mode": "minimal_cutover_state",
+        "stateEnd": "YYYY-MM-DD",
+        "bootstrapHook": "build_paper_initial_state",
+        "reason": "why startup state is needed and how it is built"
       },
       "dailyStep": {
         "reason": "one future as_of flow, state update behavior, and expensive work avoided"

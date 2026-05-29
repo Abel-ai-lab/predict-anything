@@ -449,9 +449,11 @@ def history_boundary_candidates(
             "candidate": True,
             "evidence": origin_risks[:12],
             "reason": (
-                "Use when source semantics depend on expanding/cumulative/ranked "
-                "history, absolute row ordinals, fitted calendars, or when finite "
-                "history is not established by source reading."
+                "Use origin_anchored for paper history when source semantics "
+                "depend on expanding/cumulative/ranked market history or when "
+                "finite history is not established by source reading. Calendar "
+                "or ordinal evidence may instead belong in design.calendar and "
+                "persisted state."
             ),
         },
     }

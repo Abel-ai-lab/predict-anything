@@ -78,7 +78,7 @@ def _paper_design(
 ) -> dict:
     return {
         "history": {
-            "boundary": "state_only" if cutover_state_required else "fixed_lookback",
+            "boundary": "fixed_lookback",
             "minBars": min_bars,
             "origin": "2020-01-01" if uses_ordinal or cutover_state_required else None,
             "feeds": ["TSLA"],
@@ -3083,7 +3083,7 @@ def test_contract_report_allows_negated_replay_language() -> None:
     )
     report = {
         "paperSignal": _paper_signal(
-            design=_paper_design(uses_state=True),
+            design=_paper_design(),
             live_readiness=(
                 "get_paper_signal reads live feeds and persisted state for future "
                 "paper days; this is not a replay of research evidence."
@@ -3168,8 +3168,8 @@ def test_contract_report_requires_evidence_contract() -> None:
         "paperSignal": {
             "implemented": True,
             "incrementalReady": True,
-            "continuation": _paper_continuation(),
-            "design": _paper_design(),
+            "continuation": _paper_continuation("stateful_continuation"),
+            "design": _paper_design(uses_state=True, cutover_state_required=True),
             "liveReadiness": "continuing paper signal from bounded live history",
         },
         "limitations": [],
@@ -3312,7 +3312,7 @@ def test_contract_report_rejects_full_replay_fallback_before_policy_allows() -> 
         "        return {'next_position': 1.0}\n"
     )
     design = _paper_design()
-    design["history"]["boundary"] = "full_replay"
+    design["history"]["boundary"] = "origin_anchored"
     design["cutover"]["mode"] = "full_replay"
     report = {
         "paperSignal": _paper_signal(

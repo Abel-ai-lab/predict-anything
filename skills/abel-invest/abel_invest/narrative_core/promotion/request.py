@@ -34,16 +34,17 @@ def _hosted_paper_contract_guide_reference() -> dict[str, Any]:
         "skill": "abel-invest",
         "referencePath": "references/hosted-paper-contract.md",
         "instruction": (
-            "Open this reference from the active Abel Invest skill when "
-            "stateful continuation, source edits, or gate diagnosis need "
-            "deeper guidance. The request is the normal work order."
+            "Open this reference from the active Abel Invest skill only when "
+            "stateful continuation, source edits, or a gate failure require "
+            "deeper details. Clear stateless cases should be solvable from "
+            "this request and sourcePath."
         ),
     }
 
 def _hosted_paper_contract_scaffold_references(
     requirements: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    if not requirements.get("statefulContinuationRequired"):
+    if not _uses_stateful_or_fallback_report_shape(requirements):
         return []
     return [
         {
@@ -67,24 +68,25 @@ def _hosted_paper_contract_scaffold_references(
             "code": (
                 "from abel_edge.paper_state import PaperStateStore\n\n"
                 "STATE_SCHEMA = 'my-strategy.paper-state/v1'\n\n"
-                "def _paper_store(self):\n"
-                "    return PaperStateStore.from_context(self.context, 'strategy/paper_state.pkl')\n\n"
-                "def build_paper_initial_state(self, *, cutover_as_of=None):\n"
-                "    store = self._paper_store()\n"
-                "    state = self._build_cutover_state(cutover_as_of)\n"
-                "    state['schema'] = STATE_SCHEMA\n"
-                "    state = store.mark_current(state, cutover_as_of)\n"
-                "    store.save(state)\n"
-                "    return store.summary(state, as_of=cutover_as_of)\n\n"
-                "def get_paper_signal(self, *, as_of=None):\n"
-                "    store = self._paper_store()\n"
-                "    state = store.load(default={})\n"
-                "    if store.is_current(state, as_of):\n"
+                "class BranchEngine(StrategyEngine):\n"
+                "    def _paper_store(self):\n"
+                "        return PaperStateStore.from_context(self.context, 'strategy/paper_state.pkl')\n\n"
+                "    def build_paper_initial_state(self, *, cutover_as_of=None):\n"
+                "        store = self._paper_store()\n"
+                "        state = self._build_cutover_state(cutover_as_of)\n"
+                "        state['schema'] = STATE_SCHEMA\n"
+                "        state = store.mark_current(state, cutover_as_of)\n"
+                "        store.save(state)\n"
+                "        return store.summary(state, as_of=cutover_as_of)\n\n"
+                "    def get_paper_signal(self, *, as_of=None):\n"
+                "        store = self._paper_store()\n"
+                "        state = store.load(default={})\n"
+                "        if store.is_current(state, as_of):\n"
+                "            return store.signal(next_position=state['next_position'], payload=state, as_of=as_of)\n"
+                "        state = self._advance_paper_state(state, as_of=as_of)\n"
+                "        state = store.mark_current(state, as_of)\n"
+                "        store.save(state)\n"
                 "        return store.signal(next_position=state['next_position'], payload=state, as_of=as_of)\n"
-                "    state = self._advance_paper_state(state, as_of=as_of)\n"
-                "    state = store.mark_current(state, as_of)\n"
-                "    store.save(state)\n"
-                "    return store.signal(next_position=state['next_position'], payload=state, as_of=as_of)\n"
             ),
             "gateHandoff": (
                 "Promotion calls build_paper_initial_state for the validation cutover, "
@@ -385,14 +387,7 @@ def _write_hosted_paper_contract_request(
         requirements,
         validation_failure=validation_failure,
     ):
-        guide = _hosted_paper_contract_guide_reference()
-        guide["instruction"] = (
-            "Open this reference from the active Abel Invest skill only when "
-            "stateful continuation, source edits, or a gate failure require "
-            "deeper details. Clear stateless cases should be solvable from "
-            "this request and sourcePath."
-        )
-        request_payload["contractGuide"] = guide
+        request_payload["contractGuide"] = _hosted_paper_contract_guide_reference()
     if facts_sidecar is not None:
         request_payload["factSidecars"] = {
             "fullFactsPath": str(facts_sidecar),
@@ -424,7 +419,19 @@ def _is_stateless_profile_only_request(
     source_edit_policy = requirements.get("sourceEditPolicy")
     if isinstance(source_edit_policy, dict) and source_edit_policy.get("expected"):
         return False
+    if _should_write_facts_sidecar(facts, validation_failure=None):
+        return False
     return not _scan_has_external_file_dependency(facts)
+
+
+def _uses_stateful_or_fallback_report_shape(requirements: dict[str, Any]) -> bool:
+    if requirements.get("statefulContinuationRequired"):
+        return True
+    return _clean(requirements.get("continuationMethod")) in {
+        "stateful_continuation",
+        "stateful_continuation_or_full_replay_fallback",
+        "full_replay_fallback",
+    }
 
 
 def _hosted_paper_stateless_requirements(
@@ -657,16 +664,16 @@ def _hosted_paper_contract_report_template(
     cutover_end: str,
     data_history_start: str = "",
 ) -> dict[str, Any]:
-    stateful_required = requirements.get("statefulContinuationRequired") is True
+    full_report_shape = _uses_stateful_or_fallback_report_shape(requirements)
     continuation_method = (
-        "stateful_continuation" if stateful_required else "stateless_recompute"
+        "stateful_continuation" if full_report_shape else "stateless_recompute"
     )
     source_edit_policy = (
         requirements.get("sourceEditPolicy")
         if isinstance(requirements.get("sourceEditPolicy"), dict)
         else {}
     )
-    if not stateful_required:
+    if not full_report_shape:
         paper_signal: dict[str, Any] = {
             "continuation": {
                 "method": continuation_method,
@@ -715,7 +722,7 @@ def _hosted_paper_contract_report_template(
                 "whySufficient": "Fill in why these observations support the method.",
             },
         }
-    if stateful_required:
+    if full_report_shape:
         paper_signal["design"].update(
             {
                 "calendar": {

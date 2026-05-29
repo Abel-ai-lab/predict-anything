@@ -224,12 +224,10 @@ def _validate_paper_signal_design_contract(
     if boundary not in {
         "fixed_lookback",
         "origin_anchored",
-        "state_only",
-        "full_replay",
     }:
         raise PromotionHostedPaperContractRequired(
             "paperSignal.design.history.boundary must be one of "
-            "fixed_lookback, origin_anchored, state_only, or full_replay"
+            "fixed_lookback or origin_anchored"
         )
 
     if continuation_method == "stateless_recompute":
@@ -351,10 +349,10 @@ def _validate_paper_signal_design_contract(
             )
 
     if continuation_method == "full_replay_fallback":
-        if boundary != "full_replay" or mode != "full_replay":
+        if mode != "full_replay":
             raise PromotionHostedPaperContractRequired(
                 "paperSignal.continuation.method=full_replay_fallback requires "
-                "history.boundary=full_replay and cutover.mode=full_replay"
+                "cutover.mode=full_replay"
             )
 
     daily_step = design.get("dailyStep")

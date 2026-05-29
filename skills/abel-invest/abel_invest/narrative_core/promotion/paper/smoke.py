@@ -211,7 +211,7 @@ def _run_edge_paper_run_one_smoke_unbounded(
                 _report_continuation_method(report) == "stateful_continuation"
             )
             if requires_validation_bootstrap:
-                _clear_replay_initial_state(destination)
+                _clear_tail_advanced_initial_state(destination)
                 _clear_directory(state_dir)
             seed = _seed_paper_smoke_log(
                 destination / "trade-log.csv",
@@ -319,7 +319,7 @@ def _run_edge_paper_run_one_smoke_unbounded(
             latest_position = _finite_float(comparisons[-1].get("actualNextPosition"))
             generated_initial_state_files = []
             if requires_validation_bootstrap:
-                generated_initial_state_files = _materialize_replay_initial_state(
+                generated_initial_state_files = _materialize_tail_advanced_initial_state(
                     state_dir,
                     destination=destination,
                 )
@@ -607,22 +607,22 @@ def _fast_paper_validation(
     }
 
 
-def _replay_initial_state_root(destination: Path) -> Path:
+def _tail_advanced_initial_state_root(destination: Path) -> Path:
     return destination / "promoted" / "runtime" / "initial-state"
 
 
-def _clear_replay_initial_state(destination: Path) -> None:
-    root = _replay_initial_state_root(destination)
+def _clear_tail_advanced_initial_state(destination: Path) -> None:
+    root = _tail_advanced_initial_state_root(destination)
     if root.exists():
         shutil.rmtree(root)
 
 
-def _materialize_replay_initial_state(
+def _materialize_tail_advanced_initial_state(
     state_dir: Path,
     *,
     destination: Path,
 ) -> list[dict[str, Any]]:
-    target_root = _replay_initial_state_root(destination)
+    target_root = _tail_advanced_initial_state_root(destination)
     if target_root.exists():
         shutil.rmtree(target_root)
     target_root.mkdir(parents=True, exist_ok=True)
@@ -650,16 +650,16 @@ def _materialize_replay_initial_state(
                 "artifactPath": artifact_path,
                 "bytes": len(data),
                 "sha256": _sha256_bytes(data),
-                "source": "gate_tail_replay_state",
+                "source": "gate_tail_advanced_state",
             }
         )
     return entries
 
 
-def _generated_replay_initial_state_files(
+def _generated_tail_advanced_initial_state_files(
     destination: Path,
 ) -> tuple[PromotionPackagedFile, ...]:
-    root = _replay_initial_state_root(destination)
+    root = _tail_advanced_initial_state_root(destination)
     if not root.is_dir():
         return ()
     generated: list[PromotionPackagedFile] = []
@@ -672,7 +672,7 @@ def _generated_replay_initial_state_files(
                 source_path=source,
                 purpose=(
                     "Gate-generated startup state after successful stateful "
-                    "tail paper replay."
+                    "tail paper advance."
                 ),
                 role="initial_state",
             )

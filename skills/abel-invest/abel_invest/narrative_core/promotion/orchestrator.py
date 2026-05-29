@@ -37,7 +37,7 @@ from .packaging import (
 )
 from .paper.smoke import (
     _fast_paper_validation,
-    _generated_replay_initial_state_files,
+    _generated_tail_advanced_initial_state_files,
 )
 from .paper.trace import (
     PROMOTION_TAIL_TRACE_FILENAME,
@@ -201,16 +201,16 @@ def prepare_promotion(
         trace_path=tail_trace_path,
     )
     if paper_dry_run.get("status") == "passed":
-        replay_state_files = _generated_replay_initial_state_files(destination)
-        if replay_state_files:
-            replay_artifact_paths = {
-                item.artifact_path for item in replay_state_files
+        tail_state_files = _generated_tail_advanced_initial_state_files(destination)
+        if tail_state_files:
+            tail_state_artifact_paths = {
+                item.artifact_path for item in tail_state_files
             }
             packaged_files = tuple(
                 item
                 for item in packaged_files
-                if item.artifact_path not in replay_artifact_paths
-            ) + replay_state_files
+                if item.artifact_path not in tail_state_artifact_paths
+            ) + tail_state_files
     gate_path = destination / PROMOTION_GATE_FILENAME
     gate_report = _build_contract_promotion_gate_report(
         promotion_mode=mode,

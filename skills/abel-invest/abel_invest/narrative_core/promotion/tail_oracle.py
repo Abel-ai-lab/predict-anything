@@ -187,40 +187,6 @@ def redacted_timeline_row(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def redacted_tail_failure_payload(tail: dict[str, Any]) -> dict[str, Any]:
-    comparisons = tail.get("comparisons")
-    failed: list[dict[str, Any]] = []
-    checked = 0
-    if isinstance(comparisons, list):
-        for item in comparisons:
-            if not isinstance(item, dict):
-                continue
-            checked += 1
-            abs_diff = _finite_float(item.get("absDiff"))
-            if abs_diff is not None and abs_diff <= PROMOTION_PAPER_TAIL_TOLERANCE:
-                continue
-            failed.append(
-                {
-                    "asOf": _clean(item.get("asOf")),
-                    "decisionIndex": item.get("decisionIndex"),
-                    "absDiffPresent": abs_diff is not None,
-                    "stateChanged": item.get("stateChanged") is True,
-                }
-            )
-    return {
-        "status": _clean(tail.get("status")),
-        "method": _clean(tail.get("method")),
-        "sampleSize": tail.get("sampleSize"),
-        "checkedCount": checked or None,
-        "failedSampleDates": failed,
-        "diagnostic": (
-            "sampled behavior diverged from the selected-round continuation "
-            "oracle; revisit paperSignal.continuation and paperSignal.evidence "
-            "instead of patching individual expected values"
-        ),
-    }
-
-
 def _date_part(value: str) -> str:
     if not value:
         return ""
