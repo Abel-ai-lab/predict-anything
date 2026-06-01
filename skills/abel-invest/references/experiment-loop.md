@@ -228,12 +228,12 @@ anchors, and interpretation. It is scout context, not validation evidence.
 ## Session Visualization
 
 Do not create an online session view automatically. When the strategy context
-is mature enough to be useful to review visually, ask the user whether to
-visualize the session. This can be after a strong candidate, after several
+is mature enough to be useful to review, ask the user whether to create a
+session review page. This can be after a strong candidate, after several
 informative candidate rounds, before promotion, or whenever the agent would
 naturally summarize that the exploration is worth a visual review. If the user
-agrees, or if the user explicitly asks to visualize the session, pass the
-session folder to the command:
+agrees, or if the user explicitly asks to create or publish the session review
+page, pass the session folder to the command:
 
 ```bash
 <command_prefix> visualize-session --session research/<ticker>/<exp_id>

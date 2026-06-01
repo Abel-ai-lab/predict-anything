@@ -293,7 +293,8 @@ After every recorded round, keep `exploration_path.md` covered with ledger ref,
 chosen path, compact reason, Edge feedback, and artifact refs before another
 recorded round.
 
-Only after asking the user and getting agreement for visual review, run:
+Only after asking the user and getting agreement to create a session review
+page, run:
 
 ```bash
 ./.venv/bin/abel-invest visualize-session --session research/tsla/tsla-v1
@@ -457,8 +458,9 @@ Edge result before choosing the next Edge run; after Edge feedback, keep the
 path updated. Check path coverage before starting another round. Check input
 realization before claiming graph-derived contribution. Do not create the online
 session view automatically; when the exploration is mature enough for review,
-ask the user first. If the user agrees or explicitly asks to publish the session
-view, run `visualize-session --session <session>` before inspecting Abel Invest
+ask the user whether to create a session review page. If the user agrees or
+explicitly asks to publish the session review page, run
+`visualize-session --session <session>` before inspecting Abel Invest
 implementation internals. It builds the view from the session folder and, when
 available, includes selected strategy artifact upload/promotion. If the user
 asks only for a local strategy artifact export or a promotion validation probe,

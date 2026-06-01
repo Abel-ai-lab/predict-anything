@@ -227,8 +227,8 @@ Alpha search stance:
 Visualization and promotion:
 
 - Do not create or refresh an online session view automatically.
-- When the strategy context is mature enough for visual review, ask the user
-  whether to visualize it.
+- When the strategy context is mature enough for review, ask the user whether
+  to create a session review page.
 - If the user agrees or explicitly asks, run
   `<command_prefix> visualize-session --session <session>`
   yourself and share the returned Markdown link. For an explicit session
