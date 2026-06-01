@@ -343,11 +343,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Build and print the payload without sending it.",
     )
     visualize_session.add_argument(
-        "--without-strategy-artifact",
-        action="store_true",
-        help=argparse.SUPPRESS,
-    )
-    visualize_session.add_argument(
         "--artifact-output-dir",
         default=None,
         help="Optional local directory for generated strategy artifact files.",
