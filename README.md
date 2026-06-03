@@ -45,13 +45,6 @@ They do not place trades, automate execution.
 Learn more: [Abel Strategy Research](docs/strategy-research.md)
 
 
-## Supported Agent Platforms
-
-- OpenAI Codex
-- Claude Code
-- OpenCode
-- ClawHub / OpenClaw
-
 ## Installation
 
 Installation differs by platform.
