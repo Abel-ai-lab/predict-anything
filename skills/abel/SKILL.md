@@ -63,8 +63,6 @@ Abel Ask:
 
 - Which companies benefit from AI datacenter expansion?
 - Analyze what is happening with TSLA.
-- Is spending $1M on an MBA worth it?
-- Should I learn to cook or keep eating out?
 - Should I still invest in an MBA degree?
 
 These are examples only. If the user chooses one, route it normally through the

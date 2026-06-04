@@ -117,4 +117,5 @@ Try:
 - Can Abel look for an ORCL strategy?
 - Abel, help me search for a tradable TSLA strategy.
 - Which companies benefit from AI datacenter expansion?
-- Is spending $1M on an MBA worth it?
+- Analyze what is happening with TSLA.
+- Should I still invest in an MBA degree?
