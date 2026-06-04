@@ -51,11 +51,21 @@ When the user asks what they can do with Abel, what Abel is useful for, or
 otherwise needs help choosing a first Abel prompt, answer with these recommended
 questions:
 
+Strategy Search:
+
 - Abel, find a strategy for AMZN
-- Abel, find a strategy for ORCL
-- Abel, find a strategy for TSLA
-- Abel, find a strategy for ETH
-- Abel, find a strategy for META
+- Can Abel look for an ORCL strategy?
+- Abel, help me search for a tradable TSLA strategy.
+- Is there an ETH strategy Abel can find?
+- Abel, explore a META strategy for me.
+
+Abel Ask:
+
+- Which companies benefit from AI datacenter expansion?
+- Analyze what is happening with TSLA.
+- Is spending $1M on an MBA worth it?
+- Should I learn to cook or keep eating out?
+- Should I still invest in an MBA degree?
 
 These are examples only. If the user chooses one, route it normally through the
-auth check and then to `abel-invest` as a new strategy-search request.
+auth check and then to the appropriate Abel skill.
