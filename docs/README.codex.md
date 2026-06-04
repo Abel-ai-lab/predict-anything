@@ -113,6 +113,8 @@ After restart, start from `Abel`, complete `abel-auth` if needed, then bootstrap
 
 Try:
 
-- Develop semiconductor demand strategies using Abel.
-- Explore investment strategies related to power demand and data centers.
-- Analyze causal drivers for mortgage-rate-sensitive homebuilder stocks.
+- Abel, find a strategy for AMZN.
+- Can Abel look for an ORCL strategy?
+- Abel, help me search for a tradable TSLA strategy.
+- Which companies benefit from AI datacenter expansion?
+- Is spending $1M on an MBA worth it?
