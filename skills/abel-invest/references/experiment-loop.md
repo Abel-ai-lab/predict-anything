@@ -68,13 +68,12 @@ Use a compact scored scout to choose, not just describe. The useful output is a
 ranked short list of candidate-shaped variants with objective metrics such as
 Sharpe, total return, drawdown, and turnover:
 
-- target-only scored baselines: trend, momentum, reversal, volatility regime,
-  and drawdown-aware controls
+- target-only scored baselines: trend, momentum, reversal, and volatility
+  regime
 - graph candidate shapes: lead/lag/sign, node subset, transformation, spread,
   horizon, and single-feature threshold/vote variants
 - construction choices: feature factories, model-family comparisons, ensembles,
-  filters, sizing rules, and risk expressions that can be locally scored before
-  formal validation
+  filters, and sizing rules that can be locally scored before formal validation
 
 Diagnostic tables such as IC, correlation, and feature importance are useful raw
 material, not the completed first-look scout when graph/model construction
@@ -265,8 +264,9 @@ Key performance:
 - Sharpe: 2.1, suggesting the returns were strong relative to daily swings.
 - Max drawdown: -11%, the worst pullback along the way.
 
-Overall, this is the most balanced result in the session so far: it produced
-strong growth while keeping the rough patches reasonably contained.
+Overall, this is the strongest result in the session so far: it delivered
+strong growth with a Sharpe profile that makes the return stream look
+meaningfully better than a noisy raw price bet.
 
 Would you like me to create the session review page?
 ```

@@ -155,10 +155,11 @@ Never:
 
 Core search invariants:
 
-- User objective first. If the user gives no metric target, search for a
-  high-return, reportable strategy with Sharpe > 2 and all required Abel Edge
-  gates passing. Do not stop at a mediocre branch or a promising near-pass while
-  useful graph-informed search axes remain.
+- User objective first. If the user gives no metric target, search for a strong
+  tradable strategy: high return, Sharpe > 2, and all required Abel Edge gates
+  passing. This is the internal completion target; do not stop at a mediocre
+  branch or a promising near-pass while useful graph-informed search axes
+  remain.
 - Follow `experiment-loop.md` as the single detailed source for the round loop,
   completion check, stop report, visualization prompt, and interrupted/blocked
   note boundary.
@@ -168,34 +169,50 @@ Core search invariants:
 - If the user explicitly interrupts or an external blocker prevents
   continuation, do not enter `Completed`; give only a brief
   interrupted/blocked note and do not ask for visualization.
-- Search hard, then explain. Use graph-derived context, target behavior,
-  feature construction, model comparison, denoise, subset search, regimes,
-  sizing, filters, or ensembles as data calls for them; do not turn any one
-  mechanism family into the default route.
-- Keep ordinary non-grandma alpha search empirical and graph-informed when live
-  graph candidates exist. Target-only ideas are baselines, seeds, ablations, or
-  competitors; hand-written single-mechanism rules are diagnostics or
-  refinements, not the default early search posture.
+- Search hard, then explain. Let observed results, failure modes, and metric
+  shape choose the next candidate family. Mechanism stories are useful after
+  evidence appears; they are not admission tickets.
+- Ordinary alpha search has a default posture: high-capacity empirical
+  construction over a scoped target + graph-derived universe. Use the graph,
+  target behavior, feature construction, model comparison, denoise, subset
+  search, regimes, sizing, filters, or ensembles as data calls for them; these
+  are degrees of freedom, not a scripted route.
+- Fresh or unfamiliar tickers should normally use the prepared first-look scout
+  sequence in `experiment-loop.md` before the first broad recorded candidate.
+  Its practical output is a ranked short list of scored candidate shapes, not
+  only an analysis memo. Direct recorded branches remain valid for
+  user-specified strategies, existing leads, baselines, controls,
+  continuations, or very narrow diagnostics.
 - Live graph discovery is the default high-value alpha universe when available.
   Use `discovery-protocol.md` for graph semantics and expansion; use
   `data-driven-construction.md` for feature factories, model comparison,
   denoise, node subsets, lags, regimes, sizing, filters, and ensembles.
-- Mine the current graph universe empirically before treating it as exhausted.
-  Graph expansion is available when evidence points outside the current view and
-  helps the next empirical search question; it is not a coverage ritual.
-  Supplemental non-graph drivers need user context or evidence support.
-- Let observed metrics, failure modes, and candidate shape choose the next
-  family. Mechanism stories are useful after evidence appears; they do not
-  replace scored construction.
+- Target-only work is a baseline, seed, ablation, or competitor. A
+  graph-supported branch is not automatically data-driven: runtime graph reads
+  prove input realization, not construction breadth. Hand-written
+  single-mechanism branches are diagnostics, controls, ablations, or refinements
+  around empirical construction, not the default search posture when live
+  graph-derived data is available.
+- A hard user metric target (Sharpe / MaxDD / PnL) is an optimization request.
+  Search is expected: use target/baseline context, graph-derived features,
+  feature factories, ensembles, parameter search, model-family comparison, HPO,
+  regime/sizing/filter search, and node-subset search when useful. Then report
+  candidates according to their objective quality and validation reliability.
 - Gates measure reliability and reportability; they are not the user-facing
-  goal. High return, high Sharpe, and useful risk control remain the product
-  objective. A high-ceiling near-pass is a lead, not waste or final success.
-- Record effective search width when search materially selects a submitted
-  candidate.
+  goal. High return and high Sharpe remain the product objective. A
+  high-ceiling near-pass is a lead, not waste or final success.
+- Record the effective width of any search that materially selected the
+  submitted candidate. Search-width accounting should not make the agent timid
+  about pursuing a high-ceiling empirical lead.
 - Exhaustion is ledger-proven. Do not write "exhausted", "ceiling", or "no
-  edge" unless `experiment-loop.md`'s ledger requirements are satisfied.
-- CAP graph nodes are priors, not trading instructions. Graph attribution
-  requires runtime input realization, not just a `branch.yaml` declaration.
+  edge" unless `experiment-loop.md`'s ledger requirements are satisfied,
+  including materially different search axes, graph-derived and target/baseline
+  contrasts where useful, and all attempted width. One validated candidate does
+  not certify search exhaustiveness.
+- CAP graph nodes are model-supported causal priors, not trading instructions.
+  Do not infer hidden weight, exact lag, signed effect, or tradable direction
+  from graph role alone. Expand the graph or use narrative scout context only
+  when it helps the empirical search question.
 - The framework defines legality, evidence validity, search-width accounting,
   and reportability. The agent owns the alpha search.
 

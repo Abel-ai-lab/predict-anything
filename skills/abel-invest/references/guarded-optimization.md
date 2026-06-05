@@ -61,7 +61,7 @@ record, including weak attempts and near-passes.
 
 ## Gate
 
-Final reported candidates must pass the applicable validation profile:
+Final robust-success claims require the applicable validation profile:
 
 1. semantic preflight and legal reads
 2. recorded gate / DSR / triangle profile

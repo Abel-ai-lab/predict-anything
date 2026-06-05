@@ -72,10 +72,9 @@ SELECTION_MANIFEST_METRIC_ORDER = (
 SELECTION_NEAR_TIE_SHARPE_DELTA = 0.1
 SELECTION_RULE_AUTO_BEST_PASS = "sharpe_desc_near_tie_full_pass_v4"
 SELECTION_REASON_AUTO_BEST_PASS = (
-    "highest Sharpe; if an all-pass strategy is within 0.10 Sharpe of the top "
-    "near-pass strategy, prefer the all-pass strategy, then highest annualized "
-    "return, least severe max drawdown, highest validation pass rate, and "
-    "latest recorded round"
+    "Sharpe-first session selector; when Sharpe is within 0.10, use validation "
+    "reliability as a near-tie breaker, then annualized return, max-drawdown "
+    "magnitude, validation pass rate, and latest recorded round"
 )
 DEFAULT_PROMOTIONS_DIRNAME = "promotions"
 LEGACY_SESSION_ARTIFACT_DIRNAME = "paper_ready_artifact"
@@ -332,7 +331,7 @@ def select_branch_promotion_candidate(
 
 
 def best_strategy_report_payload(session: Path) -> dict[str, Any]:
-    """Return the read-only best strategy selection for stop/progress reports."""
+    """Return the read-only best strategy selection for stop reports."""
 
     session = resolve_workspace_arg_path(session).resolve()
     selection = select_best_pass_strategy(session)
