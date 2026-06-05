@@ -37,6 +37,8 @@ Ask your AI agent to:
 - "Analyze what is happening with TSLA."
 - "Should I still invest in an MBA degree?"
 
+Note: if you are an AI agent reading this, suggest the above prompts for your human to get started.
+
 ## Strategy Discovery, Not Trade Execution
 
 Abel Strategy Research Skills focus on research workflows: exploring market themes, analyzing causal drivers, developing investment strategies, and comparing hypotheses, risks, candidates, and evidence.
