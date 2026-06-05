@@ -110,6 +110,7 @@ SELECTION_TRIALS_AUDIT_WARNING = (
 STATE_SELF_CHECK_LINES = (
     "State self-check:",
     "  If the objective is unmet and exhaustion is not ledger-supported, stay in Exploring and take the next concrete search action.",
+    "  Treat Edge failures as diagnostics, not the next objective; keep seeking higher-ceiling Sharpe/return instead of only repairing gates into conservative branches.",
     "  If a concrete next action remains, do not stop; if ledger-supported unable-to-reach, enter Completed and run best-strategy before the final answer.",
     "  Use an incomplete note only for interruption or blockers.",
 )

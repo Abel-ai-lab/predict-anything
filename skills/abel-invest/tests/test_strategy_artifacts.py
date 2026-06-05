@@ -37,6 +37,7 @@ from abel_invest.narrative_core.strategy_artifact_upload import (
 from abel_invest.narrative_core.strategy_artifacts import (
     SELECTION_METRIC_ORDER,
     _cleanup_stale_strategy_artifact_outputs,
+    best_strategy_report_payload,
     select_best_pass_strategy,
 )
 
@@ -256,6 +257,41 @@ def test_select_best_strategy_near_tie_boundary_is_tenth_sharpe(tmp_path):
 
     assert selection.selected is not None
     assert selection.selected.branch_id == "full-pass-boundary"
+
+
+def test_best_strategy_payload_includes_user_reply_reminder(tmp_path):
+    session = tmp_path / "research" / "meta" / "session-reminder"
+    session.mkdir(parents=True)
+    _write_candidate(
+        session,
+        branch_id="selected",
+        round_id="r1",
+        lo_adjusted=2.0,
+        sharpe=2.2,
+        annual_return=0.30,
+        pass_score="9/9",
+        verdict="PASS",
+    )
+    write_tsv_rows(
+        session / "events.tsv",
+        EVENTS_HEADER,
+        [
+            {
+                "event": "round_recorded",
+                "branch_id": "selected",
+                "round_id": "r1",
+            },
+        ],
+    )
+
+    payload = best_strategy_report_payload(session)
+
+    reminder = payload["userReplyReminder"]
+    assert reminder["sessionReviewEligible"] is True
+    assert "plain language" in reminder["plainLanguage"]
+    assert "PASS" in reminder["technicalDetails"]
+    assert "live quote" in reminder["technicalDetails"]
+    assert "session review page" in reminder["sessionReview"]
 
 
 def test_strategy_artifact_skip_line_keeps_session_view_language():

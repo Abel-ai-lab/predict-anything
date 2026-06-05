@@ -202,6 +202,9 @@ Core search invariants:
 - Gates measure reliability and reportability; they are not the user-facing
   goal. High return and high Sharpe remain the product objective. A
   high-ceiling near-pass is a lead, not waste or final success.
+- Edge failures are diagnostics, not the next objective. After a failed round,
+  keep choosing the next action by objective quality and upside; do not only
+  repair gates into conservative branches when return or Sharpe remain weak.
 - Record the effective width of any search that materially selected the
   submitted candidate. Search-width accounting should not make the agent timid
   about pursuing a high-ceiling empirical lead.
@@ -226,11 +229,11 @@ Completion, reporting, and artifacts:
   selection, report that command's selected branch/round exactly, and present a
   compact user-facing result: strategy idea, four key metrics with plain
   meanings, one short overall judgment, and the session review question when
-  eligible.
+  any candidate strategy round has been recorded.
 - Keep internal completion evidence out of the default user-facing goal:
   translate Abel Edge validation into confidence and robustness, and do not lead
-  with gate/PASS/DSR/K/PositionIC/Edge verdict unless the user asks for
-  technical details.
+  with gate/PASS/DSR/K/PositionIC/Edge verdict, selection-policy details, file
+  paths, or live quote context unless the user asks for technical details.
 - Do not run `visualize-session` or `export-strategy-artifact` merely to compute
   the best strategy, and do not manually rank `results.tsv`, `frontier.json`, or
   branch outputs. The read-only selector already owns near-tie reliability

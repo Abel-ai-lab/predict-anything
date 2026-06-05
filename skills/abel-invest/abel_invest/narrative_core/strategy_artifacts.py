@@ -48,6 +48,20 @@ from abel_invest.workspace_core.workspace import find_workspace_root
 
 STRATEGY_ARTIFACT_SCHEMA = "abel-invest.strategy-artifact/v1"
 BEST_STRATEGY_REPORT_SCHEMA = "abel-invest.best-strategy/v1"
+USER_REPLY_REMINDER = {
+    "plainLanguage": (
+        "Report the selected strategy in plain language with total return, "
+        "Sharpe, max drawdown, and backtest period."
+    ),
+    "technicalDetails": (
+        "Do not lead with PASS, K, DSR, PositionIC, Edge verdict, selection "
+        "policy, file paths, or live quote context unless the user asks."
+    ),
+    "sessionReview": (
+        "If the session has any recorded strategy round, ask whether to "
+        "create the session review page."
+    ),
+}
 STRATEGY_ARTIFACT_ENTRYPOINT = "strategy/strategy.py"
 STRATEGY_ARTIFACT_CLASS_NAME = "BranchEngine"
 STRATEGY_ARTIFACT_PAPER_MODE = "paper_signal"
@@ -356,6 +370,10 @@ def best_strategy_report_payload(session: Path) -> dict[str, Any]:
         "artifactExported": False,
         "artifactUploadSkipped": True,
         "promotionStarted": False,
+        "userReplyReminder": {
+            **USER_REPLY_REMINDER,
+            "sessionReviewEligible": selection.validation_round_count > 0,
+        },
     }
     if selected is None:
         return payload
@@ -795,6 +813,12 @@ def best_strategy_command(args) -> int:
         f"max_drawdown={metrics.get('maxDrawdown')}"
     )
     print("Read-only selection: no artifact export, upload, or promotion was run.")
+    print(
+        "User reply reminder: use plain language with total return, Sharpe, "
+        "max drawdown, and backtest period; avoid PASS/K/DSR/PositionIC/Edge "
+        "verdict or live quote context unless asked; ask about the session "
+        "review page when a recorded strategy round exists."
+    )
     return 0
 
 

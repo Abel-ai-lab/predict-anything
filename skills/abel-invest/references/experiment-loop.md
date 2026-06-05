@@ -216,6 +216,11 @@ path coverage completeness, visualization eligibility, or promotion blockage.
 `render`, `status`, and `check` are audit actions only. They do not complete
 exploration, create a reportable state, or justify a final answer.
 
+Edge failures are diagnostics, not the next objective. When return or Sharpe
+remain weak, keep seeking higher-ceiling search structure, graph expansion,
+ensembles, sizing, or model variants as useful; do not only repair gate
+failures into conservative branches.
+
 If the user explicitly interrupts, asks to stop, or an external blocker prevents
 continuation, do not enter `Completed` and do not use the stop report. Answer
 with a short interrupted/blocked note only: what was attempted, why it is not
@@ -253,7 +258,8 @@ Default stop reports should use this shape:
    review page.
 
 Do not lead with branch/round, gate/PASS, DSR, K, verdict, or selection-policy
-details unless the user asks for technical details.
+details unless the user asks for technical details. Do not add current price or
+live quote context to a completed backtest report unless the user asks.
 
 Example:
 
@@ -305,8 +311,8 @@ Do not create an online session view automatically. A session becomes eligible
 for visualization after at least one real candidate strategy round has been
 recorded; eligibility does not make visualization part of every exploration
 round. The visualization question belongs in the `Completed` stop report when a
-recorded candidate exists, regardless of whether the result is strong, weak, or
-not yet robust enough for promotion. Do not prompt after `init-session`,
+recorded candidate exists, regardless of whether it passed, failed, or is not
+yet robust enough for promotion. Do not prompt after `init-session`,
 prepare-only scouts, cache warming, or diagnostic tables that have not produced
 a recorded candidate strategy round. If the user declines, avoid repeating the
 prompt unless they ask after later work. If the user agrees, or if the user
