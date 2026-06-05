@@ -22,7 +22,7 @@ where = ["."]
 include = ["abel_invest*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["../../tests/abel_invest_skill"]
 
 [build-system]
 requires = ["setuptools>=68"]
