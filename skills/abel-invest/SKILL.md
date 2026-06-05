@@ -176,9 +176,10 @@ Core search invariants:
   graph candidates exist. Target-only ideas are baselines, seeds, ablations, or
   competitors; hand-written single-mechanism rules are diagnostics or
   refinements, not the default early search posture.
-- When first-hop graph leads are weak or near-pass and useful frontier nodes
-  remain, expand or rescope the graph-derived universe before treating that
-  lane as exhausted.
+- Live graph discovery is the default high-value alpha universe when available.
+  Use `discovery-protocol.md` for graph semantics and expansion; use
+  `data-driven-construction.md` for feature factories, model comparison,
+  denoise, node subsets, lags, regimes, sizing, filters, and ensembles.
 - Let observed metrics, failure modes, and candidate shape choose the next
   family. Mechanism stories are useful after evidence appears; they do not
   replace scored construction.
