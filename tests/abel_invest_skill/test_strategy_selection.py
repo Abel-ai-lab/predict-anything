@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ._memory_helpers import *  # noqa: F401,F403
 
-def test_select_best_pass_strategy_sorts_validation_rounds_by_sharpe_first(
+def test_select_best_pass_strategy_prefers_full_pass_within_sharpe_near_tie(
     tmp_path: Path,
 ) -> None:
     session = ni.init_session_dir("MSFT", "msft-v1", tmp_path / "research")
@@ -62,13 +62,50 @@ def test_select_best_pass_strategy_sorts_validation_rounds_by_sharpe_first(
     assert result.pass_round_count == 4
     assert result.eligible_count == 4
     assert result.selected_branch_id == "momentum_lead"
-    assert result.selected_round_id == "round-006"
+    assert result.selected_round_id == "round-010"
     assert result.selected is not None
     assert result.selected.selection_rank == 1
-    assert result.selected.selection_metric_values["sharpe"] == 0.967
+    assert result.selected.selection_metric_values["sharpe"] == 0.945
     assert result.selected.selection_metric_values["annual_return"] == 0.42
-    assert result.selected.selection_metric_values["max_dd_abs"] == 0.1278
-    assert result.selected.selection_metric_values["pass_rate"] == 10 / 13
+    assert result.selected.selection_metric_values["max_dd_abs"] == 0.1340
+    assert result.selected.selection_metric_values["pass_rate"] == 1.0
+
+
+def test_select_best_pass_strategy_keeps_top_sharpe_when_gap_exceeds_tenth(
+    tmp_path: Path,
+) -> None:
+    session = ni.init_session_dir("MSFT", "msft-v1", tmp_path / "research")
+    near_pass_top = ni.init_branch_dir(session, "near_pass_top")
+    full_pass_lower = ni.init_branch_dir(session, "full_pass_lower")
+    _write_strategy_result_row(
+        session,
+        near_pass_top,
+        round_id="round-001",
+        verdict="FAIL",
+        sharpe=2.90,
+        lo_adj=2.70,
+        max_dd=-0.12,
+        score="8/9",
+        annual_return=0.42,
+    )
+    _write_strategy_result_row(
+        session,
+        full_pass_lower,
+        round_id="round-001",
+        verdict="PASS",
+        sharpe=2.79,
+        lo_adj=2.60,
+        max_dd=-0.08,
+        score="9/9",
+        annual_return=0.31,
+    )
+
+    result = ni.select_best_pass_strategy(session)
+
+    assert result.selected_branch_id == "near_pass_top"
+    assert result.selected is not None
+    assert result.selected.selection_metric_values["sharpe"] == 2.90
+    assert result.selected.selection_metric_values["pass_rate"] == 8 / 9
 
 
 def test_select_best_pass_strategy_sorts_by_sharpe_return_drawdown_then_latest(
@@ -176,6 +213,45 @@ def test_select_best_pass_strategy_can_host_discarded_fail_validation_rounds(
     assert result.selected is not None
     assert result.selected.decision == "discard"
     assert result.selected.selection_metric_values["sharpe"] == 1.4
+
+
+def test_best_strategy_report_payload_is_read_only_for_stop_reports(
+    tmp_path: Path,
+) -> None:
+    session = ni.init_session_dir("AAPL", "aapl-v1", tmp_path / "research")
+    branch = ni.init_branch_dir(session, "risk_sized_trend")
+    _write_strategy_result_row(
+        session,
+        branch,
+        round_id="round-001",
+        verdict="FAIL",
+        sharpe=1.7,
+        lo_adj=1.6,
+        max_dd=-0.055,
+        score="6/9",
+        annual_return=0.18,
+        decision="discard",
+    )
+
+    payload = ni.best_strategy_report_payload(session)
+
+    assert payload["schema"] == "abel-invest.best-strategy/v1"
+    assert payload["status"] == "selected"
+    assert payload["branchId"] == "risk_sized_trend"
+    assert payload["roundId"] == "round-001"
+    assert payload["artifactExported"] is False
+    assert payload["artifactUploadSkipped"] is True
+    assert payload["promotionStarted"] is False
+    assert payload["metrics"]["totalReturn"] == 0.42
+    assert payload["metrics"]["sharpe"] == 1.7
+    assert payload["metrics"]["maxDrawdown"] == -0.055
+    assert payload["backtestPeriod"] == {
+        "start": "2020-01-01",
+        "end": "2020-12-31",
+    }
+    assert payload["selectionPolicy"]["rule"].startswith("sharpe_desc")
+    assert not (session / "strategy_artifacts").exists()
+    assert not (branch / "promotions").exists()
 
 
 def test_select_best_pass_strategy_returns_skip_when_no_validation(tmp_path: Path) -> None:

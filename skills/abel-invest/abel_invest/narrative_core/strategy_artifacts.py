@@ -47,6 +47,21 @@ from abel_invest.workspace_core.workspace import find_workspace_root
 
 
 STRATEGY_ARTIFACT_SCHEMA = "abel-invest.strategy-artifact/v1"
+BEST_STRATEGY_REPORT_SCHEMA = "abel-invest.best-strategy/v1"
+USER_REPLY_REMINDER = {
+    "plainLanguage": (
+        "Report the selected strategy in plain language with total return, "
+        "Sharpe, max drawdown, and backtest period."
+    ),
+    "technicalDetails": (
+        "Do not lead with PASS, K, DSR, PositionIC, Edge verdict, selection "
+        "policy, file paths, or live quote context unless the user asks."
+    ),
+    "sessionReview": (
+        "If the session has any recorded strategy round, ask whether to "
+        "create the session review page."
+    ),
+}
 STRATEGY_ARTIFACT_ENTRYPOINT = "strategy/strategy.py"
 STRATEGY_ARTIFACT_CLASS_NAME = "BranchEngine"
 STRATEGY_ARTIFACT_PAPER_MODE = "paper_signal"
@@ -57,6 +72,7 @@ SELECTION_SCOPE_SESSION = "session"
 SELECTION_SCOPE_BRANCH = "branch"
 SELECTION_METRIC_ORDER = (
     "sharpe",
+    "near_tie_full_pass",
     "annual_return",
     "max_dd_abs",
     "pass_rate",
@@ -67,12 +83,12 @@ SELECTION_MANIFEST_METRIC_ORDER = (
     "calmar",
     "max_dd",
 )
-SELECTION_RULE_AUTO_BEST_PASS = (
-    "sharpe_desc_annual_return_desc_max_dd_abs_asc_pass_rate_desc_latest_v3"
-)
+SELECTION_NEAR_TIE_SHARPE_DELTA = 0.1
+SELECTION_RULE_AUTO_BEST_PASS = "sharpe_desc_near_tie_full_pass_v4"
 SELECTION_REASON_AUTO_BEST_PASS = (
-    "highest Sharpe, then highest annualized return, then least severe max "
-    "drawdown, then highest validation pass rate; ties use latest recorded round"
+    "Sharpe-first session selector; when Sharpe is within 0.10, use validation "
+    "reliability as a near-tie breaker, then annualized return, max-drawdown "
+    "magnitude, validation pass rate, and latest recorded round"
 )
 DEFAULT_PROMOTIONS_DIRNAME = "promotions"
 LEGACY_SESSION_ARTIFACT_DIRNAME = "paper_ready_artifact"
@@ -248,11 +264,7 @@ def select_best_pass_strategy(session: Path) -> StrategySelectionResult:
             eligible_count=0,
         )
 
-    ranked = sorted(
-        candidates,
-        key=_auto_best_strategy_rank_key,
-    )
-    selected = _with_rank(ranked[0], selection_rank=1)
+    selected = _with_rank(_select_auto_best_strategy(candidates), selection_rank=1)
     return StrategySelectionResult(
         selected=selected,
         skip_reason="",
@@ -330,6 +342,92 @@ def select_branch_promotion_candidate(
         pass_round_count=len(validation_rows),
         eligible_count=len(candidates),
     )
+
+
+def best_strategy_report_payload(session: Path) -> dict[str, Any]:
+    """Return the read-only best strategy selection for stop reports."""
+
+    session = resolve_workspace_arg_path(session).resolve()
+    selection = select_best_pass_strategy(session)
+    selected = selection.selected
+    payload: dict[str, Any] = {
+        "schema": BEST_STRATEGY_REPORT_SCHEMA,
+        "session": str(session),
+        "status": "selected" if selected is not None else "skipped",
+        "skipReason": selection.skip_reason,
+        "selectionPolicy": {
+            "scope": SELECTION_SCOPE_SESSION,
+            "rule": SELECTION_RULE_AUTO_BEST_PASS,
+            "reason": SELECTION_REASON_AUTO_BEST_PASS,
+            "metricOrder": list(SELECTION_METRIC_ORDER),
+            "nearTieSharpeDelta": SELECTION_NEAR_TIE_SHARPE_DELTA,
+        },
+        "validationRoundCount": selection.validation_round_count,
+        "eligibleCount": selection.eligible_count,
+        "selectedBranchId": selection.selected_branch_id,
+        "selectedRoundId": selection.selected_round_id,
+        "selection": _selection_payload(selected),
+        "artifactExported": False,
+        "artifactUploadSkipped": True,
+        "promotionStarted": False,
+        "userReplyReminder": {
+            **USER_REPLY_REMINDER,
+            "sessionReviewEligible": selection.validation_round_count > 0,
+        },
+    }
+    if selected is None:
+        return payload
+
+    metrics = (
+        selected.edge_result.get("metrics")
+        if isinstance(selected.edge_result.get("metrics"), dict)
+        else {}
+    )
+    effective_window = (
+        selected.edge_result.get("effective_window")
+        if isinstance(selected.edge_result.get("effective_window"), dict)
+        else {}
+    )
+    requested_window = (
+        selected.edge_result.get("requested_window")
+        if isinstance(selected.edge_result.get("requested_window"), dict)
+        else {}
+    )
+    total_return = _to_float(metrics.get("total_return"))
+    payload.update(
+        {
+            "ticker": selected.ticker,
+            "branchId": selected.branch_id,
+            "roundId": selected.round_id,
+            "decision": selected.decision,
+            "verdict": _clean(selected.edge_result.get("verdict")),
+            "score": selected.score or _clean(selected.edge_result.get("score")),
+            "description": selected.description,
+            "metrics": {
+                "totalReturn": total_return,
+                "sharpe": selected.sharpe,
+                "maxDrawdown": selected.max_dd,
+                "loAdjusted": selected.lo_adjusted,
+                "annualReturn": selected.annual_return,
+                "calmar": selected.calmar,
+                "passRate": selected.pass_rate,
+            },
+            "backtestPeriod": {
+                "start": _clean(effective_window.get("start"))
+                or _clean(requested_window.get("start")),
+                "end": _clean(effective_window.get("end"))
+                or _clean(requested_window.get("end")),
+            },
+            "paths": {
+                "branch": str(selected.branch),
+                "engine": str(selected.strategy_source_path),
+                "edgeResult": str(selected.edge_result_path),
+                "edgeReport": str(selected.edge_report_path or ""),
+                "edgeHandoff": str(selected.edge_handoff_path or ""),
+            },
+        }
+    )
+    return payload
 
 
 def build_strategy_artifact_manifest(
@@ -681,6 +779,49 @@ def export_strategy_artifact_command(args) -> int:
     return 0
 
 
+def best_strategy_command(args) -> int:
+    """CLI adapter for read-only session best-strategy selection."""
+
+    session = resolve_workspace_arg_path(args.session).resolve()
+    payload = best_strategy_report_payload(session)
+    if getattr(args, "json", False):
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0
+    if payload.get("status") != "selected":
+        print(
+            "No best strategy selected "
+            f"(reason={payload.get('skipReason') or 'unknown'})."
+        )
+        print("Read-only selection: no artifact export, upload, or promotion was run.")
+        return 0
+
+    metrics = payload.get("metrics") if isinstance(payload.get("metrics"), dict) else {}
+    period = (
+        payload.get("backtestPeriod")
+        if isinstance(payload.get("backtestPeriod"), dict)
+        else {}
+    )
+    print(f"Selected strategy: {payload.get('branchId')}/{payload.get('roundId')}")
+    print(
+        "Backtest: "
+        f"{period.get('start') or 'unknown'} -> {period.get('end') or 'unknown'}"
+    )
+    print(
+        "Metrics: "
+        f"total_return={metrics.get('totalReturn')}, "
+        f"sharpe={metrics.get('sharpe')}, "
+        f"max_drawdown={metrics.get('maxDrawdown')}"
+    )
+    print("Read-only selection: no artifact export, upload, or promotion was run.")
+    print(
+        "User reply reminder: use plain language with total return, Sharpe, "
+        "max drawdown, and backtest period; avoid PASS/K/DSR/PositionIC/Edge "
+        "verdict or live quote context unless asked; ask about the session "
+        "review page when a recorded strategy round exists."
+    )
+    return 0
+
+
 def promote_strategy_command(args) -> int:
     """CLI adapter for explicit branch-level strategy promotion."""
 
@@ -830,6 +971,32 @@ def _auto_best_strategy_rank_key(
         abs(item.max_dd),
         -item.pass_rate,
         -item.session_round_index,
+    )
+
+
+def _select_auto_best_strategy(
+    candidates: list[StrategyArtifactCandidate],
+) -> StrategyArtifactCandidate:
+    ranked = sorted(candidates, key=_auto_best_strategy_rank_key)
+    top = ranked[0]
+    if _is_full_pass_candidate(top):
+        return top
+
+    near_tie_full_pass = [
+        item
+        for item in ranked
+        if _is_full_pass_candidate(item)
+        and top.sharpe - item.sharpe <= SELECTION_NEAR_TIE_SHARPE_DELTA + 1e-9
+    ]
+    if near_tie_full_pass:
+        return near_tie_full_pass[0]
+    return top
+
+
+def _is_full_pass_candidate(item: StrategyArtifactCandidate) -> bool:
+    return (
+        _clean(item.edge_result.get("verdict")).upper() == "PASS"
+        and item.pass_rate >= 1.0
     )
 
 

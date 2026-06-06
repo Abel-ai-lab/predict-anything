@@ -1,4 +1,5 @@
 import ast
+import importlib.util
 import subprocess
 import sys
 import tomllib
@@ -46,6 +47,24 @@ def test_abel_invest_bootstrap_script_is_preinstall_entrypoint() -> None:
     assert "Bootstrap an Abel strategy discovery workspace" in result.stdout
     assert "--edge-source" not in result.stdout
     assert "--edge-spec" not in result.stdout
+
+
+def test_abel_invest_bootstrap_fallback_agents_guide_uses_project_version() -> None:
+    skill_root = Path(__file__).resolve().parents[2] / "skills" / "abel-invest"
+    script = skill_root / "scripts" / "bootstrap_workspace.py"
+    spec = importlib.util.spec_from_file_location("bootstrap_workspace", script)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    data = tomllib.loads((skill_root / "pyproject.toml").read_text(encoding="utf-8"))
+
+    agents = module.render_agents(skill_root)
+
+    assert agents.startswith(
+        "<!-- abel-invest.workspace-agents/v1 "
+        f"version={data['project']['version']} -->"
+    )
 
 
 def test_abel_invest_dependencies_constrain_edge_major_version() -> None:
@@ -166,3 +185,15 @@ def test_visualize_session_strategy_artifact_is_default_and_opt_out_is_rejected(
                 "--with-strategy-artifact",
             ]
         )
+
+
+def test_best_strategy_is_read_only_session_selector() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(
+        ["best-strategy", "--session", "research/tsla/tsla-v1", "--json"]
+    )
+
+    assert args.command == "best-strategy"
+    assert args.session == "research/tsla/tsla-v1"
+    assert args.json is True

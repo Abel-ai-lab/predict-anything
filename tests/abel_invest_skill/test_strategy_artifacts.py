@@ -37,6 +37,7 @@ from abel_invest.narrative_core.strategy_artifact_upload import (
 from abel_invest.narrative_core.strategy_artifacts import (
     SELECTION_METRIC_ORDER,
     _cleanup_stale_strategy_artifact_outputs,
+    best_strategy_report_payload,
     select_best_pass_strategy,
 )
 
@@ -96,7 +97,7 @@ def _write_candidate(
     )
 
 
-def test_select_best_pass_strategy_prioritizes_sharpe_then_annual_return(tmp_path):
+def test_select_best_pass_strategy_prefers_full_pass_within_sharpe_near_tie(tmp_path):
     session = tmp_path / "research" / "meta" / "session-a"
     session.mkdir(parents=True)
     _write_candidate(
@@ -110,7 +111,7 @@ def test_select_best_pass_strategy_prioritizes_sharpe_then_annual_return(tmp_pat
     )
     _write_candidate(
         session,
-        branch_id="same-sharpe-lower-annual-return",
+        branch_id="full-pass-lower-sharpe",
         round_id="r2",
         lo_adjusted=2.0,
         sharpe=2.4,
@@ -119,12 +120,13 @@ def test_select_best_pass_strategy_prioritizes_sharpe_then_annual_return(tmp_pat
     )
     _write_candidate(
         session,
-        branch_id="same-sharpe-higher-annual-return",
+        branch_id="near-pass-higher-annual-return",
         round_id="r3",
         lo_adjusted=1.9,
-        sharpe=2.4,
+        sharpe=2.5,
         annual_return=0.30,
         pass_score="3/4",
+        verdict="FAIL",
     )
     write_tsv_rows(
         session / "events.tsv",
@@ -137,12 +139,12 @@ def test_select_best_pass_strategy_prioritizes_sharpe_then_annual_return(tmp_pat
             },
             {
                 "event": "round_recorded",
-                "branch_id": "same-sharpe-lower-annual-return",
+                "branch_id": "full-pass-lower-sharpe",
                 "round_id": "r2",
             },
             {
                 "event": "round_recorded",
-                "branch_id": "same-sharpe-higher-annual-return",
+                "branch_id": "near-pass-higher-annual-return",
                 "round_id": "r3",
             },
         ],
@@ -151,18 +153,19 @@ def test_select_best_pass_strategy_prioritizes_sharpe_then_annual_return(tmp_pat
     selection = select_best_pass_strategy(session)
 
     assert selection.selected is not None
-    assert selection.selected.branch_id == "same-sharpe-higher-annual-return"
+    assert selection.selected.branch_id == "full-pass-lower-sharpe"
     assert tuple(SELECTION_METRIC_ORDER) == (
         "sharpe",
+        "near_tie_full_pass",
         "annual_return",
         "max_dd_abs",
         "pass_rate",
     )
     assert selection.selected.selection_metric_values["sharpe"] == 2.4
-    assert selection.selected.selection_metric_values["annual_return"] == 0.30
+    assert selection.selected.selection_metric_values["pass_rate"] == 1.0
 
 
-def test_select_best_validation_strategy_can_select_high_sharpe_fail(tmp_path):
+def test_select_best_validation_strategy_keeps_high_sharpe_when_gap_is_material(tmp_path):
     session = tmp_path / "research" / "meta" / "session-b"
     session.mkdir(parents=True)
     _write_candidate(
@@ -208,6 +211,87 @@ def test_select_best_validation_strategy_can_select_high_sharpe_fail(tmp_path):
     assert selection.selected.branch_id == "higher-sharpe-near-pass"
     assert selection.selected.edge_result["verdict"] == "FAIL"
     assert selection.selected.selection_metric_values["pass_rate"] == 8 / 9
+
+
+def test_select_best_strategy_near_tie_boundary_is_tenth_sharpe(tmp_path):
+    session = tmp_path / "research" / "meta" / "session-c"
+    session.mkdir(parents=True)
+    _write_candidate(
+        session,
+        branch_id="full-pass-boundary",
+        round_id="r1",
+        lo_adjusted=2.2,
+        sharpe=2.8,
+        annual_return=0.28,
+        pass_score="9/9",
+        verdict="PASS",
+    )
+    _write_candidate(
+        session,
+        branch_id="near-pass-top",
+        round_id="r2",
+        lo_adjusted=2.4,
+        sharpe=2.9,
+        annual_return=0.42,
+        pass_score="8/9",
+        verdict="FAIL",
+    )
+    write_tsv_rows(
+        session / "events.tsv",
+        EVENTS_HEADER,
+        [
+            {
+                "event": "round_recorded",
+                "branch_id": "full-pass-boundary",
+                "round_id": "r1",
+            },
+            {
+                "event": "round_recorded",
+                "branch_id": "near-pass-top",
+                "round_id": "r2",
+            },
+        ],
+    )
+
+    selection = select_best_pass_strategy(session)
+
+    assert selection.selected is not None
+    assert selection.selected.branch_id == "full-pass-boundary"
+
+
+def test_best_strategy_payload_includes_user_reply_reminder(tmp_path):
+    session = tmp_path / "research" / "meta" / "session-reminder"
+    session.mkdir(parents=True)
+    _write_candidate(
+        session,
+        branch_id="selected",
+        round_id="r1",
+        lo_adjusted=2.0,
+        sharpe=2.2,
+        annual_return=0.30,
+        pass_score="9/9",
+        verdict="PASS",
+    )
+    write_tsv_rows(
+        session / "events.tsv",
+        EVENTS_HEADER,
+        [
+            {
+                "event": "round_recorded",
+                "branch_id": "selected",
+                "round_id": "r1",
+            },
+        ],
+    )
+
+    payload = best_strategy_report_payload(session)
+
+    reminder = payload["userReplyReminder"]
+    assert reminder["sessionReviewEligible"] is True
+    assert "plain language" in reminder["plainLanguage"]
+    assert "PASS" in reminder["technicalDetails"]
+    assert "live quote" in reminder["technicalDetails"]
+    assert "session review page" in reminder["sessionReview"]
 
 
 def test_strategy_artifact_skip_line_keeps_session_view_language():
