@@ -1,8 +1,8 @@
 [project]
 name = "abel-invest"
 version = "3.7.2"
-description = "Abel strategy research skill for strategy discovery, causal-driver analysis, and investment strategy development."
-keywords = ["abel", "strategy-research", "strategy-discovery", "causal-ai", "investment-strategies", "ai-agents"]
+description = "Abel strategy research skill — causal-graph-driven trading-strategy discovery, candidate search, and Abel Edge gate validation for AI agents (research/validation, not order execution)."
+keywords = ["abel", "trade-anything", "strategy-research", "strategy-discovery", "causal-ai", "trading-strategy", "sharpe-ratio", "alpha-research", "agentic-quant", "ai-agents"]
 requires-python = ">=3.11"
 license = "MIT"
 dependencies = [

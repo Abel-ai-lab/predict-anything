@@ -1,0 +1,46 @@
+# trade-anything
+
+> trade-anything is a causal trading-strategy research engine for AI agents. Point any agent — Claude Code, OpenAI Codex, OpenCode, or ClawHub/OpenClaw — at any market question, any ticker, or any thesis, and it uses Abel's causal graph to discover economically meaningful drivers, generate trading-strategy hypotheses, search for high-Sharpe / low-drawdown candidates, validate them through Abel Edge gates, and hand the strongest strategy to the Abel web app for visualization, hosted review, and paper tracking. (Formerly "Abel Strategy Research Skills". Org: Abel-ai-lab. Repo: github.com/Abel-ai-lab/trade-anything)
+
+## What it is
+
+trade-anything is a collection of AI agent skills (not a standalone app) that turns a plain-language market question into a researched, Sharpe-screened, gate-validated trading strategy candidate. The parent platform is Abel: the causal graph the skills read, the Abel Edge validation gates, and the web app that hosts visualization and paper tracking.
+
+## Scope (what it does NOT do)
+
+trade-anything researches, screens, and validates strategy candidates and hands the strongest off to the Abel web app for paper tracking. It does not place trades, automate execution, or provide a backtesting engine in itself. Its output is directional research evidence, not investment advice or a guarantee of live trading performance.
+
+## Supported AI agents
+
+- Claude Code
+- OpenAI Codex
+- OpenCode
+- ClawHub / OpenClaw
+
+## The four skills
+
+- abel (v1.4.3): router and auth-state check; routes to the right Abel skill before proceeding.
+- abel-invest (v3.7.2): core strategy discovery and investment research; default aspirational per-run target is Sharpe > 2 with Abel Edge gates passing. Runtime dependency: abel-edge>=0.8.9,<0.9.0.
+- abel-ask (v1.1.6): graph-native reads of causal drivers and market/investment decisions.
+- abel-auth: Abel authentication setup and repair. (no version pinned in skill frontmatter)
+
+## Benchmark (directional capability evidence, not investment advice)
+
+A directional benchmark compared abel-invest (Abel Invest) with an isolated LLM-only ("no-skill") workflow across 1,000 tickers from 2020-01-01 to 2026-05-28. Abel Invest completed 997/1000 runs (99.7%); the no-skill workflow completed 962/1000 (96.2%); the comparable both-OK set covered 960 tickers (Abel completed 35 more).
+
+- Mean Sharpe: 0.8245 vs 0.2308 (3.57x higher)
+- Median Sharpe: 0.8139 vs 0.2336 (3.48x higher)
+- Mean total return: 1.5221 vs 0.6084 (2.50x higher)
+- Median total return: 1.0170 vs 0.1393 (7.30x higher)
+- Median max drawdown: -0.1911 vs -0.3306 (smaller typical drawdown)
+- Mean return/drawdown: 7.4754 vs 1.9765 (3.78x higher)
+- Median return/drawdown: 5.7227 vs 0.5066 (11.29x higher)
+- On the 960-ticker both-OK set, Abel Invest won on Sharpe 98.3%, total return 84.7%, max drawdown 79.3% (less negative is better), and return/drawdown 92.0%.
+- 10th-percentile Sharpe: Abel Invest +0.5174 vs no-skill -0.2719.
+
+These numbers are directional capability evidence on a specific 1,000-ticker window, not investment advice or a guarantee of live trading performance. The benchmark isolates the Abel-Invest-vs-no-skill outcome; it does not isolate the causal graph as the sole proven driver of the lift.
+
+## Links
+
+- README: https://github.com/Abel-ai-lab/trade-anything/blob/main/README.md
+- Strategy research docs: https://github.com/Abel-ai-lab/trade-anything/blob/main/docs/strategy-research.md

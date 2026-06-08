@@ -1,6 +1,6 @@
-# Contributing to Abel Strategy Research Skills
+# Contributing to trade-anything
 
-Thank you for improving Abel Strategy Research Skills.
+Thank you for improving trade-anything.
 
 Good contributions include:
 

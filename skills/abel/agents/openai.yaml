@@ -1,4 +1,4 @@
 interface:
-  display_name: "Abel"
-  short_description: "AI agent skills for strategy discovery with Abel: explore market ideas, analyze causal drivers, and develop investment strategies."
+  display_name: "trade-anything"
+  short_description: "Causal trading-strategy research engine for AI agents: point any agent at any ticker or market question to discover causal drivers, screen for high Sharpe / low drawdown, and validate strategy candidates. Research and paper tracking, not order execution."
   default_prompt: "Use $abel to route this request to the right Abel skill."

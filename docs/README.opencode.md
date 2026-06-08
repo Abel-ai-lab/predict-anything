@@ -1,4 +1,4 @@
-# Abel Strategy Research Skills for OpenCode
+# trade-anything for OpenCode
 
 Install Abel strategy research workflows through the OpenCode plugin config.
 
@@ -13,7 +13,7 @@ Add Abel to your global OpenCode config:
 
 ```json
 {
-  "plugin": ["abel@git+https://github.com/Abel-ai-lab/abel-strategy-research-skills.git"]
+  "plugin": ["abel@git+https://github.com/Abel-ai-lab/trade-anything.git"]
 }
 ```
 
@@ -23,7 +23,7 @@ Add Abel to the current project's `opencode.json`:
 
 ```json
 {
-  "plugin": ["abel@git+https://github.com/Abel-ai-lab/abel-strategy-research-skills.git"]
+  "plugin": ["abel@git+https://github.com/Abel-ai-lab/trade-anything.git"]
 }
 ```
 
@@ -33,7 +33,7 @@ To pin a specific version, branch, or tag, append it after `#`:
 
 ```json
 {
-  "plugin": ["abel@git+https://github.com/Abel-ai-lab/abel-strategy-research-skills.git#v1.4.2"]
+  "plugin": ["abel@git+https://github.com/Abel-ai-lab/trade-anything.git#v1.4.2"]
 }
 ```
 

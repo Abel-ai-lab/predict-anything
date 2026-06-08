@@ -1,4 +1,4 @@
-# Abel Strategy Research Skills for Claude Code
+# trade-anything for Claude Code
 
 Use Claude Code to discover strategies with Abel, analyze causal drivers, and support investment research workflows.
 
@@ -7,7 +7,7 @@ Use Claude Code to discover strategies with Abel, analyze causal drivers, and su
 Tell Claude Code:
 
 ```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Abel-ai-lab/abel-strategy-research-skills/refs/heads/main/.claude/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/Abel-ai-lab/trade-anything/refs/heads/main/.claude/INSTALL.md
 ```
 
 ## Manual Installation
@@ -27,17 +27,17 @@ Choose one install scope:
 1. Clone the repo:
 
    ```bash
-   git clone https://github.com/Abel-ai-lab/abel-strategy-research-skills.git ~/.claude/abel-strategy-research-skills
+   git clone https://github.com/Abel-ai-lab/trade-anything.git ~/.claude/trade-anything
    ```
 
 2. Create Claude personal skill symlinks:
 
    ```bash
    mkdir -p ~/.claude/skills
-   ln -s ~/.claude/abel-strategy-research-skills/skills/abel ~/.claude/skills/abel
-   ln -s ~/.claude/abel-strategy-research-skills/skills/abel-ask ~/.claude/skills/abel-ask
-   ln -s ~/.claude/abel-strategy-research-skills/skills/abel-auth ~/.claude/skills/abel-auth
-   ln -s ~/.claude/abel-strategy-research-skills/skills/abel-invest ~/.claude/skills/abel-invest
+   ln -s ~/.claude/trade-anything/skills/abel ~/.claude/skills/abel
+   ln -s ~/.claude/trade-anything/skills/abel-ask ~/.claude/skills/abel-ask
+   ln -s ~/.claude/trade-anything/skills/abel-auth ~/.claude/skills/abel-auth
+   ln -s ~/.claude/trade-anything/skills/abel-invest ~/.claude/skills/abel-invest
    ```
 
 3. Before starting a new session, either:
@@ -58,17 +58,17 @@ Run these commands from the project root:
 
    ```bash
    mkdir -p .claude
-   git clone https://github.com/Abel-ai-lab/abel-strategy-research-skills.git .claude/abel-strategy-research-skills
+   git clone https://github.com/Abel-ai-lab/trade-anything.git .claude/trade-anything
    ```
 
 2. Create project-local skill symlinks:
 
    ```bash
    mkdir -p .claude/skills
-   ln -s ../abel-strategy-research-skills/skills/abel .claude/skills/abel
-   ln -s ../abel-strategy-research-skills/skills/abel-ask .claude/skills/abel-ask
-   ln -s ../abel-strategy-research-skills/skills/abel-auth .claude/skills/abel-auth
-   ln -s ../abel-strategy-research-skills/skills/abel-invest .claude/skills/abel-invest
+   ln -s ../trade-anything/skills/abel .claude/skills/abel
+   ln -s ../trade-anything/skills/abel-ask .claude/skills/abel-ask
+   ln -s ../trade-anything/skills/abel-auth .claude/skills/abel-auth
+   ln -s ../trade-anything/skills/abel-invest .claude/skills/abel-invest
    ```
 
 3. Optional project-local auth file:
@@ -83,7 +83,7 @@ Existing installs under `~/.claude/abel-skills` or `.claude/abel-skills` can kee
 
 ```bash
 cd ~/.claude/abel-skills
-git remote set-url origin https://github.com/Abel-ai-lab/abel-strategy-research-skills.git
+git remote set-url origin https://github.com/Abel-ai-lab/trade-anything.git
 ```
 
 ### After Either Install

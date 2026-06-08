@@ -1,6 +1,6 @@
 # Abel Strategy Research
 
-Abel Strategy Research Skills are AI agent skills for strategy discovery with Abel: explore market ideas, analyze causal drivers, and develop investment strategies.
+trade-anything are AI agent skills for strategy discovery with Abel: explore market ideas, analyze causal drivers, and develop investment strategies.
 
 ## Strategy Discovery, Not Trade Execution
 

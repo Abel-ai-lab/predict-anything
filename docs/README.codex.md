@@ -1,4 +1,4 @@
-# Abel Strategy Research Skills for Codex
+# trade-anything for Codex
 
 Use Codex to discover strategies with Abel, analyze causal drivers, and support strategy research workflows.
 
@@ -7,7 +7,7 @@ Use Codex to discover strategies with Abel, analyze causal drivers, and support 
 Tell Codex:
 
 ```text
-Fetch and follow instructions from https://raw.githubusercontent.com/Abel-ai-lab/abel-strategy-research-skills/refs/heads/main/.codex/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/Abel-ai-lab/trade-anything/refs/heads/main/.codex/INSTALL.md
 ```
 
 ## Manual Installation
@@ -27,18 +27,18 @@ Choose one install scope:
 1. Clone the repo:
 
    ```bash
-   git clone https://github.com/Abel-ai-lab/abel-strategy-research-skills.git ~/.codex/abel-strategy-research-skills
+   git clone https://github.com/Abel-ai-lab/trade-anything.git ~/.codex/trade-anything
    ```
 
 2. Create the skills symlink:
 
    ```bash
    mkdir -p ~/.agents/skills
-   ln -s ~/.codex/abel-strategy-research-skills/skills ~/.agents/skills/abel
+   ln -s ~/.codex/trade-anything/skills ~/.agents/skills/abel
    ```
 
 3. Before restart, either:
-   - store an existing API key in `~/.codex/abel-strategy-research-skills/skills/abel-auth/.env.skill`, or
+   - store an existing API key in `~/.codex/trade-anything/skills/abel-auth/.env.skill`, or
    - plan to run `abel-auth` as the first action after restart
 
    Example:
@@ -55,20 +55,20 @@ Run these commands from the project root:
 
    ```bash
    mkdir -p .agents
-   git clone https://github.com/Abel-ai-lab/abel-strategy-research-skills.git .agents/abel-strategy-research-skills
+   git clone https://github.com/Abel-ai-lab/trade-anything.git .agents/trade-anything
    ```
 
 2. Create the project-local skills symlink:
 
    ```bash
    mkdir -p .agents/skills
-   ln -s ../abel-strategy-research-skills/skills .agents/skills/abel
+   ln -s ../trade-anything/skills .agents/skills/abel
    ```
 
 3. Optional project-local auth file:
 
    ```text
-   .agents/abel-strategy-research-skills/skills/abel-auth/.env.skill
+   .agents/trade-anything/skills/abel-auth/.env.skill
    ```
 
 ### Existing Installs
@@ -77,7 +77,7 @@ Existing installs under `~/.codex/abel-skills` or `.agents/abel-skills` can keep
 
 ```bash
 cd ~/.codex/abel-skills
-git remote set-url origin https://github.com/Abel-ai-lab/abel-strategy-research-skills.git
+git remote set-url origin https://github.com/Abel-ai-lab/trade-anything.git
 ```
 
 ### After Either Install
@@ -96,13 +96,13 @@ git remote set-url origin https://github.com/Abel-ai-lab/abel-strategy-research-
 `abel-auth` is the canonical auth owner. In the global install, its local `.env.skill` file is the main shared auth location for the strategy research skill collection:
 
 ```text
-~/.codex/abel-strategy-research-skills/skills/abel-auth/.env.skill
+~/.codex/trade-anything/skills/abel-auth/.env.skill
 ```
 
 In the project-level install, the corresponding path is:
 
 ```text
-.agents/abel-strategy-research-skills/skills/abel-auth/.env.skill
+.agents/trade-anything/skills/abel-auth/.env.skill
 ```
 
 `abel-ask` and `abel-invest` also look for collection-level shared auth in sibling skill directories, so one successful `abel-auth` setup is enough for normal live use.

@@ -117,11 +117,12 @@ Always:
 - Reuse existing Abel auth first. If live access is missing, use `abel-auth` and
   rerun `doctor`.
 - Report to the user with the current workspace/session/branch path, doctor
-  status, blockers, what evidence exists, and the next action you will take.
+  status, blockers, what evidence exists, whether scratch work belongs under
+  `research/<ticker>/<session_id>/scratch/`, and the next action you will take.
 - Treat `agent_context.md` as the compact factual resume surface,
   `exploration_path.md` as the human-facing chosen-path and Edge-feedback log.
-- On a fresh or unfamiliar ticker, use the compact first-look scout in
-  `experiment-loop.md` before the first broad recorded candidate unless the user
+- On a fresh or unfamiliar ticker, use the compact first-look data scout in
+  `experiment-loop.md` before the first serious recorded alpha candidate unless the user
   gave a narrow path or continuation. Its output should be a ranked short list
   of scored candidate shapes, not only diagnostics or an analysis memo.
 
@@ -190,9 +191,9 @@ Core search invariants:
   denoise, node subsets, lags, regimes, sizing, filters, and ensembles.
 - Target-only work is a baseline, seed, ablation, or competitor. A
   graph-supported branch is not automatically data-driven: runtime graph reads
-  prove input realization, not construction breadth. Hand-written
-  single-mechanism branches are diagnostics, controls, ablations, or refinements
-  around empirical construction, not the default search posture when live
+  prove input realization, not construction breadth.
+- Hand-written single-mechanism branches are diagnostics, controls, ablations,
+  or refinements around empirical construction, not the default search posture when live
   graph-derived data is available.
 - A hard user metric target (Sharpe / MaxDD / PnL) is an optimization request.
   Search is expected: use target/baseline context, graph-derived features,

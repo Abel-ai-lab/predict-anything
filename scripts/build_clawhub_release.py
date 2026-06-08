@@ -38,17 +38,19 @@ If the user installs Abel, asks to connect Abel, or the workflow is missing live
 """
 
 CLAWHUB_OPENAI_YAML = """interface:
-  display_name: "Abel Strategy Research Skills"
-  short_description: "AI agent skills for strategy discovery with Abel: explore market ideas, analyze causal drivers, and develop investment strategies."
+  display_name: "trade-anything"
+  short_description: "Causal trading-strategy research engine for AI agents: point any agent at any ticker or market question to discover causal drivers, screen for high Sharpe / low drawdown, and validate strategy candidates. Research and paper tracking, not order execution."
   default_prompt: "Use $abel to route this request to the right Abel skill."
 """
 
 OPENCLAW_PLUGIN_MANIFEST = {
     "id": "abel",
-    "name": "Abel Strategy Research Skills",
+    "name": "trade-anything",
     "description": (
-        "AI agent skills for strategy discovery with Abel: explore market ideas, "
-        "analyze causal drivers, and develop investment strategies."
+        "Causal trading-strategy research engine for AI agents: point any agent at "
+        "any ticker or market question to discover causal drivers, screen for high "
+        "Sharpe / low drawdown, and validate strategy candidates. Research and "
+        "paper tracking, not order execution."
     ),
     "skills": [f"./skills/{skill_name}" for skill_name in OPENCLAW_MANIFEST_SKILL_NAMES],
     "configSchema": {
@@ -61,8 +63,8 @@ OPENCLAW_PLUGIN_MANIFEST = {
 PACKAGE_JSON_BASE = {
     "name": "abel",
     "description": (
-        "Abel Strategy Research Skills package for OpenClaw with routing, auth, "
-        "strategy discovery, and causal-driver analysis."
+        "trade-anything — Abel strategy research skills package for OpenClaw with "
+        "routing, auth, strategy discovery, and causal-driver analysis."
     ),
     "type": "module",
     "private": False,
@@ -81,8 +83,8 @@ OPENCLAW_EXTENSION_ENTRY = """import { definePluginEntry } from "openclaw/plugin
 
 export default definePluginEntry({
   id: "abel",
-  name: "Abel Strategy Research Skills",
-  description: "Plugin-shipped Abel strategy research skills bundle.",
+  name: "trade-anything",
+  description: "Plugin-shipped trade-anything (Abel strategy research) skills bundle.",
   register(_api) {},
 });
 """
