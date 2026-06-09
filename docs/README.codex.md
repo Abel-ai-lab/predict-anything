@@ -1,6 +1,6 @@
 # Predict Anything for Codex
 
-Use Codex to discover strategies with Predict Anything by Abel, analyze causal drivers, and support strategy research workflows.
+Use Codex to ask market questions, test strategy ideas, validate candidates, and track research with Predict Anything by Abel.
 
 ## Quick Install
 

@@ -39,7 +39,7 @@ If the user installs Abel, asks to connect Abel, or the workflow is missing live
 
 CLAWHUB_OPENAI_YAML = """interface:
   display_name: "Predict Anything"
-  short_description: "AI agent skills for strategy discovery with Predict Anything by Abel: explore market ideas, analyze causal drivers, and develop investment strategies."
+  short_description: "AI agent skills for Predict Anything by Abel: ask market questions, test strategy ideas, validate candidates, and track research without placing trades."
   default_prompt: "Use $abel to route this request to the right Abel skill."
 """
 
@@ -47,8 +47,8 @@ OPENCLAW_PLUGIN_MANIFEST = {
     "id": "abel",
     "name": "Predict Anything",
     "description": (
-        "AI agent skills for strategy discovery with Predict Anything by Abel: explore market ideas, "
-        "analyze causal drivers, and develop investment strategies."
+        "AI agent skills for Predict Anything by Abel: ask market questions, "
+        "test strategy ideas, validate candidates, and track research without placing trades."
     ),
     "skills": [f"./skills/{skill_name}" for skill_name in OPENCLAW_MANIFEST_SKILL_NAMES],
     "configSchema": {
@@ -62,7 +62,7 @@ PACKAGE_JSON_BASE = {
     "name": "abel",
     "description": (
         "Predict Anything package for OpenClaw with routing, auth, "
-        "strategy discovery, and causal-driver analysis."
+        "prediction research, and strategy validation."
     ),
     "type": "module",
     "private": False,
@@ -82,7 +82,7 @@ OPENCLAW_EXTENSION_ENTRY = """import { definePluginEntry } from "openclaw/plugin
 export default definePluginEntry({
   id: "abel",
   name: "Predict Anything",
-  description: "Plugin-shipped Predict Anything strategy research skills bundle.",
+  description: "Plugin-shipped Predict Anything prediction and strategy research bundle.",
   register(_api) {},
 });
 """

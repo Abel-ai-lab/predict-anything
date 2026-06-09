@@ -1,6 +1,6 @@
 # Installing Predict Anything for Claude Code
 
-Enable Predict Anything strategy discovery workflows in Claude Code via skill symlinks.
+Enable Predict Anything prediction and strategy research workflows in Claude Code via skill symlinks.
 
 Ask user to choose one install scope:
 

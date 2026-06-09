@@ -1,6 +1,6 @@
 # Predict Anything for Claude Code
 
-Use Claude Code to discover strategies with Predict Anything by Abel, analyze causal drivers, and support investment research workflows.
+Use Claude Code to ask market questions, test strategy ideas, validate candidates, and track research with Predict Anything by Abel.
 
 ## Quick Install
 

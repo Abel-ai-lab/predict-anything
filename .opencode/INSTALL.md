@@ -1,6 +1,6 @@
 # Installing Predict Anything for OpenCode
 
-Enable Predict Anything strategy discovery workflows through the OpenCode plugin config.
+Enable Predict Anything prediction and strategy research workflows through the OpenCode plugin config.
 
 Ask user to choose one install scope:
 

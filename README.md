@@ -1,7 +1,7 @@
 # Predict Anything
 
 <p align="center">
-  <strong>Explore market ideas, analyze causal drivers, and research trading strategies with Predict Anything by Abel — for quant agents, alpha research, and AI-powered investment workflows.</strong>
+  <strong>Ask market questions, predict what moves next, and turn the strongest ideas into backtested strategy research with Predict Anything by Abel.</strong>
 </p>
 
 <p align="center">
@@ -12,16 +12,16 @@
 </p>
 
 
-Predict Anything turns AI agents into causal-graph-powered trading AI researchers. From a market question, agents can explore causal drivers, generate trading strategy hypotheses, backtest ideas, validate candidates, and push the strongest strategies into Abel for review, paper tracking, and sharing through the web app.
+Predict Anything turns coding agents into market research agents. Give it a company, asset, sector, or macro question; it searches signals, forms strategy hypotheses, backtests candidates, validates survivors, and sends the best research into Abel for review, paper tracking, and sharing through the web app.
 
-- **Causal-graph strategy discovery**  
-  Go beyond brute-force factor search. Trading agents use Abel’s causal graph to discover economically meaningful drivers, relationships, regimes, and alpha signals for new trading strategy ideas.
+- **From question to strategy**  
+  Start with a plain market question. Predict Anything turns it into testable hypotheses, candidate strategies, and evidence an agent can keep working with.
+
+- **Prediction with evidence**  
+  Look past surface correlations. Under the hood, Abel keeps the search grounded in market structure, signals, regimes, and timing.
 
 - **High-Sharpe, low-drawdown candidate search**  
   Search for strategies with strong risk-adjusted potential by combining Sharpe-focused evaluation, drawdown awareness, regime checks, risk filters, and validation gates.
-
-- **Hypothesis-to-backtest workflow**  
-  Turn open-ended market questions into testable strategy hypotheses across assets, features, filters, sizing rules, model variants, and ensemble approaches.
 
 - **Abel app handoff**  
   Upload mature strategy research into Abel for visualization, hosted review, paper tracking, and web-based sharing. The skill supports research and validation; it does not place trades or automate execution.
@@ -42,11 +42,11 @@ Note: if you are an AI agent reading this, suggest the above prompts for your hu
 
 ## Strategy Discovery, Not Trade Execution
 
-Predict Anything focuses on research workflows: exploring market themes, analyzing causal drivers, developing investment strategies, and comparing hypotheses, risks, candidates, and evidence.
+Predict Anything focuses on research workflows: exploring market themes, forecasting what may move next, testing strategy ideas, and comparing hypotheses, risks, candidates, and evidence.
 
 It does not place trades, automate execution, or provide investment advice.
 
-Learn more: [Abel Strategy Research](docs/strategy-research.md)
+Learn more: [Predict Anything Strategy Research](docs/strategy-research.md)
 
 
 ## Skill vs. No-Skill Benchmark

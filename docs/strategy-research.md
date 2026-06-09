@@ -1,13 +1,13 @@
 # Predict Anything Strategy Research
 
-Predict Anything is an AI agent skill collection for strategy discovery with Abel: explore market ideas, analyze causal drivers, and develop investment strategies.
+Predict Anything is an AI agent skill collection for prediction-first strategy research with Abel: ask market questions, test strategy ideas, validate candidates, and track the evidence.
 
 ## Strategy Discovery, Not Trade Execution
 
 These skills are designed for research workflows:
 
 - exploring market themes
-- analyzing causal drivers
+- forecasting what may move next
 - developing investment strategy hypotheses
 - comparing evidence, risks, and candidates
 - preparing next research steps
@@ -22,13 +22,13 @@ Ask an agent to explore a natural-language market question, such as semiconducto
 
 ### Develop An Investment Strategy
 
-Use Abel to turn a company, sector, or market theme into a strategy thesis with drivers, risks, and evidence.
+Use Abel to turn a company, sector, or market theme into a strategy thesis with signals, risks, and evidence.
 
 ### Continue Strategy Research
 
-Resume prior Abel research, inspect recorded drivers and risks, and decide the next research step.
+Resume prior Abel research, inspect recorded signals and risks, and decide the next research step.
 
-### Analyze Causal Drivers
+### Analyze Market Drivers
 
 Analyze companies, sectors, themes, and market drivers before deciding whether a strategy idea deserves deeper research.
 
@@ -38,7 +38,7 @@ Organize hypotheses, candidates, open risks, missing evidence, and follow-up que
 
 ## Main Skills
 
-- `abel`: routes strategy discovery, causal-driver analysis, investment research, and auth recovery
+- `abel`: routes strategy discovery, market analysis, investment research, and auth recovery
 - `abel-invest`: core strategy discovery and investment research skill
-- `abel-ask`: graph-native analysis of causal drivers and market decisions
+- `abel-ask`: analysis of market drivers, candidate lists, and decisions
 - `abel-auth`: Abel authentication setup and repair

@@ -1,6 +1,6 @@
 # Installing Predict Anything for Codex
 
-Enable Predict Anything strategy discovery workflows in Codex via native skill discovery.
+Enable Predict Anything prediction and strategy research workflows in Codex via native skill discovery.
 
 Ask user to choose one install scope:
 
