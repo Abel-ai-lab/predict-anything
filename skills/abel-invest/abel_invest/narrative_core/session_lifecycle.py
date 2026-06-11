@@ -119,6 +119,7 @@ def render_data_led_start_lines(session: Path) -> list[str]:
         f"{command_prefix} init-branch --session {session} --branch-id <target-control-branch>",
         "edit branch.yaml with objective, selected inputs, search width when applicable, and validation scope",
         "spend about 5 minutes on the first-look scout: score plausible target, graph, and construction shapes, then rank what looks worth formal validation before broad recorded work",
+        "let the scout script run up to about 5 minutes; do not stop it early while it is still within that window",
         "let data decide how to express graph-derived information: features, models, subsets, lags, regimes, sizing, filters, or ensembles",
         "use target-only as baseline, seed, ablation, or competitor; simple hand-written rules are diagnostics or refinements, not the default main lane",
         "run broad candidates only after data/cache are prepared and the scout shape is understood",

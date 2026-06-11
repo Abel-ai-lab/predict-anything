@@ -124,9 +124,10 @@ Always:
   `experiment-loop.md` before the first serious recorded alpha candidate unless
   the user gave a narrow path or continuation. Spend about 5 minutes on the
   scout: score plausible target, graph, and construction shapes, then rank what
-  looks worth formal validation before broad recorded work. Put temporary scout
-  scripts or summaries under `research/<ticker>/<session_id>/scratch/` when
-  files are useful.
+  looks worth formal validation before broad recorded work. Let the scout script
+  run up to about 5 minutes; do not stop it early while it is still within that
+  window. Put temporary scout scripts or summaries under
+  `research/<ticker>/<session_id>/scratch/` when files are useful.
 
 Never:
 

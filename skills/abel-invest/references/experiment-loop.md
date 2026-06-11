@@ -70,6 +70,9 @@ then rank what looks worth formal validation before broad recorded work. Use
 objective metrics such as
 Sharpe, total return, drawdown, and turnover:
 
+Let the scout script run up to about 5 minutes; do not stop it early while it is
+still within that window.
+
 - target-only scored baselines: trend, momentum, reversal, and volatility
   regime
 - graph candidate shapes: lead/lag/sign, node subset, transformation, spread,
