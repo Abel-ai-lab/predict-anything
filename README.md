@@ -49,24 +49,38 @@ It does not place trades, automate execution, or provide investment advice.
 Learn more: [Predict Anything Strategy Research](docs/strategy-research.md)
 
 
-## Skill vs. No-Skill Benchmark
+## Four-Arm Capability Benchmark
 
-A directional benchmark compared Abel Invest with an isolated LLM-only workflow on `1,000` tickers from `2020-01-01` to `2026-05-28`. Abel Invest completed `997 / 1000` runs, while the no-skill workflow completed `962 / 1000`; the comparable both-OK set covered `960` tickers.
+A June 2026 strict four-arm benchmark isolated two capabilities over `1,000`
+tickers: Abel Invest skill use and Abel causal graph access. Each arm received
+the same strategy-discovery objective and differed only in the capabilities
+made available to the agent.
 
-| Measure | Abel Invest | No-skill LLM | Readout |
-| --- | ---: | ---: | --- |
-| OK coverage | `997 / 1000` (`99.7%`) | `962 / 1000` (`96.2%`) | Abel completed `35` more tickers |
-| Mean Sharpe | `0.8245` | `0.2308` | `3.57x` higher |
-| Median Sharpe | `0.8139` | `0.2336` | `3.48x` higher |
-| Mean total return | `1.5221` | `0.6084` | `2.50x` higher |
-| Median total return | `1.0170` | `0.1393` | `7.30x` higher |
-| Median max drawdown | `-0.1911` | `-0.3306` | smaller typical drawdown |
-| Mean return/drawdown | `7.4754` | `1.9765` | `3.78x` higher |
-| Median return/drawdown | `5.7227` | `0.5066` | `11.29x` higher |
+| Arm | Abel Invest skill | Causal graph | OK coverage | Mean Sharpe | Median Sharpe | P10 Sharpe | Median max DD | Median return/DD | Mean candidates |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Skill + graph | `yes` | `yes` | `835 / 1000` (`83.5%`) | `1.0245` | `1.0099` | `0.7089` | `-0.1666` | `8.1007` | `207.0` |
+| Skill only | `yes` | `no` | `998 / 1000` (`99.8%`) | `0.8194` | `0.8088` | `0.5126` | `-0.1916` | `5.7444` | `40.0` |
+| Graph only | `no` | `yes` | `959 / 1000` (`95.9%`) | `0.9514` | `0.9374` | `0.6461` | `-0.2527` | `9.5752` | `198.2` |
+| No skill / no graph | `no` | `no` | `959 / 1000` (`95.9%`) | `0.7617` | `0.7530` | `0.4686` | `-0.2616` | `5.7652` | `40.0` |
 
-On the both-OK set, Abel Invest won on Sharpe (`98.3%`), total return (`84.7%`), max drawdown (`79.3%`, less negative is better), and return/drawdown (`92.0%`). Lower-tail behavior also improved: Abel Invest's 10th percentile Sharpe was positive at `0.5174`, while the no-skill workflow was `-0.2719`.
+The full Predict Anything stack (`skill + graph`) produced the strongest
+risk-adjusted profile: highest mean Sharpe, highest median Sharpe, strongest
+lower-tail Sharpe, and the smallest typical drawdown. Against the pure control
+on the all-four-OK paired set (`803` tickers), it won on Sharpe for
+`710 / 803` tickers (`88.4%`), reduced drawdown for `583 / 803` (`72.6%`, less
+negative is better), and won on return/drawdown for `533 / 795` defined pairs
+(`67.0%`).
 
-This benchmark is directional capability evidence, not investment advice or a guarantee of live trading performance.
+The factor isolation is the main capability evidence: with graph held fixed,
+the skill improved Sharpe and drawdown control; with skill held fixed, graph
+access raised mean Sharpe by `+0.2125` and expanded candidate search from `40.0`
+to `207.0` mean candidates. Isolation checks passed across all `100` chunks in
+each arm, with `abel_invest_module_leak_count=0` and no forbidden-host leaks.
+
+Read the detailed benchmark: [Four-Arm Abel Invest Capability Benchmark](docs/four-arm-benchmark.md).
+
+Backtests and benchmark comparisons are research artifacts, not investment
+advice or guarantees of live trading performance.
 
 ## Installation
 

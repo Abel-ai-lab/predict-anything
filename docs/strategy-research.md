@@ -36,6 +36,16 @@ Analyze companies, sectors, themes, and market drivers before deciding whether a
 
 Organize hypotheses, candidates, open risks, missing evidence, and follow-up questions for an analyst or agent workflow.
 
+## Benchmark Evidence
+
+The June 2026 four-arm benchmark isolates Abel Invest skill use and Abel causal
+graph access across `1,000` selected tickers. The full Predict Anything stack
+(`skill + graph`) delivered the strongest risk-adjusted profile: highest mean
+Sharpe, highest median Sharpe, strongest 10th-percentile Sharpe, and the
+smallest typical drawdown.
+
+Read the detailed results: [Four-Arm Abel Invest Capability Benchmark](four-arm-benchmark.md).
+
 ## Main Skills
 
 - `abel`: routes strategy discovery, market analysis, investment research, and auth recovery
