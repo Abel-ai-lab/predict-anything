@@ -1,4 +1,4 @@
 interface:
-  display_name: "Predict Anything"
+  display_name: "Abel"
   short_description: "AI agent skills for Predict Anything by Abel: ask market questions, test strategy ideas, validate candidates, and track research without placing trades."
   default_prompt: "Use $abel to route this request to the right Abel skill."
