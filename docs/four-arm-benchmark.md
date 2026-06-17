@@ -21,6 +21,29 @@ breadth.
 | Skill only | `yes` | `no` | Abel Invest workflow without causal graph context. |
 | No skill / no graph | `no` | `no` | Isolated target-only baseline. |
 
+## Capability Ladder
+
+The benchmark suite should be read as a capability ladder, not as a single
+weak-prompt comparison. The earliest strict LLM-only control asked the model to
+select from summary statistics without running an empirical candidate grid. The
+later four-arm no-skill/no-graph baseline is intentionally stronger: it scores
+the target ticker's own historical candidate families while still withholding
+both Abel Invest workflow instructions and causal graph access.
+
+| Ladder step | What changed | Mean Sharpe | Median Sharpe | P10 Sharpe | Median max DD | Median Return/DD | Mean candidates |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Original strict LLM-only no skill / no graph | LLM chooses from summary stats only; no empirical candidate grid | `0.2016` | `0.2205` | `-0.3199` | `-0.3184` | `0.4487` | `40.0` |
+| Four-arm no skill / no graph target-history baseline | Scores deterministic target-history candidates while keeping skill and graph disabled | `0.7617` | `0.7530` | `0.4686` | `-0.2616` | `5.7652` | `40.0` |
+| Graph only | Adds causal graph candidate expansion without Abel Invest workflow instructions | `0.9514` | `0.9374` | `0.6461` | `-0.2527` | `9.5752` | `198.2` |
+| Skill only | Adds Abel Invest workflow discipline without causal graph access | `0.8194` | `0.8088` | `0.5126` | `-0.1916` | `5.7444` | `40.0` |
+| Skill + graph | Combines Abel Invest workflow with causal graph candidate expansion | `1.0245` | `1.0099` | `0.7089` | `-0.1666` | `8.1007` | `207.0` |
+
+This ladder is why the two no-skill/no-graph Sharpe numbers differ. The
+`0.2016` result measures an LLM-only strategy pick without candidate scoring.
+The `0.7617` result is the stricter four-arm control, where the runner evaluates
+`40` target-history candidates but is still isolated from Abel Invest skill
+instructions and from causal graph context.
+
 ## Arm-Level Metrics
 
 | Arm | Mean Sharpe | Median Sharpe | Std Sharpe | P10 Sharpe | P90 Sharpe | Mean total return | Median total return | Mean max DD | Median max DD | Mean Return/DD | Median Return/DD | Mean candidates |
