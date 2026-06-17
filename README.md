@@ -51,11 +51,10 @@ Learn more: [Abel Strategy Research](docs/strategy-research.md)
 
 ## Skill vs. No-Skill Benchmark
 
-A directional benchmark compared Abel Invest with an isolated LLM-only workflow on `1,000` tickers from `2020-01-01` to `2026-05-28`. Abel Invest completed `997 / 1000` runs, while the no-skill workflow completed `962 / 1000`; the comparable both-OK set covered `960` tickers.
+A directional benchmark compared Abel Invest with an isolated LLM-only workflow on `1,000` tickers from `2020-01-01` to `2026-05-28`.
 
 | Measure | Abel Invest | No-skill LLM | Readout |
 | --- | ---: | ---: | --- |
-| OK coverage | `997 / 1000` (`99.7%`) | `962 / 1000` (`96.2%`) | Abel completed `35` more tickers |
 | Mean Sharpe | `0.8245` | `0.2308` | `3.57x` higher |
 | Median Sharpe | `0.8139` | `0.2336` | `3.48x` higher |
 | Mean total return | `1.5221` | `0.6084` | `2.50x` higher |
@@ -64,7 +63,7 @@ A directional benchmark compared Abel Invest with an isolated LLM-only workflow 
 | Mean return/drawdown | `7.4754` | `1.9765` | `3.78x` higher |
 | Median return/drawdown | `5.7227` | `0.5066` | `11.29x` higher |
 
-On the both-OK set, Abel Invest won on Sharpe (`98.3%`), total return (`84.7%`), max drawdown (`79.3%`, less negative is better), and return/drawdown (`92.0%`). Lower-tail behavior also improved: Abel Invest's 10th percentile Sharpe was positive at `0.5174`, while the no-skill workflow was `-0.2719`.
+In paired comparisons, Abel Invest won on Sharpe (`98.3%`), total return (`84.7%`), max drawdown (`79.3%`, less negative is better), and return/drawdown (`92.0%`). Lower-tail behavior also improved: Abel Invest's 10th percentile Sharpe was positive at `0.5174`, while the no-skill workflow was `-0.2719`.
 
 This benchmark is directional capability evidence, not investment advice or a guarantee of live trading performance.
 
