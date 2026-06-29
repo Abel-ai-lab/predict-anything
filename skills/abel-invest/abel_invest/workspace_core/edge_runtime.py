@@ -101,7 +101,12 @@ def apply_workspace_env(
     environ: dict[str, str] | None = None,
     override: bool = False,
 ) -> dict[str, str]:
-    """Apply workspace ``.env`` Abel variables to an environment mapping.
+    """Apply only workspace ``.env`` Abel variables to an environment mapping.
+
+    This is retained for compatibility with callers that explicitly need the
+    raw workspace override layer. Normal Abel Invest runtime paths should use
+    ``apply_effective_abel_env`` or ``build_workspace_runtime_env`` so shared
+    ``abel-auth/.env.skill`` values participate in the effective environment.
 
     The default mirrors common dotenv behavior: workspace values fill missing
     variables while explicit process values keep precedence.
