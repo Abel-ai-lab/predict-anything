@@ -308,7 +308,7 @@ def test_init_session_without_workspace_refuses_local_research_fallback(
     assert "Traceback" not in captured.err
     assert "Error: No Abel strategy discovery workspace" in captured.err
     assert "Next step:" in captured.err
-    assert "workspace context --path . --json" in captured.err
+    assert "active Abel Invest skill bootstrap shim" in captured.err
     assert not (tmp_path / "research").exists()
 
 

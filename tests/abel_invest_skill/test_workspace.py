@@ -1,23 +1,17 @@
 from __future__ import annotations
 
-import argparse
-import json
 from pathlib import Path
 
 import pytest
 
-from . import api as strategy_api
 from abel_invest import __version__ as ABEL_INVEST_VERSION
-from abel_invest.narrative_core.command_handlers import workspace as workspace_handlers
 from abel_invest.narrative_core.session_lifecycle import resolve_workspace_arg_path
-from abel_invest.workspace_core.env import build_local_install_command, resolve_alpha_source
 from abel_invest.workspace_core.workspace import (
     WORKSPACE_AGENTS_GUIDE_SCHEMA,
     build_default_manifest,
     refresh_generated_workspace_files,
     render_workspace_status,
     scaffold_workspace,
-    workspace_agents_status,
     workspace_generated_files_status,
 )
 
@@ -33,7 +27,7 @@ def test_scaffold_workspace_writes_alpha_owned_boundary_guidance(tmp_path: Path)
     assert agents.startswith(
         f"<!-- {WORKSPACE_AGENTS_GUIDE_SCHEMA} version={ABEL_INVEST_VERSION} -->"
     )
-    assert workspace_agents_status(root)["status"] == "current"
+    assert workspace_generated_files_status(root)["files"]["AGENTS.md"]["status"] == "current"
     assert "This workspace is for alpha-managed strategy search." in readme
     assert "Do not run `abel-edge init` inside this workspace." in readme
     assert "Do not bootstrap `./abel-invest-workspace` inside it." in readme
@@ -70,60 +64,6 @@ def test_scaffold_workspace_writes_alpha_owned_boundary_guidance(tmp_path: Path)
     assert generated["files"]["AGENTS.md"]["status"] == "current"
     assert generated["files"][".env.example"]["status"] == "current"
     assert generated["files"][".gitignore"]["status"] == "current"
-
-
-def test_workspace_bootstrap_refreshes_stale_agents_guide(
-    tmp_path: Path,
-    monkeypatch,
-    capsys,
-) -> None:
-    root = scaffold_workspace("trial-lab", target_root=tmp_path / "trial-lab")
-    (root / "AGENTS.md").write_text(
-        "# Old guide\nIf the command emits refactor-request.json, use it.\n",
-        encoding="utf-8",
-    )
-    assert workspace_agents_status(root)["status"] == "stale"
-
-    monkeypatch.setattr(
-        workspace_handlers,
-        "init_workspace_env",
-        lambda **_kwargs: argparse.Namespace(
-            python_path=root / ".venv/bin/python",
-            alpha_editable=True,
-            runtime_mode="existing_python",
-            venv_provider="test",
-        ),
-    )
-    monkeypatch.setattr(
-        workspace_handlers,
-        "run_doctor",
-        lambda _root: {
-            "status": "ready",
-            "workspace_mode": "alpha-managed strategy search",
-            "next_step": "abel-invest init-session --ticker <TICKER> --exp-id <session-id>",
-        },
-    )
-    args = argparse.Namespace(
-        workspace_command="bootstrap",
-        path=str(root),
-        name="trial-lab",
-        base_python=None,
-        alpha_source=None,
-        runtime_python=None,
-        no_editable=False,
-    )
-
-    assert strategy_api.handle_workspace_command(args) == 0
-    out = capsys.readouterr().out
-    agents = (root / "AGENTS.md").read_text(encoding="utf-8")
-
-    assert "workspace_reuse: reused_existing_root" in out
-    assert "agents_guide: current (action=refreshed" in out
-    assert agents.startswith(
-        f"<!-- {WORKSPACE_AGENTS_GUIDE_SCHEMA} version={ABEL_INVEST_VERSION} -->"
-    )
-    assert "refactor-request.json" not in agents
-    assert workspace_agents_status(root)["status"] == "current"
 
 
 def test_refresh_generated_workspace_files_overwrites_readme_and_agents(tmp_path: Path) -> None:
@@ -165,33 +105,6 @@ def test_scaffold_workspace_rejects_nested_workspace_under_existing_root(tmp_pat
         scaffold_workspace("nested", target_root=root / "abel-invest-workspace")
 
 
-def test_workspace_bootstrap_rejects_nested_target_with_reentry_hint(
-    tmp_path: Path,
-    capsys,
-) -> None:
-    root = scaffold_workspace("trial-lab", target_root=tmp_path / "trial-lab")
-    nested_target = root / "abel-invest-workspace"
-
-    args = argparse.Namespace(
-        workspace_command="bootstrap",
-        path=str(nested_target),
-        name="abel-invest-workspace",
-        base_python=None,
-        alpha_source=None,
-        runtime_python=None,
-        no_editable=False,
-    )
-
-    rc = strategy_api.handle_workspace_command(args)
-    out = capsys.readouterr().out
-
-    assert rc == 1
-    assert "Refusing to bootstrap a nested Abel strategy discovery workspace" in out
-    assert f"Existing workspace root for this area: {root}" in out
-    assert f"abel-invest workspace status --path {root}" in out
-    assert f"abel-invest doctor --path {root}" in out
-
-
 def test_render_workspace_status_reports_alpha_managed_mode(tmp_path: Path) -> None:
     root = tmp_path / "workspace"
     root.mkdir()
@@ -200,105 +113,6 @@ def test_render_workspace_status_reports_alpha_managed_mode(tmp_path: Path) -> N
 
     assert "Workspace mode: alpha-managed strategy search" in status
     assert f"Research root: {root / 'research'}" in status
-
-
-def test_resolve_alpha_source_defaults_to_skill_root() -> None:
-    resolved = resolve_alpha_source()
-    expected = Path(__file__).resolve().parents[2] / "skills" / "abel-invest"
-
-    assert resolved == expected.resolve()
-    assert (resolved / "pyproject.toml").exists()
-
-
-def test_workspace_install_command_upgrades_runtime_dependencies(tmp_path: Path) -> None:
-    command = build_local_install_command(
-        tmp_path / ".venv" / "bin" / "python",
-        tmp_path / "skills" / "abel-invest",
-        editable=True,
-    )
-
-    assert "--upgrade" in command
-    assert command[command.index("--upgrade-strategy") + 1] == "eager"
-    assert "-e" in command
-
-
-def test_workspace_context_json_reports_resolved_research_root(
-    tmp_path: Path,
-    monkeypatch,
-    capsys,
-) -> None:
-    root = scaffold_workspace("trial-lab", target_root=tmp_path / "trial-lab")
-    monkeypatch.setattr(
-        workspace_handlers,
-        "run_doctor",
-        lambda _root: {
-            "status": "ready",
-            "workspace_mode": "alpha-managed strategy search",
-            "next_step": "abel-invest init-session --ticker <TICKER> --exp-id <session-id>",
-        },
-    )
-    args = argparse.Namespace(
-        workspace_command="context",
-        path=str(root),
-        json_output=True,
-    )
-
-    assert strategy_api.handle_workspace_command(args) == 0
-    payload = json.loads(capsys.readouterr().out)
-
-    assert payload["workspace_root"] == str(root)
-    assert payload["workspace_resolution"] == "current_workspace_root"
-    assert payload["research_root"] == str(root / "research")
-    assert payload["doctor_status"] == "ready"
-    assert payload["session_command_prefix"] == "abel-invest init-session"
-
-
-def test_workspace_context_json_reports_default_child_reuse(
-    tmp_path: Path,
-    monkeypatch,
-    capsys,
-) -> None:
-    root = scaffold_workspace(
-        "abel-invest-workspace",
-        target_root=tmp_path / "abel-invest-workspace",
-    )
-    monkeypatch.setattr(
-        workspace_handlers,
-        "run_doctor",
-        lambda _root: {"status": "auth_missing", "next_step": "Use abel-auth"},
-    )
-    args = argparse.Namespace(
-        workspace_command="context",
-        path=str(tmp_path),
-        json_output=True,
-    )
-
-    assert strategy_api.handle_workspace_command(args) == 0
-    payload = json.loads(capsys.readouterr().out)
-
-    assert payload["workspace_root"] == str(root)
-    assert payload["workspace_resolution"] == "launch_root_child"
-    assert payload["research_root"] == str(root / "research")
-    assert payload["doctor_status"] == "auth_missing"
-
-
-def test_workspace_context_missing_returns_bootstrap_next_step(
-    tmp_path: Path,
-    capsys,
-) -> None:
-    args = argparse.Namespace(
-        workspace_command="context",
-        path=str(tmp_path),
-        json_output=True,
-    )
-
-    assert strategy_api.handle_workspace_command(args) == 1
-    payload = json.loads(capsys.readouterr().out)
-
-    assert payload["workspace_root"] is None
-    assert payload["doctor_status"] == "workspace_missing"
-    assert payload["default_workspace_path"] == str(tmp_path / "abel-invest-workspace")
-    assert "workspace bootstrap" in payload["next_step"]
 
 
 def test_workspace_arg_path_accepts_existing_launch_root_relative_session(

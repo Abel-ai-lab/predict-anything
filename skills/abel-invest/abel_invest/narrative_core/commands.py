@@ -16,11 +16,6 @@ from abel_invest.narrative_core.command_handlers.session import (
     handle_set_backtest_start,
     handle_set_hypothesis,
 )
-from abel_invest.narrative_core.command_handlers.workspace import (
-    handle_doctor_command,
-    handle_env_command,
-    handle_workspace_command,
-)
 from abel_invest.narrative_core.cli_parser import build_parser
 from abel_invest.narrative_core.dashboard import upload_skill_dashboard_session
 from abel_invest.narrative_core.rendering.session_rendering import (
@@ -43,12 +38,6 @@ def main() -> int:
     args = parser.parse_args()
     hydrate_command_workspace_env(args)
 
-    if args.command == "workspace":
-        return handle_workspace_command(args)
-    if args.command == "env":
-        return handle_env_command(args)
-    if args.command == "doctor":
-        return handle_doctor_command(args)
     if args.command == "init-session":
         return handle_init_session(args)
     if args.command == "set-backtest-start":

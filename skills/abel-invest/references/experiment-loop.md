@@ -1,14 +1,8 @@
 # Experiment Loop
 
-Use this reference after workspace preflight is complete and doctor is ready.
-Commands below use the workspace `command_prefix` returned by
-`workspace context --json` or doctor.
-
-Before creating a new session, confirm the workspace context:
-
-```bash
-<command_prefix> workspace context --path . --json
-```
+Use this reference after the active bootstrap shim reports readiness `ready`.
+Commands below use the workspace command prefix printed by bootstrap, usually
+`./.venv/bin/abel-invest` from the workspace root.
 
 Use the resolved workspace `research_root`. Do not pass `--root` unless this
 is an intentional legacy/offline session outside a workspace; in that case pass

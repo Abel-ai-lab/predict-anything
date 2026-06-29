@@ -41,8 +41,8 @@ def fetch_live_graph_frontier(
         command_prefix = workspace_command(workspace_root, None) if workspace_root else "abel-invest"
         raise RuntimeError(
             "Live Abel discovery requires abel-edge with the Abel plugin installed. "
-            f"Run `{command_prefix} doctor` in the workspace, follow its env next_step, "
-            "rerun doctor, then retry."
+            f"Rerun the active Abel Invest bootstrap shim for {workspace_root or Path.cwd()}, "
+            f"then retry `{command_prefix} init-session --ticker {ticker.upper()} --exp-id <exp-id>`."
         ) from exc
     workspace_root, _ = resolve_workspace_entry()
     if workspace_root is not None:
@@ -88,8 +88,8 @@ def fetch_live_graph_expansion(
         command_prefix = workspace_command(workspace_root, None) if workspace_root else "abel-invest"
         raise RuntimeError(
             "Live Abel frontier expansion requires abel-edge with the Abel plugin installed. "
-            f"Run `{command_prefix} doctor` in the workspace, follow its env next_step, "
-            "rerun doctor, then retry."
+            f"Rerun the active Abel Invest bootstrap shim for {workspace_root or Path.cwd()}, "
+            f"then retry `{command_prefix} frontier expand --session <session> --node {anchor_node}`."
         ) from exc
     workspace_root, _ = resolve_workspace_entry()
     if workspace_root is not None:

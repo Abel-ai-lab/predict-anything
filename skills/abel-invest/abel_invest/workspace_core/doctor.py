@@ -87,7 +87,7 @@ def run_doctor(start: Path | None = None) -> dict[str, object]:
                 "auth": "not_run",
             },
             "next_step": (
-                "abel-invest workspace bootstrap --path "
+                "rerun the active Abel Invest bootstrap shim for "
                 f"{default_workspace_path(start_path)}"
             ),
         }

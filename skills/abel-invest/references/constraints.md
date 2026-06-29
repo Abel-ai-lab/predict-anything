@@ -2,8 +2,8 @@
 
 Use this reference when writing `engine.py`, reading semantic preflight, or
 debugging runtime validity.
-Commands below use the workspace `command_prefix` returned by
-`workspace context --json` or doctor.
+Commands below use the workspace command prefix printed by the active bootstrap
+shim, usually `./.venv/bin/abel-invest` from the workspace root.
 
 The branch-default safety story is:
 

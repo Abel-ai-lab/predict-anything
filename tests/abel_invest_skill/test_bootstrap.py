@@ -85,22 +85,15 @@ def test_abel_invest_bootstrap_lets_pyproject_install_dependencies() -> None:
     assert "eager" in source
 
 
-def test_abel_invest_cli_hides_edge_install_overrides() -> None:
+def test_abel_invest_cli_rejects_removed_lifecycle_commands() -> None:
     parser = build_parser()
 
     with pytest.raises(SystemExit):
-        parser.parse_args(
-            [
-                "workspace",
-                "bootstrap",
-                "--path",
-                "abel-invest-workspace",
-                "--edge-source",
-                "../Abel-edge",
-            ]
-        )
+        parser.parse_args(["workspace", "bootstrap", "--path", "abel-invest-workspace"])
     with pytest.raises(SystemExit):
-        parser.parse_args(["env", "init", "--edge-spec", "abel-edge==0.8.0"])
+        parser.parse_args(["env", "refresh", "--path", "abel-invest-workspace"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["doctor", "--path", "abel-invest-workspace"])
 
 
 def test_abel_invest_cli_rejects_non_positive_public_limits() -> None:
@@ -141,16 +134,6 @@ def test_abel_invest_cli_rejects_non_positive_public_limits() -> None:
                 "0",
             ]
         )
-
-
-def test_abel_invest_cli_exposes_env_refresh() -> None:
-    parser = build_parser()
-
-    args = parser.parse_args(["env", "refresh", "--path", "abel-invest-workspace"])
-
-    assert args.command == "env"
-    assert args.env_command == "refresh"
-    assert args.path == "abel-invest-workspace"
 
 
 def test_visualize_session_strategy_artifact_is_default_and_opt_out_is_rejected(

@@ -366,7 +366,7 @@ do not create a child `abel-invest-workspace` here. Run the active Abel Invest
 skill bootstrap shim before creating a new session.
 
 Report to the user:
-- workspace root and doctor status
+- workspace root and bootstrap readiness
 - auth or runtime blockers
 - current session and branch path
 - the next action you will run or the one blocker that needs user input

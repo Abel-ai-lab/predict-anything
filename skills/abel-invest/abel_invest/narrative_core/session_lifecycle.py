@@ -93,9 +93,8 @@ def resolve_session_root(
         "No Abel strategy discovery workspace was resolved for session creation. "
         f"Entry path: {entry_path}. "
         f"Default workspace path: {target}. "
-        "Run `abel-invest workspace context --path . --json` to inspect the "
-        "current workspace if the CLI is on PATH, or bootstrap one with "
-        f"`abel-invest workspace bootstrap --path {target}`. "
+        "Run the active Abel Invest skill bootstrap shim for that workspace "
+        "path before creating a session. "
         "For an intentional offline or legacy session, pass both `--root` and "
         "`--allow-outside-workspace`."
     )
@@ -282,8 +281,8 @@ def fetch_live_discovery(ticker: str, *, limit: int) -> dict:
         command_prefix = workspace_command(workspace_root, None) if workspace_root else "abel-invest"
         raise RuntimeError(
             "Live Abel discovery requires abel-edge with the Abel plugin installed. "
-            f"Run `{command_prefix} doctor` in the workspace, follow its env next_step, "
-            "rerun doctor, then retry."
+            f"Rerun the active Abel Invest bootstrap shim for {workspace_root or Path.cwd()}, "
+            f"then retry `{command_prefix} init-session --ticker {ticker.upper()} --exp-id <exp-id>`."
         ) from exc
     workspace_root, _ = resolve_workspace_entry()
     if workspace_root is not None:
