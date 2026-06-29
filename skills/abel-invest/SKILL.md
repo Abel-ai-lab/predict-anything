@@ -33,33 +33,30 @@ Use this skill for:
 Always start by resolving workspace state before strategy work.
 
 1. Read `references/workspace-bootstrap.md`.
-2. Resolve the workspace context:
+2. Resolve the workspace location:
    - if `alpha.workspace.yaml` is in the current directory, use the current
      directory
    - else if `abel-invest-workspace/alpha.workspace.yaml` exists
      under the current directory, use that child workspace
    - else bootstrap a workspace before deep strategy work
-3. Prefer `abel-invest workspace context --path . --json` once a CLI is
-   available. If `abel-invest` is not on PATH and an existing workspace has a
-   venv, use `<workspace-root>/.venv/bin/abel-invest workspace context --path . --json`
-   for this first context check. Use the returned `workspace_root`,
-   `research_root`, and `command_prefix` instead of guessing from directory
-   names or assuming a global PATH.
+3. Run the active skill bootstrap shim for the resolved or default workspace:
+   `python3 <abel-invest-skill-root>/scripts/bootstrap_workspace.py --path <workspace-root>`.
+   Use `--runtime-python /path/to/python` only when the local machine cannot
+   create a venv and the user intentionally provides an existing interpreter.
 4. Baseline-first: before from-scratch search, check whether a validated
    strategy for this target already exists in any baseline / strategy catalog
    the user maintains. If one exists, treat it as a benchmark and launchpad;
    iterate from it when useful rather than wasting rounds rediscovering it.
-5. Run `<command_prefix> doctor --path <workspace-root>`.
-6. If doctor reports `runtime_stale`, `env_missing`, `edge_missing`, or
-   `edge_contract_missing`, run the exact command from `next_step`, then rerun
-   doctor. `doctor` diagnoses runtime drift; `env` commands repair it.
-7. If doctor reports `auth_missing`, use `abel-auth`, then rerun doctor.
-8. Only start or continue session/branch work after doctor is ready, unless the
-   user explicitly asks you to inspect or repair setup.
+5. If bootstrap reports `auth_missing`, use `abel-auth`, then rerun the active
+   bootstrap shim. If it reports `scaffold_stale`, `runtime_stale`,
+   `env_missing`, `edge_missing`, or `edge_contract_missing`, rerun the active
+   bootstrap shim after fixing the stated blocker.
+6. Only start or continue session/branch work after bootstrap readiness is
+   `ready`, unless the user explicitly asks you to inspect or repair setup.
 
 ## Reference Routing
 
-- New workspace, workspace reuse, auth, doctor, or setup repair:
+- New workspace, workspace reuse, auth, generated-file refresh, or setup repair:
   read `references/workspace-bootstrap.md`.
 - New session, normal round loop, or resuming a session:
   read `references/experiment-loop.md`.
@@ -100,8 +97,8 @@ Always start by resolving workspace state before strategy work.
 
 Always:
 
-- Work workspace-first. Resolve `workspace_root`, `research_root`, and doctor
-  status before session or branch work.
+- Work workspace-first. Resolve `workspace_root`, `research_root`, and
+  bootstrap readiness before session or branch work.
 - Reuse the default workspace when it already exists; reuse any resolved
   existing workspace before bootstrapping another one.
 - Bootstrap the workspace before deep strategy work when no workspace exists.
@@ -111,13 +108,17 @@ Always:
   `python3 <abel-invest-skill-root>/scripts/bootstrap_workspace.py --path abel-invest-workspace`.
   Do not import `abel_invest` with the system interpreter for first-run
   bootstrap.
-- If a skill update changed the workspace runtime contract, `doctor` reports
-  `runtime_stale`. Run the suggested `next_step` command and rerun doctor before
-  strategy work. Do not refresh on every entry when doctor is already ready.
+- If a skill update changed the workspace scaffold, runtime contract, or
+  generated workspace docs, rerun the active bootstrap shim before strategy
+  work. Do not use workspace-local lifecycle commands to repair setup.
 - Reuse existing Abel auth first. If live access is missing, use `abel-auth` and
-  rerun `doctor`.
-- Report to the user with the current workspace/session/branch path, doctor
-  status, blockers, what evidence exists, and the next action you will take.
+  rerun the active bootstrap shim.
+- Treat `abel-auth/.env.skill` as the normal shared auth/profile source.
+  Workspace `.env` is only an explicit per-workspace override; do not copy API
+  keys there unless the user intentionally wants this workspace to use different
+  credentials or endpoints. Trust bootstrap's effective profile/CAP URL report.
+- Report to the user with the current workspace/session/branch path, bootstrap
+  readiness, blockers, what evidence exists, and the next action you will take.
 - Treat `agent_context.md` as the compact factual resume surface,
   `exploration_path.md` as the human-facing chosen-path and Edge-feedback log.
 - On a fresh or unfamiliar ticker, use the compact first-look data scout in
@@ -131,7 +132,7 @@ Always:
 
 Never:
 
-- Do not create sessions before workspace context resolves.
+- Do not create sessions before bootstrap readiness is confirmed.
 - Do not use `--root` unless intentionally creating a legacy/offline session;
   then pass `--allow-outside-workspace`.
 - Do not treat `branch.yaml` as evidence. It is an audit declaration.

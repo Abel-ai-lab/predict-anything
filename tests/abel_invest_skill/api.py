@@ -65,7 +65,6 @@ from abel_invest.narrative_core.command_handlers.branch import (
     run_branch_round,
     subprocess,
 )
-from abel_invest.narrative_core.command_handlers.workspace import handle_workspace_command
 from abel_invest.narrative_core.commands import main
 from abel_invest.narrative_core.contracts.paths import (
     context_guide_path,

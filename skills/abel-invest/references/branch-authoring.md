@@ -2,8 +2,8 @@
 
 Use this reference after the workspace is ready and you are creating or revising
 a candidate branch.
-Commands below use the workspace `command_prefix` returned by
-`workspace context --json` or doctor.
+Commands below use the workspace command prefix printed by the active bootstrap
+shim, usually `./.venv/bin/abel-invest` from the workspace root.
 
 ## Branch Model
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from pathlib import Path
 
@@ -20,7 +19,7 @@ from abel_invest.narrative_core.contracts.constants import (
 from abel_invest.narrative_core.evidence.frontier import increment_count, render_inline_counts
 from abel_invest.narrative_core.io import _now
 from abel_invest.workspace_core.doctor import build_auth_recovery_instruction, workspace_command
-from abel_invest.workspace_core.edge_runtime import resolve_runtime_auth_env_file
+from abel_invest.workspace_core.edge_runtime import apply_effective_abel_env
 from abel_invest.workspace_core.workspace import resolve_workspace_entry
 
 
@@ -41,14 +40,12 @@ def fetch_live_graph_frontier(
         command_prefix = workspace_command(workspace_root, None) if workspace_root else "abel-invest"
         raise RuntimeError(
             "Live Abel discovery requires abel-edge with the Abel plugin installed. "
-            f"Run `{command_prefix} doctor` in the workspace, follow its env next_step, "
-            "rerun doctor, then retry."
+            f"Rerun the active Abel Invest bootstrap shim for {workspace_root or Path.cwd()}, "
+            f"then retry `{command_prefix} init-session --ticker {ticker.upper()} --exp-id <exp-id>`."
         ) from exc
     workspace_root, _ = resolve_workspace_entry()
     if workspace_root is not None:
-        auth_env = resolve_runtime_auth_env_file(workspace_root)
-        if auth_env is not None:
-            os.environ.setdefault("ABEL_AUTH_ENV_FILE", str(auth_env))
+        apply_effective_abel_env(workspace_root)
 
     try:
         require_api_key()
@@ -88,14 +85,12 @@ def fetch_live_graph_expansion(
         command_prefix = workspace_command(workspace_root, None) if workspace_root else "abel-invest"
         raise RuntimeError(
             "Live Abel frontier expansion requires abel-edge with the Abel plugin installed. "
-            f"Run `{command_prefix} doctor` in the workspace, follow its env next_step, "
-            "rerun doctor, then retry."
+            f"Rerun the active Abel Invest bootstrap shim for {workspace_root or Path.cwd()}, "
+            f"then retry `{command_prefix} frontier expand --session <session> --node {anchor_node}`."
         ) from exc
     workspace_root, _ = resolve_workspace_entry()
     if workspace_root is not None:
-        auth_env = resolve_runtime_auth_env_file(workspace_root)
-        if auth_env is not None:
-            os.environ.setdefault("ABEL_AUTH_ENV_FILE", str(auth_env))
+        apply_effective_abel_env(workspace_root)
 
     try:
         require_api_key()

@@ -13,6 +13,10 @@ MANIFEST_NAME = "alpha.workspace.yaml"
 DEFAULT_WORKSPACE_NAME = "abel-invest-workspace"
 WORKSPACE_AGENTS_GUIDE_SCHEMA = "abel-invest.workspace-agents/v1"
 WORKSPACE_AGENTS_GUIDE_VERSION = ABEL_INVEST_VERSION
+WORKSPACE_README_SCHEMA = "abel-invest.workspace-readme/v1"
+WORKSPACE_ENV_EXAMPLE_SCHEMA = "abel-invest.workspace-env-example/v1"
+WORKSPACE_GITIGNORE_SCHEMA = "abel-invest.workspace-gitignore/v1"
+GENERATED_WORKSPACE_FILES = ("README.md", "AGENTS.md", ".env.example", ".gitignore")
 
 
 def find_workspace_root(start: Path | None = None) -> Path | None:
@@ -162,11 +166,8 @@ def scaffold_workspace(
         resolved[key].mkdir(parents=True, exist_ok=True)
 
     write_text(root / MANIFEST_NAME, dump_manifest(manifest))
-    write_text(root / ".gitignore", render_gitignore())
-    write_text(root / ".env.example", render_env_example())
     write_text(root / ".env", "")
-    write_text(root / "README.md", render_workspace_readme(name))
-    write_text(root / "AGENTS.md", render_workspace_agents())
+    refresh_generated_workspace_files(root, manifest)
 
     return root
 
@@ -217,11 +218,11 @@ def default_activate_command() -> str:
 
 
 def render_workspace_status(root: Path, manifest: dict | None = None) -> str:
-    """Render a human-readable workspace status summary."""
+    """Render a human-readable workspace scaffold summary."""
     manifest = manifest or load_workspace_manifest(root)
     resolved = resolve_workspace_paths(root, manifest)
     runtime_python = resolve_runtime_python(root, manifest)
-    agents_status = workspace_agents_status(root)
+    generated_status = workspace_generated_files_status(root, manifest)
     lines = [
         f"Workspace: {manifest.get('workspace', {}).get('name', root.name)}",
         f"Root: {root}",
@@ -236,9 +237,9 @@ def render_workspace_status(root: Path, manifest: dict | None = None) -> str:
         f"Runtime python: {runtime_python}",
         f"Runtime python exists: {'yes' if runtime_python.exists() else 'no'}",
         (
-            "Agents guide: "
-            f"{agents_status['status']} "
-            f"(expected abel-invest {agents_status['expectedVersion']})"
+            "Generated workspace files: "
+            f"{generated_status['status']} "
+            f"(expected abel-invest {generated_status['expectedVersion']})"
         ),
         "Edge dependency: managed by abel-invest package dependencies",
     ]
@@ -247,7 +248,8 @@ def render_workspace_status(root: Path, manifest: dict | None = None) -> str:
 
 def render_workspace_readme(name: str) -> str:
     """Render the starter README for a new workspace."""
-    return f"""# {name}
+    return f"""<!-- {WORKSPACE_README_SCHEMA} version={WORKSPACE_AGENTS_GUIDE_VERSION} -->
+# {name}
 
 This is an Abel Invest alpha-search workspace.
 
@@ -258,17 +260,24 @@ or activate `.venv` first and then use `abel-invest`.
 If `alpha.workspace.yaml` already exists here, this directory is already the
 workspace root. Do not bootstrap `./abel-invest-workspace` inside it.
 
-The CLI commands below keep alpha search auditable inside this workspace. The
-point is not to memorize a checklist. The point is to search hard while keeping
-the current state legible from session setup into branch evidence.
+The active Abel Invest skill bootstrap shim owns workspace creation, reuse,
+runtime repair, and generated-file refresh. If setup looks stale or broken, go
+back to the active skill and rerun:
+
+```bash
+python3 <abel-invest-skill-root>/scripts/bootstrap_workspace.py --path <this-workspace-root>
+```
+
+After bootstrap succeeds, the CLI commands below keep alpha search auditable
+inside this workspace. The point is not to memorize a checklist. The point is
+to search hard while keeping the current state legible from session setup into
+branch evidence.
 
 ## A Usual Path
 
 Run these commands from the workspace root:
 
 ```bash
-./.venv/bin/abel-invest workspace context --path . --json
-./.venv/bin/abel-invest doctor
 {default_activate_command()}
 ./.venv/bin/abel-invest init-session --ticker TSLA --exp-id tsla-v1
 ./.venv/bin/abel-invest frontier status --session research/tsla/tsla-v1
@@ -313,8 +322,8 @@ agreement, run:
 ```
 
 Use that path as orientation, not as a rigid script. The important boundary is:
-- `doctor` tells you whether the workspace is actually ready
-- `workspace context --json` tells you the owning workspace and `research_root`
+- the active bootstrap shim tells you whether the workspace is ready and which
+  command prefix to use
 - `branch.yaml` makes the branch inputs explicit
 - `prepare-branch` resolves inputs before you treat any round as evidence
 - the starter `engine.py` is only there to verify branch wiring before a branch-specific candidate exists
@@ -337,9 +346,9 @@ Use that path as orientation, not as a rigid script. The important boundary is:
 - if you open this workspace root again later, continue here
 - if you open the parent launch directory later, reuse its child `abel-invest-workspace` before creating another one
 - do not create a second workspace in the same area unless you want one intentionally
-- create new sessions only after workspace context resolves; use `--root` only
-  for intentional outside-workspace legacy/offline sessions and pass
-  `--allow-outside-workspace`
+- create new sessions only after the active bootstrap shim has completed
+  successfully; use `--root` only for intentional outside-workspace
+  legacy/offline sessions and pass `--allow-outside-workspace`
 
 ## What This Workspace Makes Explicit
 
@@ -371,24 +380,20 @@ Use that path as orientation, not as a rigid script. The important boundary is:
 - Do not run `abel-edge init` inside this workspace.
 - If you need a standalone Abel-edge project, create it in a separate directory outside this workspace.
 
-If the workspace runtime is missing or you want to replace it, run the env
-repair command from `doctor`'s `next_step`.
-If `doctor` reports `runtime_stale`, run the command from `next_step`, then
-rerun `doctor`.
-If your environment cannot create a new venv, point alpha at an existing
-interpreter by adding `--runtime-python /path/to/python` to that env repair
-command.
-
 ## Readiness Gate
 
-Run `./.venv/bin/abel-invest workspace context --path . --json` and `./.venv/bin/abel-invest doctor`
-before opening a session.
+Run the active Abel Invest bootstrap shim before opening a session. It refreshes
+`README.md`, `AGENTS.md`, `.env.example`, and `.gitignore`; prepares `.venv`;
+checks auth/runtime readiness through its internal runtime doctor; and prints
+the command prefix for strategy work.
 
 - `ready`: you can start alpha search
 - `ready` means continue with `init-session -> init scout/candidate branch -> prepare-branch -> first-look data scout with roughly 5-minute expected runtime before any broad run`; let progressing scout work finish naturally
-- `auth_missing`: no reusable auth was found; use `abel-auth`, then rerun `doctor`
-- `runtime_stale`, `env_missing`, `edge_missing`, or `edge_contract_missing`:
-  run the exact env repair command from `next_step`, then rerun `doctor`
+- `auth_missing`: no reusable auth was found; use `abel-auth`, then rerun the
+  active bootstrap shim
+- `scaffold_stale`, `runtime_stale`, `env_missing`, `edge_missing`, or
+  `edge_contract_missing`: rerun the active bootstrap shim; do not use a
+  workspace-local CLI command to repair the environment
 """
 
 
@@ -408,20 +413,18 @@ or activate `.venv` first and then use `abel-invest`.
 
 ### Check whether this directory is a valid workspace
 ```bash
-./.venv/bin/abel-invest workspace context --path . --json
-./.venv/bin/abel-invest workspace status
-./.venv/bin/abel-invest doctor
+python3 <abel-invest-skill-root>/scripts/bootstrap_workspace.py --path <this-workspace-root>
 ```
 
 If `alpha.workspace.yaml` is already present in this directory, this directory
 is the workspace root. Do not create `./abel-invest-workspace` inside it.
+The active bootstrap shim owns workspace creation, generated-file refresh,
+runtime repair, and readiness checks. The workspace CLI owns strategy work.
 
 ### Start a new exploration session
 Run these commands from the workspace root:
 
 ```bash
-./.venv/bin/abel-invest workspace context --path . --json
-./.venv/bin/abel-invest doctor
 ./.venv/bin/abel-invest init-session --ticker TSLA --exp-id tsla-v1
 ./.venv/bin/abel-invest frontier status --session research/tsla/tsla-v1
 ./.venv/bin/abel-invest init-branch --session research/tsla/tsla-v1 --branch-id <candidate-branch>
@@ -448,16 +451,15 @@ before creating an online session view. If the user agrees:
 ./.venv/bin/abel-invest visualize-session --session research/tsla/tsla-v1
 ```
 
-Run `doctor` before `init-session`. If it reports `auth_missing`, use
-`abel-auth`, then rerun `doctor`.
-If it reports `runtime_stale`, `env_missing`, `edge_missing`, or
-`edge_contract_missing`, run the exact env repair command from
-`next_step`, then rerun `doctor`. Do not refresh the runtime when `doctor` is
-already ready.
-Run `workspace context --path . --json` before creating a session so the
-session lands under this workspace's `research/` directory. Do not pass
-`--root` unless intentionally creating a legacy/offline session outside the
-workspace, and then pass `--allow-outside-workspace`.
+Run the active bootstrap shim before `init-session`. If it reports
+`auth_missing`, use `abel-auth`, then rerun the active bootstrap shim.
+If bootstrap reports `scaffold_stale`, `runtime_stale`, `env_missing`,
+`edge_missing`, or `edge_contract_missing`, rerun the active bootstrap shim. Do
+not use a workspace-local CLI command to repair setup.
+Create sessions from this workspace root so they land under this workspace's
+`research/` directory. Do not pass `--root` unless intentionally creating a
+legacy/offline session outside the workspace, and then pass
+`--allow-outside-workspace`.
 Treat `branch.yaml` as the place where target, start, selected inputs, objective,
 search width, and validation scope become explicit enough to audit. Treat
 `prepare-branch` as the moment that makes those inputs real. Treat the generated
@@ -518,7 +520,7 @@ standalone `abel-edge init` project inside it. Put standalone edge work in a
 separate directory.
 
 ### Report to the user
-- resolved workspace root and doctor status
+- resolved workspace root and bootstrap readiness status
 - current session and branch path
 - live/auth blockers and the exact next command only when you are going to run it
 - evidence status honestly: branch declarations are not evidence until prepared and run
@@ -541,56 +543,96 @@ separate directory.
 - if `alpha.workspace.yaml` is in the current directory, continue here directly and do not bootstrap a child workspace
 - if you are already in this workspace root, continue here directly
 - if you are in the parent launch directory, reuse its `abel-invest-workspace` child before creating another one
-- run `./.venv/bin/abel-invest workspace context --path . --json` before creating a session
+- rerun the active Abel Invest bootstrap shim before creating or resuming a session after a skill update
 """
 
 
-def workspace_agents_status(root: Path) -> dict[str, str]:
-    """Return whether the workspace AGENTS guide matches this Abel Invest version."""
-    path = root / "AGENTS.md"
-    expected = render_workspace_agents()
-    if not path.exists():
-        return {
-            "status": "missing",
-            "path": str(path),
-            "schema": WORKSPACE_AGENTS_GUIDE_SCHEMA,
-            "expectedVersion": WORKSPACE_AGENTS_GUIDE_VERSION,
-            "foundVersion": "",
-        }
-    actual = path.read_text(encoding="utf-8")
-    found_version = _workspace_agents_found_version(actual)
-    status = (
-        "current"
-        if _normalize_generated_text(actual) == _normalize_generated_text(expected)
-        else "stale"
-    )
+def render_generated_workspace_files(root: Path, manifest: dict | None = None) -> dict[str, str]:
+    """Render all skill-owned generated workspace files."""
+    manifest = manifest or load_workspace_manifest(root)
+    workspace = manifest.get("workspace") if isinstance(manifest, dict) else {}
+    name = str(workspace.get("name") or root.name) if isinstance(workspace, dict) else root.name
     return {
-        "status": status,
-        "path": str(path),
-        "schema": WORKSPACE_AGENTS_GUIDE_SCHEMA,
-        "expectedVersion": WORKSPACE_AGENTS_GUIDE_VERSION,
-        "foundVersion": found_version,
+        "README.md": render_workspace_readme(name),
+        "AGENTS.md": render_workspace_agents(),
+        ".env.example": render_env_example(),
+        ".gitignore": render_gitignore(),
     }
 
 
-def refresh_workspace_agents(root: Path) -> dict[str, str]:
-    """Refresh the generated workspace AGENTS guide when it is missing or stale."""
-    before = workspace_agents_status(root)
-    if before["status"] == "current":
-        return {**before, "action": "unchanged", "previousStatus": before["status"]}
-    (root / "AGENTS.md").write_text(render_workspace_agents(), encoding="utf-8")
-    after = workspace_agents_status(root)
-    action = "created" if before["status"] == "missing" else "refreshed"
+def workspace_generated_files_status(root: Path, manifest: dict | None = None) -> dict[str, object]:
+    """Return freshness for all skill-owned generated workspace files."""
+    expected = render_generated_workspace_files(root, manifest)
+    files: dict[str, dict[str, str]] = {}
+    statuses: list[str] = []
+    for relative, expected_text in expected.items():
+        path = root / relative
+        if not path.exists():
+            status = "missing"
+            found_version = ""
+        else:
+            actual = path.read_text(encoding="utf-8")
+            status = (
+                "current"
+                if _normalize_generated_text(actual) == _normalize_generated_text(expected_text)
+                else "stale"
+            )
+            found_version = _generated_file_found_version(actual, relative)
+        statuses.append(status)
+        files[relative] = {
+            "status": status,
+            "path": str(path),
+            "expectedVersion": WORKSPACE_AGENTS_GUIDE_VERSION,
+            "foundVersion": found_version,
+        }
+
+    overall = "current" if all(status == "current" for status in statuses) else "stale"
+    if any(status == "missing" for status in statuses):
+        overall = "missing"
+    return {
+        "status": overall,
+        "expectedVersion": WORKSPACE_AGENTS_GUIDE_VERSION,
+        "files": files,
+    }
+
+
+def refresh_generated_workspace_files(root: Path, manifest: dict | None = None) -> dict[str, object]:
+    """Overwrite all skill-owned generated workspace files from current templates."""
+    before = workspace_generated_files_status(root, manifest)
+    for relative, content in render_generated_workspace_files(root, manifest).items():
+        write_text(root / relative, content)
+    after = workspace_generated_files_status(root, manifest)
+    action = "unchanged" if before["status"] == "current" else "refreshed"
     return {**after, "action": action, "previousStatus": before["status"]}
 
 
+def _generated_file_found_version(text: str, relative: str) -> str:
+    schemas = {
+        "README.md": WORKSPACE_README_SCHEMA,
+        "AGENTS.md": WORKSPACE_AGENTS_GUIDE_SCHEMA,
+        ".env.example": WORKSPACE_ENV_EXAMPLE_SCHEMA,
+        ".gitignore": WORKSPACE_GITIGNORE_SCHEMA,
+    }
+    schema = schemas.get(relative, "")
+    if not schema:
+        return ""
+    return _front_matter_found_version(text, schema)
+
+
 def _workspace_agents_found_version(text: str) -> str:
-    prefix = f"<!-- {WORKSPACE_AGENTS_GUIDE_SCHEMA} version="
+    return _front_matter_found_version(text, WORKSPACE_AGENTS_GUIDE_SCHEMA)
+
+
+def _front_matter_found_version(text: str, schema: str) -> str:
     lines = text.splitlines()
     first_line = lines[0].strip() if lines else ""
-    if not first_line.startswith(prefix) or not first_line.endswith("-->"):
-        return ""
-    return first_line.removeprefix(prefix).removesuffix("-->").strip()
+    html_prefix = f"<!-- {schema} version="
+    if first_line.startswith(html_prefix) and first_line.endswith("-->"):
+        return first_line.removeprefix(html_prefix).removesuffix("-->").strip()
+    comment_prefix = f"# {schema} version="
+    if first_line.startswith(comment_prefix):
+        return first_line.removeprefix(comment_prefix).strip()
+    return ""
 
 
 def _normalize_generated_text(text: str) -> str:
@@ -599,7 +641,8 @@ def _normalize_generated_text(text: str) -> str:
 
 def render_gitignore() -> str:
     """Render the default workspace gitignore."""
-    return """# Abel strategy discovery workspace
+    return f"""# {WORKSPACE_GITIGNORE_SCHEMA} version={WORKSPACE_AGENTS_GUIDE_VERSION}
+# Abel strategy discovery workspace
 .venv/
 .env
 cache/
@@ -611,11 +654,19 @@ __pycache__/
 
 def render_env_example() -> str:
     """Render the starter environment example."""
-    return """# Optional override for standalone Abel auth fallback
-# ABEL_API_KEY=
+    return f"""# {WORKSPACE_ENV_EXAMPLE_SCHEMA} version={WORKSPACE_AGENTS_GUIDE_VERSION}
+# Abel Invest normally uses the shared abel-auth/.env.skill file.
+# Leave workspace .env empty unless this workspace needs an explicit override.
 
-# Optional: point abel-edge at a shared auth file
+# Optional: point this workspace at a custom shared auth/profile file.
 # ABEL_AUTH_ENV_FILE=
+
+# Optional: override only this workspace's Abel endpoints.
+# ABEL_PROFILE=
+# ABEL_CAP_BASE_URL=
+# ABEL_AUTH_BASE_URL=
+# ABEL_ROUTER_BASE_URL=
+# ABEL_NARRATIVE_CAP_BASE_URL=
 """
 
 

@@ -2,8 +2,8 @@
 
 Use this reference after workspace preflight is complete when live graph
 discovery, graph-derived feeds, or frontier expansion are relevant.
-Commands below use the workspace `command_prefix` returned by
-`workspace context --json` or doctor.
+Commands below use the workspace command prefix printed by the active bootstrap
+shim, usually `./.venv/bin/abel-invest` from the workspace root.
 
 ## Purpose
 

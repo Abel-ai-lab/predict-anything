@@ -35,7 +35,7 @@ def test_abel_invest_bootstrap_script_is_preinstall_entrypoint() -> None:
     assert not any(module.startswith("abel_invest") for module in imported_modules)
     assert not any(module == "yaml" or module.startswith("yaml.") for module in imported_modules)
     assert '"abel_invest.cli"' not in source
-    assert '"abel_invest"' in source
+    assert '"abel_invest.bootstrap_runtime_doctor"' in source
 
     result = subprocess.run(
         [sys.executable, "-S", str(script), "--help"],
@@ -71,7 +71,7 @@ def test_abel_invest_dependencies_constrain_edge_major_version() -> None:
     pyproject = Path(__file__).resolve().parents[2] / "skills" / "abel-invest" / "pyproject.toml"
     data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
 
-    assert "abel-edge>=0.8.9,<0.9.0" in data["project"]["dependencies"]
+    assert "abel-edge>=0.8.10,<0.9.0" in data["project"]["dependencies"]
 
 
 def test_abel_invest_bootstrap_lets_pyproject_install_dependencies() -> None:
@@ -85,22 +85,15 @@ def test_abel_invest_bootstrap_lets_pyproject_install_dependencies() -> None:
     assert "eager" in source
 
 
-def test_abel_invest_cli_hides_edge_install_overrides() -> None:
+def test_abel_invest_cli_rejects_removed_lifecycle_commands() -> None:
     parser = build_parser()
 
     with pytest.raises(SystemExit):
-        parser.parse_args(
-            [
-                "workspace",
-                "bootstrap",
-                "--path",
-                "abel-invest-workspace",
-                "--edge-source",
-                "../Abel-edge",
-            ]
-        )
+        parser.parse_args(["workspace", "bootstrap", "--path", "abel-invest-workspace"])
     with pytest.raises(SystemExit):
-        parser.parse_args(["env", "init", "--edge-spec", "abel-edge==0.8.0"])
+        parser.parse_args(["env", "refresh", "--path", "abel-invest-workspace"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["doctor", "--path", "abel-invest-workspace"])
 
 
 def test_abel_invest_cli_rejects_non_positive_public_limits() -> None:
@@ -141,16 +134,6 @@ def test_abel_invest_cli_rejects_non_positive_public_limits() -> None:
                 "0",
             ]
         )
-
-
-def test_abel_invest_cli_exposes_env_refresh() -> None:
-    parser = build_parser()
-
-    args = parser.parse_args(["env", "refresh", "--path", "abel-invest-workspace"])
-
-    assert args.command == "env"
-    assert args.env_command == "refresh"
-    assert args.path == "abel-invest-workspace"
 
 
 def test_visualize_session_strategy_artifact_is_default_and_opt_out_is_rejected(

@@ -23,6 +23,11 @@ def test_run_doctor_ready_reports_alpha_managed_strategy_search(
     monkeypatch.setattr(doctor, "load_workspace_manifest", lambda _root: {"runtime": {}})
     monkeypatch.setattr(doctor, "resolve_runtime_python", lambda _root, manifest=None: python_path)
     monkeypatch.setattr(doctor, "resolve_workspace_env_file", lambda _root: root / ".env")
+    monkeypatch.setattr(
+        doctor,
+        "workspace_generated_files_status",
+        lambda *_args, **_kwargs: {"status": "current"},
+    )
     monkeypatch.setattr(doctor, "probe_abel_edge_import", lambda *_args, **_kwargs: {"ok": True})
     monkeypatch.setattr(doctor, "probe_abel_edge_cli", lambda *_args, **_kwargs: {"ok": True})
     monkeypatch.setattr(doctor, "probe_edge_discovery_payload", lambda *_args, **_kwargs: True)
@@ -39,6 +44,22 @@ def test_run_doctor_ready_reports_alpha_managed_strategy_search(
             "ok": True,
             "source": "workspace_env",
             "path": str(root / ".env"),
+            },
+    )
+    monkeypatch.setattr(
+        doctor,
+        "describe_effective_abel_env",
+        lambda *_args, **_kwargs: {
+            "auth": {
+                "ok": True,
+                "source": "shared_auth_file",
+                "path": str(root / ".agents" / "abel-auth" / ".env.skill"),
+            },
+            "profileSource": "shared_auth_file",
+            "effectiveProfile": "sit",
+            "effectiveCapBaseUrl": "https://cap-sit.abel.ai/api",
+            "workspaceOverrideKeys": [],
+            "envConflictKeys": [],
         },
     )
 
@@ -52,6 +73,8 @@ def test_run_doctor_ready_reports_alpha_managed_strategy_search(
 
     report = doctor.render_doctor_report(result)
     assert "Workspace mode: alpha-managed strategy search" in report
+    assert "Effective profile: sit (shared_auth_file)" in report
+    assert "Effective CAP base URL: https://cap-sit.abel.ai/api" in report
     assert "Edge install target:" not in report
 
 
@@ -73,6 +96,11 @@ def test_run_doctor_auth_missing_routes_to_abel_auth(
     monkeypatch.setattr(doctor, "load_workspace_manifest", lambda _root: {"runtime": {}})
     monkeypatch.setattr(doctor, "resolve_runtime_python", lambda _root, manifest=None: python_path)
     monkeypatch.setattr(doctor, "resolve_workspace_env_file", lambda _root: root / ".env")
+    monkeypatch.setattr(
+        doctor,
+        "workspace_generated_files_status",
+        lambda *_args, **_kwargs: {"status": "current"},
+    )
     monkeypatch.setattr(doctor, "probe_abel_edge_import", lambda *_args, **_kwargs: {"ok": True})
     monkeypatch.setattr(doctor, "probe_abel_edge_cli", lambda *_args, **_kwargs: {"ok": True})
     monkeypatch.setattr(doctor, "probe_edge_discovery_payload", lambda *_args, **_kwargs: True)
@@ -98,7 +126,7 @@ def test_run_doctor_auth_missing_routes_to_abel_auth(
     assert "Auth action: Use abel-auth" in report
 
 
-def test_run_doctor_runtime_stale_routes_to_env_refresh(
+def test_run_doctor_runtime_stale_routes_to_active_bootstrap(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -118,10 +146,15 @@ def test_run_doctor_runtime_stale_routes_to_env_refresh(
     monkeypatch.setattr(doctor, "resolve_workspace_env_file", lambda _root: root / ".env")
     monkeypatch.setattr(
         doctor,
+        "workspace_generated_files_status",
+        lambda *_args, **_kwargs: {"status": "current"},
+    )
+    monkeypatch.setattr(
+        doctor,
         "probe_package_freshness",
         lambda *_args, **_kwargs: {
             "ok": False,
-            "summary": "Workspace runtime has abel-edge 0.8.4, below this skill's required >= 0.8.9.",
+            "summary": "Workspace runtime has abel-edge 0.8.4, below this skill's required >= 0.8.10.",
         },
     )
 
@@ -130,6 +163,37 @@ def test_run_doctor_runtime_stale_routes_to_env_refresh(
 
     assert result["status"] == "runtime_stale"
     assert result["checks"]["package_freshness"] == "fail"
-    assert result["next_step"] == f"{python_path} -m abel_invest env refresh --path {root}"
+    assert result["next_step"] == f"rerun the active Abel Invest bootstrap shim for {root}"
     assert "Package freshness: Workspace runtime has abel-edge 0.8.4" in report
+
+
+def test_run_doctor_scaffold_stale_routes_to_active_bootstrap(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "workspace"
+    root.mkdir()
+    python_path = root / ".venv" / "bin" / "python"
+    python_path.parent.mkdir(parents=True)
+    python_path.write_text("", encoding="utf-8")
+
+    monkeypatch.setattr(
+        doctor,
+        "resolve_workspace_entry",
+        lambda start=None: (root, "current_workspace_root"),
+    )
+    monkeypatch.setattr(doctor, "load_workspace_manifest", lambda _root: {"runtime": {}})
+    monkeypatch.setattr(doctor, "resolve_runtime_python", lambda _root, manifest=None: python_path)
+    monkeypatch.setattr(doctor, "resolve_workspace_env_file", lambda _root: root / ".env")
+    monkeypatch.setattr(
+        doctor,
+        "workspace_generated_files_status",
+        lambda *_args, **_kwargs: {"status": "stale"},
+    )
+
+    result = doctor.run_doctor(root)
+
+    assert result["status"] == "scaffold_stale"
+    assert result["checks"]["generated_files"] == "fail"
+    assert result["next_step"] == f"rerun the active Abel Invest bootstrap shim for {root}"
 

@@ -23,6 +23,7 @@ from abel_invest.narrative_core.contracts.branch_spec import (
 )
 from abel_invest.workspace_core.edge_runtime import (
     build_workspace_runtime_env,
+    describe_effective_abel_env,
 )
 from abel_invest.narrative_core.runtime.edge_commands import (
     resolve_default_python_bin,
@@ -33,7 +34,6 @@ from abel_invest.narrative_core.runtime.dsr_accounting import (
 )
 from abel_invest.workspace_core.workspace import (
     find_workspace_root,
-    resolve_workspace_env_file,
 )
 from abel_invest.narrative_core.runtime.workflow_blockers import (
     record_workflow_blocker_round,
@@ -482,9 +482,16 @@ def run_branch_round(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         if workspace_root is not None:
+            effective_env = describe_effective_abel_env(workspace_root)
+            auth = effective_env.get("auth")
+            source = "unknown"
+            path = ""
+            if isinstance(auth, dict):
+                source = str(auth.get("source") or source)
+                path = str(auth.get("path") or "")
             print(
-                f"Alpha expected workspace auth at {resolve_workspace_env_file(workspace_root)} "
-                "and exported it through ABEL_AUTH_ENV_FILE for this run.",
+                "Abel runtime auth source for this run: "
+                f"{source}" + (f" ({path})" if path else ""),
                 file=sys.stderr,
             )
         with SessionLock(session):

@@ -11,6 +11,7 @@ import tomllib
 from pathlib import Path
 
 from abel_invest.workspace_core.edge_runtime import (
+    describe_effective_abel_env,
     probe_abel_auth,
     probe_abel_edge_cli,
     probe_abel_edge_import,
@@ -23,6 +24,7 @@ from abel_invest.workspace_core.workspace import (
     resolve_workspace_entry,
     resolve_workspace_env_file,
     resolve_runtime_python,
+    workspace_generated_files_status,
 )
 
 
@@ -33,11 +35,7 @@ PACKAGE_CHECK = "package_freshness"
 
 def build_auth_recovery_instruction(root: Path | str) -> str:
     """Return the agent-facing recovery instruction when reusable auth is missing."""
-    root_path = Path(root)
-    return (
-        "Use abel-auth, then rerun "
-        f"{workspace_command(root_path, None, 'doctor', '--path', str(root_path))}."
-    )
+    return f"Use abel-auth, then rerun the active Abel Invest bootstrap shim for {Path(root)}."
 
 
 def shell_join(parts: list[str]) -> str:
@@ -81,6 +79,7 @@ def run_doctor(start: Path | None = None) -> dict[str, object]:
             "checks": {
                 "workspace_manifest": "fail",
                 "python_env": "not_run",
+                "generated_files": "not_run",
                 PACKAGE_CHECK: "not_run",
                 "abel_edge_import": "not_run",
                 "abel_edge_cli": "not_run",
@@ -89,7 +88,7 @@ def run_doctor(start: Path | None = None) -> dict[str, object]:
                 "auth": "not_run",
             },
             "next_step": (
-                "abel-invest workspace bootstrap --path "
+                "rerun the active Abel Invest bootstrap shim for "
                 f"{default_workspace_path(start_path)}"
             ),
         }
@@ -104,6 +103,7 @@ def run_doctor(start: Path | None = None) -> dict[str, object]:
             "checks": {
                 "workspace_manifest": "fail",
                 "python_env": "not_run",
+                "generated_files": "not_run",
                 PACKAGE_CHECK: "not_run",
                 "abel_edge_import": "not_run",
                 "abel_edge_cli": "not_run",
@@ -120,6 +120,7 @@ def run_doctor(start: Path | None = None) -> dict[str, object]:
     command_prefix = workspace_command(root, manifest)
     checks: dict[str, object] = {
         "workspace_manifest": "pass",
+        "generated_files": "not_run",
         "python_env": "pass" if python_path.exists() else "fail",
         PACKAGE_CHECK: "not_run",
         "abel_edge_import": "not_run",
@@ -146,10 +147,20 @@ def run_doctor(start: Path | None = None) -> dict[str, object]:
             {
                 "status": "env_missing",
                 "summary": f"Workspace python does not exist at {python_path}",
-                "next_step": (
-                    f"{workspace_command(root, manifest, 'env', 'init', '--path', str(root))} "
-                    "# or use --runtime-python /path/to/python"
-                ),
+                "next_step": f"rerun the active Abel Invest bootstrap shim for {root}",
+            }
+        )
+        return result
+
+    generated_status = workspace_generated_files_status(root, manifest)
+    checks["generated_files"] = "pass" if generated_status.get("status") == "current" else "fail"
+    result["generated_files"] = generated_status
+    if generated_status.get("status") != "current":
+        result.update(
+            {
+                "status": "scaffold_stale",
+                "summary": "Workspace generated files are stale for this Abel Invest skill.",
+                "next_step": f"rerun the active Abel Invest bootstrap shim for {root}",
             }
         )
         return result
@@ -165,7 +176,7 @@ def run_doctor(start: Path | None = None) -> dict[str, object]:
                     freshness.get("summary")
                     or "Workspace runtime package metadata is stale for this Abel Invest skill."
                 ),
-                "next_step": workspace_command(root, manifest, "env", "refresh", "--path", str(root)),
+                "next_step": f"rerun the active Abel Invest bootstrap shim for {root}",
             }
         )
         return result
@@ -177,10 +188,7 @@ def run_doctor(start: Path | None = None) -> dict[str, object]:
             {
                 "status": "edge_missing",
                 "summary": f"Workspace python cannot import abel_edge: {import_check.get('error', 'unknown error')}",
-                "next_step": (
-                    f"{workspace_command(root, manifest, 'env', 'refresh', '--path', str(root))} "
-                    "# or use --runtime-python /path/to/python"
-                ),
+                "next_step": f"rerun the active Abel Invest bootstrap shim for {root}",
             }
         )
         return result
@@ -198,6 +206,8 @@ def run_doctor(start: Path | None = None) -> dict[str, object]:
     checks["auth"] = "pass" if auth_check.get("ok") else "fail"
     result["auth"] = auth_check
     result["auth_scope"] = classify_auth_scope(root, auth_check)
+    effective_env = describe_effective_abel_env(root)
+    result["effective_env"] = effective_env
 
     if discovery_contract_ok is not True or context_contract_ok is not True:
         result.update(
@@ -208,7 +218,7 @@ def run_doctor(start: Path | None = None) -> dict[str, object]:
                     "required alpha contracts such as structured discovery or `--context-json`."
                 ),
                 "next_step": (
-                    f"{workspace_command(root, manifest, 'env', 'refresh', '--path', str(root))} "
+                    f"rerun the active Abel Invest bootstrap shim for {root} "
                     "# reinstall the workspace runtime dependencies"
                 ),
             }
@@ -438,6 +448,9 @@ def render_doctor_report(result: dict[str, object]) -> str:
     if isinstance(checks, dict):
         for key, value in checks.items():
             lines.append(f"  - {key}: {value}")
+    generated = result.get("generated_files")
+    if isinstance(generated, dict):
+        lines.append(f"Generated files: {generated.get('status', '')}")
     package_freshness = result.get("package_freshness")
     if isinstance(package_freshness, dict):
         lines.append(f"Package freshness: {package_freshness.get('summary', '')}")
@@ -448,6 +461,20 @@ def render_doctor_report(result: dict[str, object]) -> str:
             f"{auth.get('source', 'unknown')}"
             + (f" ({auth.get('path')})" if auth.get("path") else "")
         )
+    effective_env = result.get("effective_env")
+    if isinstance(effective_env, dict):
+        profile = effective_env.get("effectiveProfile") or "<unset>"
+        profile_source = effective_env.get("profileSource") or "unknown"
+        cap_url = effective_env.get("effectiveCapBaseUrl") or ""
+        lines.append(f"Effective profile: {profile} ({profile_source})")
+        if cap_url:
+            lines.append(f"Effective CAP base URL: {cap_url}")
+        overrides = effective_env.get("workspaceOverrideKeys")
+        if isinstance(overrides, list) and overrides:
+            lines.append(f"Workspace env overrides: {', '.join(str(item) for item in overrides)}")
+        conflicts = effective_env.get("envConflictKeys")
+        if isinstance(conflicts, list) and conflicts:
+            lines.append(f"Workspace/shared env conflicts: {', '.join(str(item) for item in conflicts)}")
     auth_scope = result.get("auth_scope")
     if auth_scope:
         lines.append(f"Auth scope: {auth_scope}")

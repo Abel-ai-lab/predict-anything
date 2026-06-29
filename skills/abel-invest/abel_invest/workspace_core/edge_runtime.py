@@ -31,6 +31,28 @@ def _is_abel_runtime_env_key(key: str) -> bool:
     return key.startswith(("ABEL_", "CAP_"))
 
 
+SECRET_ENV_KEYS = {"ABEL_API_KEY", "CAP_API_KEY"}
+AUTH_ENV_FILE_KEY = "ABEL_AUTH_ENV_FILE"
+DEFAULT_CAP_BASE_URL = "https://cap.abel.ai/api"
+DEFAULT_AUTH_BASE_URL = "https://api.abel.ai/echo"
+
+
+def _is_secret_env_key(key: str) -> bool:
+    return key in SECRET_ENV_KEYS
+
+
+def _non_secret_runtime_values(values: Mapping[str, str]) -> dict[str, str]:
+    return {
+        key: value
+        for key, value in values.items()
+        if key
+        and value
+        and _is_abel_runtime_env_key(key)
+        and not _is_secret_env_key(key)
+        and key != AUTH_ENV_FILE_KEY
+    }
+
+
 def load_workspace_env_values(workspace_root: Path) -> dict[str, str]:
     """Load Abel runtime variables from the workspace-local ``.env`` file."""
     workspace_env = (workspace_root / ".env").resolve()
@@ -41,13 +63,50 @@ def load_workspace_env_values(workspace_root: Path) -> dict[str, str]:
     }
 
 
+def resolve_auth_env_value(value: str, *, workspace_root: Path) -> Path:
+    """Resolve an auth env file value to an absolute path."""
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return path.resolve()
+    return (workspace_root / path).resolve()
+
+
+def load_shared_auth_env_values(workspace_root: Path, base: Mapping[str, str] | None = None) -> tuple[Path | None, dict[str, str]]:
+    """Load the active shared Abel auth/profile env file, if one is available."""
+    base_values = os.environ if base is None else base
+    explicit_auth_file = str(base_values.get(AUTH_ENV_FILE_KEY) or "").strip()
+    if explicit_auth_file:
+        auth_path = resolve_auth_env_value(explicit_auth_file, workspace_root=workspace_root)
+        return auth_path, {
+            key: value
+            for key, value in read_env_file_values(auth_path).items()
+            if key and value and _is_abel_runtime_env_key(key)
+        }
+
+    shared_auth = resolve_auth_env_file(collection_auth_anchor())
+    if shared_auth is None and collection_auth_anchor().exists():
+        shared_auth = collection_auth_anchor().resolve()
+    if shared_auth is None:
+        return None, {}
+    return shared_auth, {
+        key: value
+        for key, value in read_env_file_values(shared_auth).items()
+        if key and value and _is_abel_runtime_env_key(key)
+    }
+
+
 def apply_workspace_env(
     workspace_root: Path,
     *,
     environ: dict[str, str] | None = None,
     override: bool = False,
 ) -> dict[str, str]:
-    """Apply workspace ``.env`` Abel variables to an environment mapping.
+    """Apply only workspace ``.env`` Abel variables to an environment mapping.
+
+    This is retained for compatibility with callers that explicitly need the
+    raw workspace override layer. Normal Abel Invest runtime paths should use
+    ``apply_effective_abel_env`` or ``build_workspace_runtime_env`` so shared
+    ``abel-auth/.env.skill`` values participate in the effective environment.
 
     The default mirrors common dotenv behavior: workspace values fill missing
     variables while explicit process values keep precedence.
@@ -61,14 +120,154 @@ def apply_workspace_env(
     return applied
 
 
-def resolve_runtime_auth_env_file(workspace_root: Path) -> Path | None:
-    """Prefer workspace auth, then shared skill auth, then the workspace env file."""
+def build_effective_abel_env(
+    workspace_root: Path,
+    *,
+    base: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Build the effective Abel runtime env for this workspace.
+
+    Precedence is explicit process/base env, then workspace-local overrides,
+    then shared ``abel-auth/.env.skill`` profile defaults. Shared API keys are
+    not expanded into the process env; they remain available through
+    ``ABEL_AUTH_ENV_FILE``.
+    """
+    env = dict(os.environ if base is None else base)
+    initial_keys = {
+        key for key, value in env.items() if value and _is_abel_runtime_env_key(key)
+    }
+    workspace_values = load_workspace_env_values(workspace_root)
+
+    shared_base = dict(env)
+    if AUTH_ENV_FILE_KEY not in initial_keys and workspace_values.get(AUTH_ENV_FILE_KEY):
+        shared_base[AUTH_ENV_FILE_KEY] = workspace_values[AUTH_ENV_FILE_KEY]
+    shared_auth_path, shared_values = load_shared_auth_env_values(workspace_root, shared_base)
+    for key, value in _non_secret_runtime_values(shared_values).items():
+        if key not in initial_keys and not env.get(key):
+            env[key] = value
+
+    for key, value in workspace_values.items():
+        if key in initial_keys:
+            continue
+        if key == AUTH_ENV_FILE_KEY:
+            env[key] = str(resolve_auth_env_value(value, workspace_root=workspace_root))
+        else:
+            env[key] = value
+
     workspace_env = (workspace_root / ".env").resolve()
-    if has_auth_token(workspace_env):
-        return workspace_env
-    shared_auth = resolve_auth_env_file(collection_auth_anchor())
-    if shared_auth is not None:
-        return shared_auth
+    if not env.get(AUTH_ENV_FILE_KEY):
+        if has_auth_token(workspace_env):
+            env[AUTH_ENV_FILE_KEY] = str(workspace_env)
+        elif shared_auth_path is not None and has_auth_token(shared_auth_path):
+            env[AUTH_ENV_FILE_KEY] = str(shared_auth_path)
+        elif workspace_env.exists():
+            env[AUTH_ENV_FILE_KEY] = str(workspace_env)
+    return env
+
+
+def apply_effective_abel_env(
+    workspace_root: Path,
+    *,
+    environ: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """Apply effective Abel runtime variables to the current or supplied env."""
+    target = os.environ if environ is None else environ
+    effective = build_effective_abel_env(workspace_root, base=target)
+    applied: dict[str, str] = {}
+    for key, value in effective.items():
+        if not _is_abel_runtime_env_key(key):
+            continue
+        if target.get(key) == value:
+            continue
+        target[key] = value
+        applied[key] = value
+    return applied
+
+
+def describe_effective_abel_env(
+    workspace_root: Path,
+    *,
+    base: Mapping[str, str] | None = None,
+) -> dict[str, object]:
+    """Return non-secret metadata for the effective Abel runtime env."""
+    base_values = os.environ if base is None else base
+    process_keys = {
+        key for key, value in base_values.items() if value and _is_abel_runtime_env_key(key)
+    }
+    workspace_values = load_workspace_env_values(workspace_root)
+    shared_base = dict(base_values)
+    if AUTH_ENV_FILE_KEY not in process_keys and workspace_values.get(AUTH_ENV_FILE_KEY):
+        shared_base[AUTH_ENV_FILE_KEY] = workspace_values[AUTH_ENV_FILE_KEY]
+    shared_auth_path, shared_values = load_shared_auth_env_values(workspace_root, shared_base)
+    effective = build_effective_abel_env(workspace_root, base=base_values)
+    workspace_env = (workspace_root / ".env").resolve()
+
+    process_token = any((base_values.get(key) or "").strip() for key in SECRET_ENV_KEYS)
+    workspace_token = any((workspace_values.get(key) or "").strip() for key in SECRET_ENV_KEYS)
+    auth_path_value = str(effective.get(AUTH_ENV_FILE_KEY) or "").strip()
+    auth_path = resolve_auth_env_value(auth_path_value, workspace_root=workspace_root) if auth_path_value else None
+
+    if process_token:
+        auth_source = "env_var"
+        auth_path_text = None
+        auth_ok = True
+    elif workspace_token:
+        auth_source = "workspace_env"
+        auth_path_text = str(workspace_env)
+        auth_ok = True
+    elif auth_path is not None and has_auth_token(auth_path):
+        auth_source = "workspace_env" if auth_path == workspace_env else "shared_auth_file"
+        auth_path_text = str(auth_path)
+        auth_ok = True
+    else:
+        auth_source = "missing"
+        auth_path_text = str(auth_path) if auth_path is not None else None
+        auth_ok = False
+
+    key_sources: dict[str, str] = {}
+    for key in process_keys:
+        key_sources[key] = "env_var"
+    for key in _non_secret_runtime_values(shared_values):
+        key_sources.setdefault(key, "shared_auth_file")
+    for key in workspace_values:
+        if key not in process_keys:
+            key_sources[key] = "workspace_env"
+
+    conflict_keys = sorted(
+        key
+        for key, workspace_value in workspace_values.items()
+        if key in shared_values and shared_values[key] != workspace_value
+    )
+    effective_profile = str(effective.get("ABEL_PROFILE") or "").strip()
+    effective_cap = str(effective.get("ABEL_CAP_BASE_URL") or DEFAULT_CAP_BASE_URL).strip()
+    effective_auth = str(effective.get("ABEL_AUTH_BASE_URL") or DEFAULT_AUTH_BASE_URL).strip()
+    profile_source = key_sources.get("ABEL_PROFILE") or key_sources.get("ABEL_CAP_BASE_URL") or "default"
+
+    return {
+        "auth": {
+            "ok": auth_ok,
+            "source": auth_source,
+            "path": auth_path_text,
+        },
+        "authEnvFile": str(auth_path) if auth_path is not None else None,
+        "sharedAuthFile": str(shared_auth_path) if shared_auth_path is not None else None,
+        "workspaceEnvFile": str(workspace_env),
+        "profileSource": profile_source,
+        "effectiveProfile": effective_profile,
+        "effectiveCapBaseUrl": effective_cap.rstrip("/"),
+        "effectiveAuthBaseUrl": effective_auth.rstrip("/"),
+        "workspaceOverrideKeys": sorted(workspace_values),
+        "envConflictKeys": conflict_keys,
+        "keySources": key_sources,
+    }
+
+
+def resolve_runtime_auth_env_file(workspace_root: Path) -> Path | None:
+    """Return the auth env file selected by the effective Abel env."""
+    auth_value = str(build_effective_abel_env(workspace_root).get(AUTH_ENV_FILE_KEY) or "").strip()
+    if auth_value:
+        return resolve_auth_env_value(auth_value, workspace_root=workspace_root)
+    workspace_env = (workspace_root / ".env").resolve()
     if workspace_env.exists():
         return workspace_env
     return None
@@ -194,11 +393,7 @@ def build_workspace_runtime_env(
     base: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     """Build a deterministic runtime environment for Abel-edge subprocesses."""
-    env = dict(os.environ if base is None else base)
-    apply_workspace_env(workspace_root, environ=env)
-    auth_env = resolve_runtime_auth_env_file(workspace_root)
-    if not env.get("ABEL_AUTH_ENV_FILE") and auth_env is not None:
-        env["ABEL_AUTH_ENV_FILE"] = str(auth_env)
+    env = build_effective_abel_env(workspace_root, base=base)
     manifest = load_workspace_manifest(workspace_root)
     cache_root = resolve_workspace_paths(workspace_root, manifest)["cache_root"].resolve()
     env.setdefault("ABEL_EDGE_CACHE_ROOT", str(cache_root))
@@ -207,7 +402,16 @@ def build_workspace_runtime_env(
 
 def probe_abel_auth(python_path: Path | str, cwd: Path) -> dict[str, object]:
     """Probe whether Abel auth is available to the installed runtime."""
-    runtime_env = build_workspace_runtime_env(cwd, base={})
+    env_description = describe_effective_abel_env(cwd)
+    auth_description = env_description.get("auth")
+    if isinstance(auth_description, dict) and auth_description.get("ok"):
+        return {
+            "ok": True,
+            "source": auth_description.get("source"),
+            "path": auth_description.get("path"),
+        }
+
+    runtime_env = build_workspace_runtime_env(cwd)
     auth_env_file = runtime_env.get("ABEL_AUTH_ENV_FILE")
     if auth_env_file and has_auth_token(auth_env_file):
         auth_path = Path(auth_env_file).expanduser().resolve()

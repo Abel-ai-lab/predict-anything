@@ -43,8 +43,8 @@ def _next_step_for_error(message: str) -> str:
         "no abel strategy discovery workspace" in lowered or "bootstrap" in lowered
     ):
         return (
-            "Run `abel-invest workspace context --path . --json`, then follow its "
-            "next_step or bootstrap the reported default workspace."
+            "Run the active Abel Invest skill bootstrap shim for the reported "
+            "workspace path, then retry the strategy command."
         )
     if "auth" in lowered or "api key" in lowered:
         return "Use `abel-auth`, then rerun the failed Abel Invest command."
