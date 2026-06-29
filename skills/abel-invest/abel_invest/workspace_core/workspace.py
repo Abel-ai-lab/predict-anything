@@ -624,12 +624,15 @@ def _workspace_agents_found_version(text: str) -> str:
 
 
 def _front_matter_found_version(text: str, schema: str) -> str:
-    prefix = f"<!-- {schema} version="
     lines = text.splitlines()
     first_line = lines[0].strip() if lines else ""
-    if not first_line.startswith(prefix) or not first_line.endswith("-->"):
-        return ""
-    return first_line.removeprefix(prefix).removesuffix("-->").strip()
+    html_prefix = f"<!-- {schema} version="
+    if first_line.startswith(html_prefix) and first_line.endswith("-->"):
+        return first_line.removeprefix(html_prefix).removesuffix("-->").strip()
+    comment_prefix = f"# {schema} version="
+    if first_line.startswith(comment_prefix):
+        return first_line.removeprefix(comment_prefix).strip()
+    return ""
 
 
 def _normalize_generated_text(text: str) -> str:

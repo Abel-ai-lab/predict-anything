@@ -64,6 +64,8 @@ def test_scaffold_workspace_writes_alpha_owned_boundary_guidance(tmp_path: Path)
     assert generated["files"]["AGENTS.md"]["status"] == "current"
     assert generated["files"][".env.example"]["status"] == "current"
     assert generated["files"][".gitignore"]["status"] == "current"
+    assert generated["files"][".env.example"]["foundVersion"] == ABEL_INVEST_VERSION
+    assert generated["files"][".gitignore"]["foundVersion"] == ABEL_INVEST_VERSION
 
 
 def test_refresh_generated_workspace_files_overwrites_readme_and_agents(tmp_path: Path) -> None:
