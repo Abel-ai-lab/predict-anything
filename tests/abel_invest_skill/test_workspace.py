@@ -14,9 +14,11 @@ from abel_invest.workspace_core.env import build_local_install_command, resolve_
 from abel_invest.workspace_core.workspace import (
     WORKSPACE_AGENTS_GUIDE_SCHEMA,
     build_default_manifest,
+    refresh_generated_workspace_files,
     render_workspace_status,
     scaffold_workspace,
     workspace_agents_status,
+    workspace_generated_files_status,
 )
 
 
@@ -62,6 +64,12 @@ def test_scaffold_workspace_writes_alpha_owned_boundary_guidance(tmp_path: Path)
     assert "edit research/" not in _bash_blocks(agents)
     assert "read research/" not in _bash_blocks(agents)
     assert "Report to the user" in agents
+    generated = workspace_generated_files_status(root)
+    assert generated["status"] == "current"
+    assert generated["files"]["README.md"]["status"] == "current"
+    assert generated["files"]["AGENTS.md"]["status"] == "current"
+    assert generated["files"][".env.example"]["status"] == "current"
+    assert generated["files"][".gitignore"]["status"] == "current"
 
 
 def test_workspace_bootstrap_refreshes_stale_agents_guide(
@@ -116,6 +124,20 @@ def test_workspace_bootstrap_refreshes_stale_agents_guide(
     )
     assert "refactor-request.json" not in agents
     assert workspace_agents_status(root)["status"] == "current"
+
+
+def test_refresh_generated_workspace_files_overwrites_readme_and_agents(tmp_path: Path) -> None:
+    root = scaffold_workspace("trial-lab", target_root=tmp_path / "trial-lab")
+    (root / "README.md").write_text("old readme with upload-dashboard-bundle\n", encoding="utf-8")
+    (root / "AGENTS.md").write_text("old agents with upload-dashboard-bundle\n", encoding="utf-8")
+
+    before = workspace_generated_files_status(root)
+    refreshed = refresh_generated_workspace_files(root)
+
+    assert before["status"] == "stale"
+    assert refreshed["status"] == "current"
+    assert "upload-dashboard-bundle" not in (root / "README.md").read_text(encoding="utf-8")
+    assert "upload-dashboard-bundle" not in (root / "AGENTS.md").read_text(encoding="utf-8")
 
 
 def _bash_blocks(text: str) -> str:

@@ -13,6 +13,10 @@ MANIFEST_NAME = "alpha.workspace.yaml"
 DEFAULT_WORKSPACE_NAME = "abel-invest-workspace"
 WORKSPACE_AGENTS_GUIDE_SCHEMA = "abel-invest.workspace-agents/v1"
 WORKSPACE_AGENTS_GUIDE_VERSION = ABEL_INVEST_VERSION
+WORKSPACE_README_SCHEMA = "abel-invest.workspace-readme/v1"
+WORKSPACE_ENV_EXAMPLE_SCHEMA = "abel-invest.workspace-env-example/v1"
+WORKSPACE_GITIGNORE_SCHEMA = "abel-invest.workspace-gitignore/v1"
+GENERATED_WORKSPACE_FILES = ("README.md", "AGENTS.md", ".env.example", ".gitignore")
 
 
 def find_workspace_root(start: Path | None = None) -> Path | None:
@@ -162,11 +166,8 @@ def scaffold_workspace(
         resolved[key].mkdir(parents=True, exist_ok=True)
 
     write_text(root / MANIFEST_NAME, dump_manifest(manifest))
-    write_text(root / ".gitignore", render_gitignore())
-    write_text(root / ".env.example", render_env_example())
     write_text(root / ".env", "")
-    write_text(root / "README.md", render_workspace_readme(name))
-    write_text(root / "AGENTS.md", render_workspace_agents())
+    refresh_generated_workspace_files(root, manifest)
 
     return root
 
@@ -221,7 +222,8 @@ def render_workspace_status(root: Path, manifest: dict | None = None) -> str:
     manifest = manifest or load_workspace_manifest(root)
     resolved = resolve_workspace_paths(root, manifest)
     runtime_python = resolve_runtime_python(root, manifest)
-    agents_status = workspace_agents_status(root)
+    generated_status = workspace_generated_files_status(root, manifest)
+    agents_status = generated_status["files"].get("AGENTS.md", {})
     lines = [
         f"Workspace: {manifest.get('workspace', {}).get('name', root.name)}",
         f"Root: {root}",
@@ -240,6 +242,11 @@ def render_workspace_status(root: Path, manifest: dict | None = None) -> str:
             f"{agents_status['status']} "
             f"(expected abel-invest {agents_status['expectedVersion']})"
         ),
+        (
+            "Generated workspace files: "
+            f"{generated_status['status']} "
+            f"(expected abel-invest {generated_status['expectedVersion']})"
+        ),
         "Edge dependency: managed by abel-invest package dependencies",
     ]
     return "\n".join(lines)
@@ -247,7 +254,8 @@ def render_workspace_status(root: Path, manifest: dict | None = None) -> str:
 
 def render_workspace_readme(name: str) -> str:
     """Render the starter README for a new workspace."""
-    return f"""# {name}
+    return f"""<!-- {WORKSPACE_README_SCHEMA} version={WORKSPACE_AGENTS_GUIDE_VERSION} -->
+# {name}
 
 This is an Abel Invest alpha-search workspace.
 
@@ -541,36 +549,73 @@ separate directory.
 - if `alpha.workspace.yaml` is in the current directory, continue here directly and do not bootstrap a child workspace
 - if you are already in this workspace root, continue here directly
 - if you are in the parent launch directory, reuse its `abel-invest-workspace` child before creating another one
-- run `./.venv/bin/abel-invest workspace context --path . --json` before creating a session
+    - run `./.venv/bin/abel-invest workspace context --path . --json` before creating a session
 """
+
+
+def render_generated_workspace_files(root: Path, manifest: dict | None = None) -> dict[str, str]:
+    """Render all skill-owned generated workspace files."""
+    manifest = manifest or load_workspace_manifest(root)
+    workspace = manifest.get("workspace") if isinstance(manifest, dict) else {}
+    name = str(workspace.get("name") or root.name) if isinstance(workspace, dict) else root.name
+    return {
+        "README.md": render_workspace_readme(name),
+        "AGENTS.md": render_workspace_agents(),
+        ".env.example": render_env_example(),
+        ".gitignore": render_gitignore(),
+    }
+
+
+def workspace_generated_files_status(root: Path, manifest: dict | None = None) -> dict[str, object]:
+    """Return freshness for all skill-owned generated workspace files."""
+    expected = render_generated_workspace_files(root, manifest)
+    files: dict[str, dict[str, str]] = {}
+    statuses: list[str] = []
+    for relative, expected_text in expected.items():
+        path = root / relative
+        if not path.exists():
+            status = "missing"
+            found_version = ""
+        else:
+            actual = path.read_text(encoding="utf-8")
+            status = (
+                "current"
+                if _normalize_generated_text(actual) == _normalize_generated_text(expected_text)
+                else "stale"
+            )
+            found_version = _generated_file_found_version(actual, relative)
+        statuses.append(status)
+        files[relative] = {
+            "status": status,
+            "path": str(path),
+            "expectedVersion": WORKSPACE_AGENTS_GUIDE_VERSION,
+            "foundVersion": found_version,
+        }
+
+    overall = "current" if all(status == "current" for status in statuses) else "stale"
+    if any(status == "missing" for status in statuses):
+        overall = "missing"
+    return {
+        "status": overall,
+        "expectedVersion": WORKSPACE_AGENTS_GUIDE_VERSION,
+        "files": files,
+    }
+
+
+def refresh_generated_workspace_files(root: Path, manifest: dict | None = None) -> dict[str, object]:
+    """Overwrite all skill-owned generated workspace files from current templates."""
+    before = workspace_generated_files_status(root, manifest)
+    for relative, content in render_generated_workspace_files(root, manifest).items():
+        write_text(root / relative, content)
+    after = workspace_generated_files_status(root, manifest)
+    action = "unchanged" if before["status"] == "current" else "refreshed"
+    return {**after, "action": action, "previousStatus": before["status"]}
 
 
 def workspace_agents_status(root: Path) -> dict[str, str]:
     """Return whether the workspace AGENTS guide matches this Abel Invest version."""
-    path = root / "AGENTS.md"
-    expected = render_workspace_agents()
-    if not path.exists():
-        return {
-            "status": "missing",
-            "path": str(path),
-            "schema": WORKSPACE_AGENTS_GUIDE_SCHEMA,
-            "expectedVersion": WORKSPACE_AGENTS_GUIDE_VERSION,
-            "foundVersion": "",
-        }
-    actual = path.read_text(encoding="utf-8")
-    found_version = _workspace_agents_found_version(actual)
-    status = (
-        "current"
-        if _normalize_generated_text(actual) == _normalize_generated_text(expected)
-        else "stale"
-    )
-    return {
-        "status": status,
-        "path": str(path),
-        "schema": WORKSPACE_AGENTS_GUIDE_SCHEMA,
-        "expectedVersion": WORKSPACE_AGENTS_GUIDE_VERSION,
-        "foundVersion": found_version,
-    }
+    status = workspace_generated_files_status(root)["files"]["AGENTS.md"]
+    return {**status, "schema": WORKSPACE_AGENTS_GUIDE_SCHEMA}
 
 
 def refresh_workspace_agents(root: Path) -> dict[str, str]:
@@ -584,8 +629,25 @@ def refresh_workspace_agents(root: Path) -> dict[str, str]:
     return {**after, "action": action, "previousStatus": before["status"]}
 
 
+def _generated_file_found_version(text: str, relative: str) -> str:
+    schemas = {
+        "README.md": WORKSPACE_README_SCHEMA,
+        "AGENTS.md": WORKSPACE_AGENTS_GUIDE_SCHEMA,
+        ".env.example": WORKSPACE_ENV_EXAMPLE_SCHEMA,
+        ".gitignore": WORKSPACE_GITIGNORE_SCHEMA,
+    }
+    schema = schemas.get(relative, "")
+    if not schema:
+        return ""
+    return _front_matter_found_version(text, schema)
+
+
 def _workspace_agents_found_version(text: str) -> str:
-    prefix = f"<!-- {WORKSPACE_AGENTS_GUIDE_SCHEMA} version="
+    return _front_matter_found_version(text, WORKSPACE_AGENTS_GUIDE_SCHEMA)
+
+
+def _front_matter_found_version(text: str, schema: str) -> str:
+    prefix = f"<!-- {schema} version="
     lines = text.splitlines()
     first_line = lines[0].strip() if lines else ""
     if not first_line.startswith(prefix) or not first_line.endswith("-->"):
@@ -599,7 +661,8 @@ def _normalize_generated_text(text: str) -> str:
 
 def render_gitignore() -> str:
     """Render the default workspace gitignore."""
-    return """# Abel strategy discovery workspace
+    return f"""# {WORKSPACE_GITIGNORE_SCHEMA} version={WORKSPACE_AGENTS_GUIDE_VERSION}
+# Abel strategy discovery workspace
 .venv/
 .env
 cache/
@@ -611,7 +674,8 @@ __pycache__/
 
 def render_env_example() -> str:
     """Render the starter environment example."""
-    return """# Optional override for standalone Abel auth fallback
+    return f"""# {WORKSPACE_ENV_EXAMPLE_SCHEMA} version={WORKSPACE_AGENTS_GUIDE_VERSION}
+# Optional override for standalone Abel auth fallback
 # ABEL_API_KEY=
 
 # Optional: point abel-edge at a shared auth file

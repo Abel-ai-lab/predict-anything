@@ -85,7 +85,7 @@ def test_resolve_runtime_cli_uses_workspace_python_directory(tmp_path):
     assert resolve_runtime_cli(workspace) == workspace / ".venv/bin/abel-invest"
 
 
-def test_doctor_runtime_stale_next_step_uses_workspace_cli(tmp_path, monkeypatch):
+def test_doctor_runtime_stale_next_step_uses_active_bootstrap(tmp_path, monkeypatch):
     workspace = tmp_path / "abel-invest-workspace"
     _write_workspace(workspace)
     bin_dir = workspace / ".venv/bin"
@@ -103,6 +103,11 @@ def test_doctor_runtime_stale_next_step_uses_workspace_cli(tmp_path, monkeypatch
             "installed": {},
         },
     )
+    monkeypatch.setattr(
+        doctor_core,
+        "workspace_generated_files_status",
+        lambda *_args, **_kwargs: {"status": "current"},
+    )
 
     result = doctor_core.run_doctor(workspace)
 
@@ -110,7 +115,7 @@ def test_doctor_runtime_stale_next_step_uses_workspace_cli(tmp_path, monkeypatch
     assert result["status"] == "runtime_stale"
     assert result["cli_path"] == str(cli_path)
     assert result["command_prefix"] == str(cli_path)
-    assert result["next_step"] == f"{cli_path} env refresh --path {workspace}"
+    assert result["next_step"] == f"rerun the active Abel Invest bootstrap shim for {workspace}"
 
 
 def test_workspace_context_exposes_workspace_command_prefix(tmp_path, monkeypatch):

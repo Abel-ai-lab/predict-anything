@@ -35,7 +35,7 @@ def test_abel_invest_bootstrap_script_is_preinstall_entrypoint() -> None:
     assert not any(module.startswith("abel_invest") for module in imported_modules)
     assert not any(module == "yaml" or module.startswith("yaml.") for module in imported_modules)
     assert '"abel_invest.cli"' not in source
-    assert '"abel_invest"' in source
+    assert '"abel_invest.bootstrap_runtime_doctor"' in source
 
     result = subprocess.run(
         [sys.executable, "-S", str(script), "--help"],

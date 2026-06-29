@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -15,6 +16,10 @@ from shutil import which
 MANIFEST_NAME = "alpha.workspace.yaml"
 DEFAULT_WORKSPACE_NAME = "abel-invest-workspace"
 WORKSPACE_AGENTS_GUIDE_SCHEMA = "abel-invest.workspace-agents/v1"
+WORKSPACE_README_SCHEMA = "abel-invest.workspace-readme/v1"
+WORKSPACE_ENV_EXAMPLE_SCHEMA = "abel-invest.workspace-env-example/v1"
+WORKSPACE_GITIGNORE_SCHEMA = "abel-invest.workspace-gitignore/v1"
+BOOTSTRAP_CONTRACT_ID = "abel-invest.bootstrap-reconcile/v1"
 
 
 def main() -> int:
@@ -30,20 +35,26 @@ def main() -> int:
         editable=not args.no_editable,
     )
     refresh_workspace_guidance(python_path=python_path, root=root, name=args.name)
-    command = [str(python_path), "-m", "abel_invest", "doctor", "--path", str(root)]
-    print(f"Running workspace doctor with {python_path}")
-    completed = subprocess.run(command, text=True)
+    print(f"Running bootstrap runtime doctor with {python_path}")
+    doctor_payload = run_bootstrap_runtime_doctor(
+        python_path=python_path,
+        root=root,
+        skill_root=skill_root,
+        verify_source_root=not args.no_editable,
+    )
+    doctor_result = doctor_payload.get("doctor", {})
+    print(render_runtime_doctor_report(doctor_result))
     cli_path = runtime_cli_path(python_path)
     print("")
     print("From here:")
-    if completed.returncode == 0:
+    if int(doctor_payload.get("exit_code", 1)) == 0:
         print(f"  cd {root}")
         print(f"  {default_activate_command()}")
         print(f"  {cli_path} init-session --ticker <TICKER> --exp-id <session-id>")
     else:
         print(f"  cd {root}")
-        print(f"  {cli_path} doctor")
-    return completed.returncode
+        print("  resolve the blocker above, then rerun this active skill bootstrap command")
+    return int(doctor_payload.get("exit_code", 1))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -229,13 +240,85 @@ def update_manifest_value(path: Path, prefix: str, replacement: str) -> None:
 def refresh_workspace_guidance(*, python_path: Path, root: Path, name: str) -> None:
     code = (
         "from pathlib import Path\n"
-        "from abel_invest.workspace_core.workspace import render_workspace_readme, render_workspace_agents\n"
+        "from abel_invest.workspace_core.workspace import refresh_generated_workspace_files\n"
+        "from abel_invest.workspace_core.workspace import load_workspace_manifest\n"
         f"root = Path({str(root)!r})\n"
-        f"name = {name!r}\n"
-        "(root / 'README.md').write_text(render_workspace_readme(name), encoding='utf-8')\n"
-        "(root / 'AGENTS.md').write_text(render_workspace_agents(), encoding='utf-8')\n"
+        "refresh_generated_workspace_files(root, load_workspace_manifest(root))\n"
     )
     run_command([str(python_path), "-c", code], cwd=root)
+
+
+def run_bootstrap_runtime_doctor(
+    *,
+    python_path: Path,
+    root: Path,
+    skill_root: Path,
+    verify_source_root: bool,
+) -> dict:
+    command = [
+        str(python_path),
+        "-m",
+        "abel_invest.bootstrap_runtime_doctor",
+        "--workspace",
+        str(root),
+        "--expected-version",
+        local_project_version(skill_root),
+        "--expected-contract-id",
+        BOOTSTRAP_CONTRACT_ID,
+        "--json",
+    ]
+    if verify_source_root:
+        command.extend(["--expected-source-root", str(skill_root)])
+    completed = subprocess.run(command, cwd=root, capture_output=True, text=True)
+    payload = parse_json_stdout(completed.stdout, command)
+    if completed.stderr.strip():
+        print(completed.stderr.strip(), file=sys.stderr)
+    if completed.returncode not in {0, 1, 2}:
+        raise SystemExit(
+            f"Bootstrap runtime doctor failed with exit code {completed.returncode}: {' '.join(command)}"
+        )
+    contract = payload.get("bootstrap_contract") if isinstance(payload, dict) else None
+    mismatches = contract.get("mismatches") if isinstance(contract, dict) else None
+    if mismatches:
+        raise SystemExit(
+            "Bootstrap runtime doctor contract mismatch: "
+            + ", ".join(str(item) for item in mismatches)
+        )
+    return payload
+
+
+def parse_json_stdout(stdout: str, command: list[str]) -> dict:
+    try:
+        return json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(
+            "Bootstrap runtime doctor did not emit valid JSON: "
+            + " ".join(command)
+            + f"\n{stdout.strip()}"
+        ) from exc
+
+
+def render_runtime_doctor_report(result: object) -> str:
+    if not isinstance(result, dict):
+        return "Status: unknown\nSummary: runtime doctor returned an invalid payload"
+    lines = [
+        f"Status: {result.get('status', 'unknown')}",
+        f"Summary: {result.get('summary', '')}",
+    ]
+    for key in ("workspace_root", "python_path", "cli_path", "command_prefix"):
+        value = result.get(key)
+        if value:
+            label = key.replace("_", " ").title()
+            lines.append(f"{label}: {value}")
+    auth = result.get("auth")
+    if isinstance(auth, dict):
+        source = auth.get("source", "unknown")
+        path = auth.get("path")
+        lines.append(f"Auth source: {source}" + (f" ({path})" if path else ""))
+    next_step = result.get("next_step")
+    if next_step:
+        lines.append(f"Next step: {next_step}")
+    return "\n".join(lines)
 
 
 def render_manifest(name: str) -> str:
@@ -259,19 +342,17 @@ defaults:
 
 
 def render_readme(name: str) -> str:
-    return f"""# {name}
+    return f"""<!-- {WORKSPACE_README_SCHEMA} version={local_project_version(Path(__file__).resolve().parents[1])} -->
+# {name}
 
 This is an Abel Invest alpha-search workspace.
 
 From this workspace root, use `./.venv/bin/abel-invest` as the command prefix,
 or activate `.venv` first and then use `abel-invest`.
 
-Run `./.venv/bin/abel-invest workspace context --path . --json` and
-`./.venv/bin/abel-invest doctor` before creating a session. Sessions belong
-under this workspace's `research/` directory unless you intentionally use an
-explicit outside-workspace escape hatch. After each recorded round, update
-`exploration_path.md` with the ledger ref, chosen path, compact reason, Edge
-feedback, and artifact refs before running another recorded round.
+Run the active skill bootstrap shim before creating or continuing sessions. The
+shim owns workspace reconciliation; the workspace CLI owns exploration commands
+after bootstrap reports ready.
 """
 
 
@@ -281,9 +362,8 @@ def render_agents(skill_root: Path) -> str:
 # AGENTS.md - Abel strategy discovery Workspace
 
 Use this directory as the workspace root. If `alpha.workspace.yaml` is present,
-do not create a child `abel-invest-workspace` here. Run
-`./.venv/bin/abel-invest workspace context --path . --json` before creating a
-new session.
+do not create a child `abel-invest-workspace` here. Run the active Abel Invest
+skill bootstrap shim before creating a new session.
 
 Report to the user:
 - workspace root and doctor status
@@ -300,7 +380,9 @@ default substitute for live graph search.
 
 
 def render_gitignore() -> str:
-    return """# Abel strategy discovery workspace
+    version = local_project_version(Path(__file__).resolve().parents[1])
+    return f"""# {WORKSPACE_GITIGNORE_SCHEMA} version={version}
+# Abel strategy discovery workspace
 .venv/
 .env
 cache/
@@ -311,7 +393,9 @@ __pycache__/
 
 
 def render_env_example() -> str:
-    return """# Optional override for standalone Abel auth fallback
+    version = local_project_version(Path(__file__).resolve().parents[1])
+    return f"""# {WORKSPACE_ENV_EXAMPLE_SCHEMA} version={version}
+# Optional override for standalone Abel auth fallback
 # ABEL_API_KEY=
 
 # Optional: point abel-edge at a shared auth file
