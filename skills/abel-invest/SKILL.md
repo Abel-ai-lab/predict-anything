@@ -113,6 +113,10 @@ Always:
   work. Do not use workspace-local lifecycle commands to repair setup.
 - Reuse existing Abel auth first. If live access is missing, use `abel-auth` and
   rerun the active bootstrap shim.
+- Treat `abel-auth/.env.skill` as the normal shared auth/profile source.
+  Workspace `.env` is only an explicit per-workspace override; do not copy API
+  keys there unless the user intentionally wants this workspace to use different
+  credentials or endpoints. Trust bootstrap's effective profile/CAP URL report.
 - Report to the user with the current workspace/session/branch path, bootstrap
   readiness, blockers, what evidence exists, and the next action you will take.
 - Treat `agent_context.md` as the compact factual resume surface,

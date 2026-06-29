@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from pathlib import Path
 
@@ -20,7 +19,7 @@ from abel_invest.narrative_core.contracts.constants import (
 from abel_invest.narrative_core.evidence.frontier import increment_count, render_inline_counts
 from abel_invest.narrative_core.io import _now
 from abel_invest.workspace_core.doctor import build_auth_recovery_instruction, workspace_command
-from abel_invest.workspace_core.edge_runtime import resolve_runtime_auth_env_file
+from abel_invest.workspace_core.edge_runtime import apply_effective_abel_env
 from abel_invest.workspace_core.workspace import resolve_workspace_entry
 
 
@@ -46,9 +45,7 @@ def fetch_live_graph_frontier(
         ) from exc
     workspace_root, _ = resolve_workspace_entry()
     if workspace_root is not None:
-        auth_env = resolve_runtime_auth_env_file(workspace_root)
-        if auth_env is not None:
-            os.environ.setdefault("ABEL_AUTH_ENV_FILE", str(auth_env))
+        apply_effective_abel_env(workspace_root)
 
     try:
         require_api_key()
@@ -93,9 +90,7 @@ def fetch_live_graph_expansion(
         ) from exc
     workspace_root, _ = resolve_workspace_entry()
     if workspace_root is not None:
-        auth_env = resolve_runtime_auth_env_file(workspace_root)
-        if auth_env is not None:
-            os.environ.setdefault("ABEL_AUTH_ENV_FILE", str(auth_env))
+        apply_effective_abel_env(workspace_root)
 
     try:
         require_api_key()

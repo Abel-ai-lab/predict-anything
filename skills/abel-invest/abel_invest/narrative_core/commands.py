@@ -29,7 +29,7 @@ from abel_invest.narrative_core.strategy_artifacts import (
     export_strategy_artifact_command,
     promote_strategy_command,
 )
-from abel_invest.workspace_core.edge_runtime import apply_workspace_env
+from abel_invest.workspace_core.edge_runtime import apply_effective_abel_env
 from abel_invest.workspace_core.workspace import find_workspace_root, resolve_workspace_entry
 
 
@@ -74,10 +74,10 @@ def main() -> int:
 
 
 def hydrate_command_workspace_env(args) -> None:
-    """Load workspace-local Abel runtime env before command handlers run."""
+    """Load the effective Abel runtime env before command handlers run."""
     workspace_root = resolve_command_workspace_root(args)
     if workspace_root is not None:
-        apply_workspace_env(workspace_root)
+        apply_effective_abel_env(workspace_root)
 
 
 def resolve_command_workspace_root(args) -> Path | None:

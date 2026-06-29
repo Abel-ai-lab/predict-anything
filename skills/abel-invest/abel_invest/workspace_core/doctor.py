@@ -11,6 +11,7 @@ import tomllib
 from pathlib import Path
 
 from abel_invest.workspace_core.edge_runtime import (
+    describe_effective_abel_env,
     probe_abel_auth,
     probe_abel_edge_cli,
     probe_abel_edge_import,
@@ -205,6 +206,8 @@ def run_doctor(start: Path | None = None) -> dict[str, object]:
     checks["auth"] = "pass" if auth_check.get("ok") else "fail"
     result["auth"] = auth_check
     result["auth_scope"] = classify_auth_scope(root, auth_check)
+    effective_env = describe_effective_abel_env(root)
+    result["effective_env"] = effective_env
 
     if discovery_contract_ok is not True or context_contract_ok is not True:
         result.update(
@@ -458,6 +461,20 @@ def render_doctor_report(result: dict[str, object]) -> str:
             f"{auth.get('source', 'unknown')}"
             + (f" ({auth.get('path')})" if auth.get("path") else "")
         )
+    effective_env = result.get("effective_env")
+    if isinstance(effective_env, dict):
+        profile = effective_env.get("effectiveProfile") or "<unset>"
+        profile_source = effective_env.get("profileSource") or "unknown"
+        cap_url = effective_env.get("effectiveCapBaseUrl") or ""
+        lines.append(f"Effective profile: {profile} ({profile_source})")
+        if cap_url:
+            lines.append(f"Effective CAP base URL: {cap_url}")
+        overrides = effective_env.get("workspaceOverrideKeys")
+        if isinstance(overrides, list) and overrides:
+            lines.append(f"Workspace env overrides: {', '.join(str(item) for item in overrides)}")
+        conflicts = effective_env.get("envConflictKeys")
+        if isinstance(conflicts, list) and conflicts:
+            lines.append(f"Workspace/shared env conflicts: {', '.join(str(item) for item in conflicts)}")
     auth_scope = result.get("auth_scope")
     if auth_scope:
         lines.append(f"Auth scope: {auth_scope}")

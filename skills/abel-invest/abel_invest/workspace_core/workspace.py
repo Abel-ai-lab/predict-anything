@@ -655,11 +655,18 @@ __pycache__/
 def render_env_example() -> str:
     """Render the starter environment example."""
     return f"""# {WORKSPACE_ENV_EXAMPLE_SCHEMA} version={WORKSPACE_AGENTS_GUIDE_VERSION}
-# Optional override for standalone Abel auth fallback
-# ABEL_API_KEY=
+# Abel Invest normally uses the shared abel-auth/.env.skill file.
+# Leave workspace .env empty unless this workspace needs an explicit override.
 
-# Optional: point abel-edge at a shared auth file
+# Optional: point this workspace at a custom shared auth/profile file.
 # ABEL_AUTH_ENV_FILE=
+
+# Optional: override only this workspace's Abel endpoints.
+# ABEL_PROFILE=
+# ABEL_CAP_BASE_URL=
+# ABEL_AUTH_BASE_URL=
+# ABEL_ROUTER_BASE_URL=
+# ABEL_NARRATIVE_CAP_BASE_URL=
 """
 
 

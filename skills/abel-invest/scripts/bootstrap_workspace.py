@@ -315,6 +315,26 @@ def render_runtime_doctor_report(result: object) -> str:
         source = auth.get("source", "unknown")
         path = auth.get("path")
         lines.append(f"Auth source: {source}" + (f" ({path})" if path else ""))
+    effective_env = result.get("effective_env")
+    if isinstance(effective_env, dict):
+        profile = effective_env.get("effectiveProfile") or "<unset>"
+        profile_source = effective_env.get("profileSource") or "unknown"
+        cap_url = effective_env.get("effectiveCapBaseUrl")
+        lines.append(f"Effective profile: {profile} ({profile_source})")
+        if cap_url:
+            lines.append(f"Effective CAP base URL: {cap_url}")
+        overrides = effective_env.get("workspaceOverrideKeys")
+        if isinstance(overrides, list) and overrides:
+            lines.append(
+                "Workspace env overrides: "
+                + ", ".join(str(item) for item in overrides)
+            )
+        conflicts = effective_env.get("envConflictKeys")
+        if isinstance(conflicts, list) and conflicts:
+            lines.append(
+                "Workspace/shared env conflicts: "
+                + ", ".join(str(item) for item in conflicts)
+            )
     next_step = result.get("next_step")
     if next_step:
         lines.append(f"Next step: {next_step}")
@@ -395,11 +415,18 @@ __pycache__/
 def render_env_example() -> str:
     version = local_project_version(Path(__file__).resolve().parents[1])
     return f"""# {WORKSPACE_ENV_EXAMPLE_SCHEMA} version={version}
-# Optional override for standalone Abel auth fallback
-# ABEL_API_KEY=
+# Abel Invest normally uses the shared abel-auth/.env.skill file.
+# Leave workspace .env empty unless this workspace needs an explicit override.
 
-# Optional: point abel-edge at a shared auth file
+# Optional: point this workspace at a custom shared auth/profile file.
 # ABEL_AUTH_ENV_FILE=
+
+# Optional: override only this workspace's Abel endpoints.
+# ABEL_PROFILE=
+# ABEL_CAP_BASE_URL=
+# ABEL_AUTH_BASE_URL=
+# ABEL_ROUTER_BASE_URL=
+# ABEL_NARRATIVE_CAP_BASE_URL=
 """
 
 

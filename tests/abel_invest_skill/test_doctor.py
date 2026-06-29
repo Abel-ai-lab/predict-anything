@@ -44,6 +44,22 @@ def test_run_doctor_ready_reports_alpha_managed_strategy_search(
             "ok": True,
             "source": "workspace_env",
             "path": str(root / ".env"),
+            },
+    )
+    monkeypatch.setattr(
+        doctor,
+        "describe_effective_abel_env",
+        lambda *_args, **_kwargs: {
+            "auth": {
+                "ok": True,
+                "source": "shared_auth_file",
+                "path": str(root / ".agents" / "abel-auth" / ".env.skill"),
+            },
+            "profileSource": "shared_auth_file",
+            "effectiveProfile": "sit",
+            "effectiveCapBaseUrl": "https://cap-sit.abel.ai/api",
+            "workspaceOverrideKeys": [],
+            "envConflictKeys": [],
         },
     )
 
@@ -57,6 +73,8 @@ def test_run_doctor_ready_reports_alpha_managed_strategy_search(
 
     report = doctor.render_doctor_report(result)
     assert "Workspace mode: alpha-managed strategy search" in report
+    assert "Effective profile: sit (shared_auth_file)" in report
+    assert "Effective CAP base URL: https://cap-sit.abel.ai/api" in report
     assert "Edge install target:" not in report
 
 

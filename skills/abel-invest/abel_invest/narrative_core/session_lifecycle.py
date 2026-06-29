@@ -21,7 +21,7 @@ from abel_invest.narrative_core.contracts.constants import (
 )
 from abel_invest.workspace_core.doctor import build_auth_recovery_instruction, workspace_command
 from abel_invest.narrative_core.runtime.edge_commands import run_edge_verify_data
-from abel_invest.workspace_core.edge_runtime import resolve_runtime_auth_env_file
+from abel_invest.workspace_core.edge_runtime import apply_effective_abel_env
 from abel_invest.narrative_core.io import (
     SessionLock,
     _now,
@@ -286,9 +286,7 @@ def fetch_live_discovery(ticker: str, *, limit: int) -> dict:
         ) from exc
     workspace_root, _ = resolve_workspace_entry()
     if workspace_root is not None:
-        auth_env = resolve_runtime_auth_env_file(workspace_root)
-        if auth_env is not None:
-            os.environ.setdefault("ABEL_AUTH_ENV_FILE", str(auth_env))
+        apply_effective_abel_env(workspace_root)
 
     try:
         require_api_key()

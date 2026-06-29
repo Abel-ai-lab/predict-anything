@@ -44,6 +44,21 @@ start live discovery yet. Use `abel-auth`, then rerun the active bootstrap shim.
 Do not invent a separate auth flow from this skill. `abel-auth` owns explicit
 auth handoff and credential setup.
 
+Abel Invest assembles one effective runtime env before calling Abel-edge:
+
+```text
+explicit process env
+> workspace .env overrides
+> abel-auth/.env.skill shared auth/profile
+> runtime defaults
+```
+
+The shared `abel-auth/.env.skill` file is the canonical auth/profile source for
+normal use. The workspace `.env` file is only a per-workspace override. Do not
+copy API keys into workspace `.env` unless the user intentionally wants this one
+workspace to use different credentials. Bootstrap reports the effective profile,
+CAP base URL, workspace overrides, and any workspace/shared env conflicts.
+
 If the user explicitly asks for offline inspection, you may inspect existing
 artifacts without auth, but mark live discovery/evaluation as blocked until
 bootstrap readiness is `ready`.
