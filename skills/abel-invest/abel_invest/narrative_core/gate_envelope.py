@@ -40,12 +40,11 @@ def build_user_request(objective_text: str | None, *, source_kind: str = "cli_ob
 
     raw_text = str(objective_text or "").strip()
     defaulted = _is_unusably_vague(raw_text)
+    raw_prompt = _raw_prompt(raw_text, source_kind, defaulted=defaulted)
     if defaulted:
         return {
             "schema": USER_REQUEST_SCHEMA,
-            "raw_text": raw_text,
-            "raw_text_hash": _hash_text(raw_text),
-            "source": {"kind": "default" if not raw_text else source_kind, "field": "--objective"},
+            "raw_prompt": raw_prompt,
             "defaulted": True,
             "default_policy": "current_gate_compat",
             "principle_ref": None,
@@ -69,9 +68,7 @@ def build_user_request(objective_text: str | None, *, source_kind: str = "cli_ob
     preferences = _normalize_preferences(lowered)
     return {
         "schema": USER_REQUEST_SCHEMA,
-        "raw_text": raw_text,
-        "raw_text_hash": _hash_text(raw_text),
-        "source": {"kind": source_kind, "field": "--objective"},
+        "raw_prompt": raw_prompt,
         "defaulted": False,
         "default_policy": None,
         "principle_ref": None,
@@ -95,11 +92,12 @@ def build_gate_envelope(
     """Build, validate, canonicalize, and hash a session gate envelope."""
 
     target = str(ticker or "").strip().upper()
-    user_request = build_user_request(objective_text)
     edge_vocabulary = vocabulary or load_edge_gate_vocabulary()
-    selected_gate = _generate_selected_gate(user_request, edge_vocabulary)
+    edge_context = _edge_vocabulary_context(edge_vocabulary)
+    user_request = build_user_request(objective_text)
+    selected_gate = _generate_selected_gate(user_request, edge_context)
     dimensions_used = _dimensions_used(selected_gate)
-    agent_summary = _agent_summary(edge_vocabulary, dimensions_used)
+    agent_summary = _agent_summary(edge_context, dimensions_used)
     envelope = {
         "schema": GATE_ENVELOPE_SCHEMA,
         "identity": {
@@ -110,7 +108,7 @@ def build_gate_envelope(
         "created_at": created_at or _now(),
         "source": {
             "mode": str(mode or "standard").strip().lower() or "standard",
-            "request_source": user_request["source"]["kind"],
+            "request_source": user_request["raw_prompt"]["source"]["kind"],
             "vocabulary_source": "abel-edge.validation.gate_vocabulary",
             "generator_version": GENERATOR_VERSION,
         },
@@ -185,9 +183,9 @@ def build_gate_decision_trace(envelope: dict) -> dict:
         "gate_hash": env["gate_hash"],
         "created_before_exploration": True,
         "user_request_snapshot": {
-            "raw_text": env["user_request"].get("raw_text", ""),
-            "raw_text_hash": env["user_request"].get("raw_text_hash"),
-            "normalized": _request_trace_normalized(env["user_request"]),
+            "ssot": "session_state.gate_envelope.user_request",
+            "raw_prompt": _raw_prompt_snapshot(env["user_request"]),
+            "normalized_user_request": _normalized_user_request_snapshot(env["user_request"]),
         },
         "edge_vocabulary_snapshot": {
             "vocabulary_hash": env["edge_vocabulary"].get("vocabulary_hash"),
@@ -198,7 +196,7 @@ def build_gate_decision_trace(envelope: dict) -> dict:
         "generation": {
             "generated_gate_id": env["selected_gate"]["gate_id"],
             "rationale_codes": _rationale_codes(env["selected_gate"]),
-            "heuristic_inputs": ["objective", "limits", "preferences"],
+            "inputs": ["user_request", "edge_vocabulary_context"],
         },
         "generator": {"name": "abel-invest.gate-generator", "version": 1},
     }
@@ -268,8 +266,8 @@ def render_gate_envelope_summary(envelope: dict) -> str:
     )
 
 
-def _generate_selected_gate(user_request: dict, vocabulary: dict) -> dict:
-    dim_map = {str(item.get("id")): item for item in vocabulary.get("dimensions") or []}
+def _generate_selected_gate(user_request: dict, edge_context: dict) -> dict:
+    dim_map = edge_context["dimension_map"]
     objective = user_request.get("objective") or {}
     limits = user_request.get("limits") or {}
     preferences = user_request.get("preferences") or {}
@@ -483,12 +481,42 @@ def _plain_language(raw_text: str) -> str:
     return raw_text
 
 
+def _raw_prompt(raw_text: str, source_kind: str, *, defaulted: bool) -> dict[str, Any]:
+    source = {"kind": "default" if defaulted and not raw_text else source_kind, "field": "--objective"}
+    return {"text": raw_text, "hash": _hash_text(raw_text), "source": source}
+
+
+def _raw_prompt_snapshot(user_request: dict) -> dict[str, Any]:
+    raw_prompt = user_request.get("raw_prompt")
+    if isinstance(raw_prompt, dict):
+        return raw_prompt
+    text = str(user_request.get("raw_text") or "")
+    return {
+        "text": text,
+        "hash": user_request.get("raw_text_hash") or _hash_text(text),
+        "source": user_request.get("source") or {"kind": "unknown", "field": "--objective"},
+    }
+
+
+def _edge_vocabulary_context(vocabulary: dict) -> dict[str, Any]:
+    dimensions = vocabulary.get("dimensions") or []
+    dimension_map = {str(item.get("id")): item for item in dimensions if item.get("id")}
+    if not dimension_map:
+        raise RuntimeError("Abel Edge returned an empty gate vocabulary.")
+    return {
+        "schema": vocabulary.get("schema"),
+        "vocabulary_hash": vocabulary.get("vocabulary_hash"),
+        "edge_version": vocabulary.get("edge_version"),
+        "dimension_map": dimension_map,
+    }
+
+
 def _dimensions_used(selected_gate: dict) -> list[str]:
     return sorted({str(check["dimension"]) for check in selected_gate.get("checks") or []})
 
 
-def _agent_summary(vocabulary: dict, dimensions_used: list[str]) -> dict[str, str]:
-    dim_map = {str(item.get("id")): item for item in vocabulary.get("dimensions") or []}
+def _agent_summary(edge_context: dict, dimensions_used: list[str]) -> dict[str, str]:
+    dim_map = edge_context["dimension_map"]
     return {
         dimension: str(dim_map[dimension].get("numeric_meaning") or "")
         for dimension in dimensions_used
@@ -504,7 +532,7 @@ def _rationale_codes(selected_gate: dict) -> list[str]:
     ]
 
 
-def _request_trace_normalized(user_request: dict) -> dict[str, Any]:
+def _normalized_user_request_snapshot(user_request: dict) -> dict[str, Any]:
     objective = user_request.get("objective") or {}
     limits = user_request.get("limits") or {}
     preferences = user_request.get("preferences") or {}

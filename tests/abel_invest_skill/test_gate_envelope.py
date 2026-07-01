@@ -20,6 +20,8 @@ def test_build_user_request_defaults_to_current_gate_for_missing_objective():
 
     assert request["defaulted"] is True
     assert request["default_policy"] == "current_gate_compat"
+    assert request["raw_prompt"]["text"] == ""
+    assert request["raw_prompt"]["source"]["kind"] == "default"
     assert request["objective"]["metric"] == "sharpe"
     assert request["objective"]["target"] == 2.0
     assert request["limits"]["edge_required_gates"] == "pass_all_current_required"
@@ -81,6 +83,7 @@ def test_ordinary_request_can_generate_lite_like_envelope_shape():
 
     assert envelope["source"]["mode"] == "standard"
     assert envelope["source"]["request_source"] == "cli_objective"
+    assert envelope["user_request"]["raw_prompt"]["source"]["kind"] == "cli_objective"
     assert envelope["user_request"]["preferences"]["gate_envelope_shape"] == "lite_like"
     assert envelope["compatibility"]["gate_envelope_shape"] == "lite_like"
     assert envelope["selected_gate"]["gate_id"] == "generated:beginner-simple-current-gate-v1"
@@ -135,7 +138,11 @@ def test_gate_decision_trace_cites_only_generation_inputs(tmp_path):
     assert (tmp_path / GATE_DECISION_TRACE_FILENAME).exists()
     assert trace["created_before_exploration"] is True
     assert trace["gate_hash"] == envelope["gate_hash"]
+    assert trace["user_request_snapshot"]["ssot"] == "session_state.gate_envelope.user_request"
+    assert "normalized" not in trace["user_request_snapshot"]
+    assert "normalized_user_request" in trace["user_request_snapshot"]
     assert trace["generation"]["generated_gate_id"] == envelope["selected_gate"]["gate_id"]
+    assert trace["generation"]["inputs"] == ["user_request", "edge_vocabulary_context"]
     assert trace["edge_vocabulary_snapshot"]["snapshot_scope"] == "cited_dimensions_only"
     trace_json = json.dumps(trace)
     assert "candidate_metrics" not in trace_json
@@ -161,7 +168,7 @@ def test_render_gate_envelope_summary_is_factual():
     assert "try next" not in rendered.lower()
 
 
-def test_missing_required_edge_dimension_fails_actionably():
+def test_empty_edge_vocabulary_fails_before_gate_generation():
     vocabulary = {
         "schema": "abel-edge.gate-vocabulary/v1",
         "edge_version": "test",
@@ -169,7 +176,26 @@ def test_missing_required_edge_dimension_fails_actionably():
         "dimensions": [],
     }
 
-    with pytest.raises(RuntimeError, match="missing required dimension"):
+    with pytest.raises(RuntimeError, match="empty gate vocabulary"):
+        build_gate_envelope(
+            ticker="MSFT",
+            mode="standard",
+            objective_text="",
+            discovery={"target_node": "MSFT.price"},
+            backtest_start="2020-01-01",
+            vocabulary=vocabulary,
+        )
+
+
+def test_missing_required_edge_dimension_fails_actionably():
+    vocabulary = {
+        "schema": "abel-edge.gate-vocabulary/v1",
+        "edge_version": "test",
+        "vocabulary_hash": "sha256:test",
+        "dimensions": [{"id": "sharpe", "numeric_meaning": "test"}],
+    }
+
+    with pytest.raises(RuntimeError, match="missing required dimension: edge_required_gates"):
         build_gate_envelope(
             ticker="MSFT",
             mode="standard",
