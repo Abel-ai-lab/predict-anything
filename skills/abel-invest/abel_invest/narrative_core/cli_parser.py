@@ -44,6 +44,14 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["standard", "grandma"],
         help="Session strategy mode. Grandma mode routes branches to the conservative grandma_daily profile.",
     )
+    init_session.add_argument(
+        "--objective",
+        default="",
+        help=(
+            "User request for this session's generated gate. When omitted or vague, "
+            "Abel Invest uses current gate compatibility."
+        ),
+    )
     discovery_group = init_session.add_mutually_exclusive_group()
     discovery_group.add_argument(
         "--discover",

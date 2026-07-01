@@ -12,6 +12,7 @@ from abel_invest.narrative_core.contracts.constants import (
     EVENTS_HEADER,
     EXPLORATION_PATH_FILENAME,
     GRAPH_FRONTIER_FILENAME,
+    GATE_DECISION_TRACE_FILENAME,
     READINESS_FILENAME,
 )
 from abel_invest.narrative_core.io import SessionLock, _now, append_tsv_row
@@ -56,6 +57,7 @@ def handle_init_session(args: argparse.Namespace) -> int:
         discover_limit=args.discover_limit,
         backtest_start=args.backtest_start,
         mode=mode,
+        objective_text=getattr(args, "objective", ""),
     )
     discovery = load_discovery(session)
     readiness = load_readiness(session)
@@ -64,6 +66,15 @@ def handle_init_session(args: argparse.Namespace) -> int:
     print(f"Created Abel strategy discovery session at {session}")
     print(f"  ticker: {discovery.get('ticker', args.ticker.upper())}")
     print(f"  mode: {effective_mode}")
+    gate_envelope = session_state.get("gate_envelope") if isinstance(session_state, dict) else {}
+    if isinstance(gate_envelope, dict):
+        print(f"  selected_gate: {gate_envelope.get('gate_id', 'unknown')}")
+        print(
+            "  edge_vocabulary: "
+            f"{(gate_envelope.get('edge_vocabulary') or {}).get('vocabulary_hash', 'unknown')}"
+        )
+        print(f"  gate_hash: {gate_envelope.get('gate_hash', 'unknown')}")
+        print(f"  decision_trace: {session / GATE_DECISION_TRACE_FILENAME}")
     print(f"  graph_frontier: {session / GRAPH_FRONTIER_FILENAME}")
     print(f"  exploration_path: {session / EXPLORATION_PATH_FILENAME}")
     print(f"  events: {session / 'events.tsv'}")

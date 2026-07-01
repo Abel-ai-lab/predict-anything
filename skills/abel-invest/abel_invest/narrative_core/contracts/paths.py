@@ -11,6 +11,7 @@ from abel_invest.narrative_core.contracts.constants import (
     DATA_MANIFEST_FILENAME,
     DEPENDENCIES_FILENAME,
     EXECUTION_CONSTRAINTS_FILENAME,
+    GATE_DECISION_TRACE_FILENAME,
     PROBE_SAMPLES_FILENAME,
     RUNTIME_PROFILE_FILENAME,
     SESSION_STATE_FILENAME,
@@ -51,3 +52,7 @@ def branch_state_path(branch: Path) -> Path:
 
 def session_state_path(session: Path) -> Path:
     return session / SESSION_STATE_FILENAME
+
+
+def gate_decision_trace_path(session: Path) -> Path:
+    return session / GATE_DECISION_TRACE_FILENAME

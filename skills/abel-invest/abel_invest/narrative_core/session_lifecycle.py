@@ -31,6 +31,10 @@ from abel_invest.narrative_core.io import (
 from abel_invest.narrative_core.evidence.exploration_path import ensure_exploration_path
 from abel_invest.narrative_core.evidence import graph_frontier
 from abel_invest.narrative_core.contracts.paths import branch_spec_path, branch_state_path, session_state_path
+from abel_invest.narrative_core.gate_envelope import (
+    build_gate_envelope,
+    write_gate_decision_trace,
+)
 from abel_invest.narrative_core.readiness import format_data_readiness_summary
 from abel_invest.narrative_core.rendering.session_rendering import render_session
 from abel_invest.narrative_core.state import (
@@ -168,6 +172,7 @@ def init_session_dir(
     discover_limit: int = 10,
     backtest_start: str = DEFAULT_BACKTEST_START,
     mode: str | None = None,
+    objective_text: str | None = None,
 ) -> Path:
     requested_mode = None
     if mode is not None and str(mode).strip():
@@ -209,6 +214,20 @@ def init_session_dir(
             session_state["validation_profile"] = "grandma_daily"
         else:
             session_state.pop("validation_profile", None)
+        branches_dir = session / "branches"
+        has_branches = branches_dir.exists() and any(
+            child.is_dir() for child in branches_dir.iterdir()
+        )
+        if not has_branches or not isinstance(session_state.get("gate_envelope"), dict):
+            gate_envelope = build_gate_envelope(
+                ticker=ticker,
+                mode=effective_mode,
+                objective_text=objective_text,
+                discovery=discovery_data,
+                backtest_start=backtest_start,
+            )
+            session_state["gate_envelope"] = gate_envelope
+            write_gate_decision_trace(session, gate_envelope)
         write_session_state(session, session_state)
         graph_frontier.write_graph_frontier(session, frontier_data)
         if readiness_report is not None:
