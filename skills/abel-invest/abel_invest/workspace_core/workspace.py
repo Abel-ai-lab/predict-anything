@@ -298,10 +298,11 @@ Then run the branch preflight and recorded round:
 ./.venv/bin/abel-invest run-branch --branch research/tsla/tsla-v1/branches/<chosen-branch> -d "candidate search result"
 ```
 
-After every recorded round, follow the `Decision checkpoint` printed by
+After every recorded round, follow the terse `loop_checkpoint` printed by
 `run-branch`: either update `exploration_path.md` with ledger ref, chosen path,
 compact reason, Edge feedback, and artifact refs before continuing a concrete
-exploration action, or enter final report.
+exploration action, or enter final report. The checkpoint is evidence feedback,
+not strategy advice.
 
 When exploration enters Completed, if at least one real candidate strategy round
 has been recorded, summarize the selected strategy with the read-only final
@@ -335,10 +336,15 @@ Use that path as orientation, not as a rigid script. The important boundary is:
 - target-only candidates are baselines, seeds, ablations, and competitors for
   measuring graph-derived marginal contribution, not the default main lane when
   graph-derived data is live and unsearched
-- every recorded round ends with a `Decision checkpoint`; continue only after
+- every recorded round ends with a terse `loop_checkpoint`; continue only after
   `exploration_path.md` is covered, or enter final report with `best-strategy`
 - every next Edge run should be chosen after reading `exploration_path.md` and
-  the latest Edge result; `run-branch` appends a concise entry there
+  the latest CLI checkpoint. Use `artifact-digest --session <session>
+  --compact` when resuming, after major session changes, or when checkpoint
+  feedback is insufficient; use `artifact-digest --branch <branch> --compact`
+  when latest/best branch failure details matter.
+  Use full `--json` digest for audit/recovery/debugging only; open full Edge
+  JSON only for blocker diagnosis, claim verification, or a precise next change
 
 ## Re-entry
 
@@ -469,9 +475,14 @@ candidate logic there. Treat session readiness as advisory context; the branch's
 `.venv` as the canonical runtime for daily work. Treat branch count as a
 file-organization fact, not as proof of search breadth. Use `exploration_path.md`
 as the single human-facing exploration log: record each chosen path, compact
-reason, Edge feedback, and ledger ref. Read `exploration_path.md` and the latest
-Edge result before choosing the next Edge run; after Edge feedback, keep the
-path updated. After every recorded round, follow the `Decision checkpoint`
+reason, Edge feedback, and ledger ref. Use the latest CLI checkpoint before
+choosing the next Edge run. Run `artifact-digest --session <session> --compact`
+when resuming, after major session changes, or when checkpoint feedback is
+insufficient; use `artifact-digest --branch <branch> --compact` when latest/best
+branch failure details matter. Use full `--json` digest for
+audit/recovery/debugging only; open full Edge JSON only for blocker diagnosis,
+claim verification, or a precise next change. After every
+recorded round, follow the `loop_checkpoint`
 printed by `run-branch`: either continue a concrete exploration action or enter
 final report. Check path coverage before starting another round. Check input
 realization before claiming graph-derived contribution. Stay in Exploring until

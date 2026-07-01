@@ -31,7 +31,9 @@ tuning to improve the ratio.
 4. Before running, confirm prepared `inputs/runtime_profile.json` includes
    `validation_profile: grandma_daily` and `inputs/execution_constraints.json`
    includes `position_bounds: [-1.0, 1.0]`.
-5. Read Edge results by total return, MaxDD, `pnl_to_maxdd`, and leverage status.
+5. Use `artifact-digest --branch <branch> --compact` before opening full Edge
+   artifacts. Judge grandma results by total return, MaxDD, `pnl_to_maxdd`, and
+   leverage status.
 
 ## What Not To Do
 

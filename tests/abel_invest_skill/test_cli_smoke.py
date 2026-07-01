@@ -397,8 +397,10 @@ def test_public_cli_prepare_branch_smoke(
     assert _run_cli(monkeypatch, ["prepare-branch", "--branch", str(branch)]) == 0
     assert ni.branch_inputs_ready(branch)
     output = capsys.readouterr().out
-    assert "Prepared branch inputs:" in output
-    assert "From here:" in output
+    assert "prepare_checkpoint " in output
+    assert "protocol_state=prepared_ready_for_debug" in output
+    assert "Prepared branch inputs:" not in output
+    assert "From here:" not in output
 
 
 def test_public_cli_debug_branch_blocker_smoke(
@@ -422,8 +424,10 @@ def test_public_cli_debug_branch_blocker_smoke(
     assert _run_cli(monkeypatch, ["debug-branch", "--branch", str(branch)]) == 1
     assert (branch / "outputs" / "debug-alpha-context.json").exists()
     output = capsys.readouterr().out
-    assert "No narrative round was recorded." in output
-    assert "From here:" in output
-    assert "fix the engine or prepared inputs before recording a round" in output
+    assert "debug_checkpoint " in output
+    assert "primary_error=" in output
+    assert "protocol_state=debug_fix_engine_before_run" in output
+    assert "No narrative round was recorded." not in output
+    assert "From here:" not in output
 
 

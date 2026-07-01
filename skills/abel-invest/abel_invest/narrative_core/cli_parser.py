@@ -134,6 +134,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=5000,
         help="Warm-cache fetch limit used for each requested symbol",
     )
+    prepare_branch.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print the full human-readable branch preparation report",
+    )
+    prepare_branch.add_argument(
+        "--audit",
+        action="store_true",
+        help="Print audit-oriented details instead of the terse loop checkpoint",
+    )
 
     run_branch = sub.add_parser(
         "run-branch", help="Run edge evaluate and record a branch round"
@@ -170,6 +180,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--python-bin",
         default=None,
         help="Interpreter used to run abel-edge evaluate (defaults to the workspace python when available)",
+    )
+    run_branch.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print the full human-readable recorded-round report",
+    )
+    run_branch.add_argument(
+        "--audit",
+        action="store_true",
+        help="Print audit-oriented details instead of the terse loop checkpoint",
     )
     visualize_session = sub.add_parser(
         "visualize-session",
@@ -241,6 +261,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print machine-readable JSON instead of a compact text summary.",
     )
 
+    artifact_digest = sub.add_parser(
+        "artifact-digest",
+        help="Print a compact read-only digest of session or branch artifacts",
+    )
+    artifact_scope = artifact_digest.add_mutually_exclusive_group(required=True)
+    artifact_scope.add_argument(
+        "--session",
+        default=None,
+        help="Session directory to summarize.",
+    )
+    artifact_scope.add_argument(
+        "--branch",
+        default=None,
+        help="Optional branch directory to summarize instead of the whole session.",
+    )
+    artifact_output = artifact_digest.add_mutually_exclusive_group()
+    artifact_output.add_argument(
+        "--json",
+        action="store_true",
+        help="Print machine-readable JSON instead of compact text.",
+    )
+    artifact_output.add_argument(
+        "--compact",
+        action="store_true",
+        help="Print bounded normal-loop decision facts instead of the full audit digest.",
+    )
+
     export_strategy_artifact = sub.add_parser(
         "export-strategy-artifact",
         help=(
@@ -297,6 +344,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--python-bin",
         default=None,
         help="Interpreter used to run abel-edge debug-evaluate (defaults to the workspace python when available)",
+    )
+    debug_branch.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print the full human-readable debug preflight report",
+    )
+    debug_branch.add_argument(
+        "--audit",
+        action="store_true",
+        help="Print audit-oriented details instead of the terse debug checkpoint",
     )
 
     render = sub.add_parser("render", help="Render summaries for a session")

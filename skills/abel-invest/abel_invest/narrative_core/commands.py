@@ -9,6 +9,9 @@ from abel_invest.narrative_core.command_handlers.branch import (
     prepare_branch_inputs,
     run_branch_round,
 )
+from abel_invest.narrative_core.command_handlers.artifact_digest import (
+    artifact_digest_command,
+)
 from abel_invest.narrative_core.command_handlers.frontier import handle_frontier_command
 from abel_invest.narrative_core.command_handlers.session import (
     handle_init_branch,
@@ -56,6 +59,8 @@ def main() -> int:
         return upload_skill_dashboard_session(args)
     if args.command == "best-strategy":
         return best_strategy_command(args)
+    if args.command == "artifact-digest":
+        return artifact_digest_command(args)
     if args.command == "export-strategy-artifact":
         return export_strategy_artifact_command(args)
     if args.command == "promote-strategy":

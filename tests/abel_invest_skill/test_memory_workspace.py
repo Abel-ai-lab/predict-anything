@@ -164,7 +164,12 @@ def test_run_branch_round_updates_ledger_and_agent_context(
                     "2026-05-01,0.02,0.02,0.50,0.02,0.25,0.0,0.75,102.0\n",
                     encoding="utf-8",
                 )
-            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+            return subprocess.CompletedProcess(
+                command,
+                1,
+                stdout="Verdict: PASS\nRaw JSON: leaked\n",
+                stderr="Report: leaked\n",
+            )
         raise AssertionError(f"unexpected command: {command}")
 
     monkeypatch.setattr(ni.subprocess, "run", fake_subprocess_run)
@@ -199,15 +204,15 @@ def test_run_branch_round_updates_ledger_and_agent_context(
         )
     )
     round_output = capsys.readouterr().out
-    assert "Decision checkpoint:" in round_output
-    assert "Choose exactly one next action." in round_output
-    assert "Continue exploration:" in round_output
-    assert "Final report:" in round_output
+    assert "loop_checkpoint " in round_output
+    assert "metrics " in round_output
+    assert "blockers " in round_output
+    assert "best_so_far " in round_output
+    assert "protocol_state=" in round_output
     assert "exploration_path.md" in round_output
-    assert "ledger:graph-v1:round-001" in round_output
-    assert "best-strategy --session" in round_output
-    assert "exploration is incomplete" in round_output
-    assert "while also naming the next experiment" in round_output
+    assert "Decision checkpoint:" not in round_output
+    assert "Raw JSON: leaked" not in round_output
+    assert "Report: leaked" not in round_output
 
     ledger = json.loads((session / ni.EVIDENCE_LEDGER_FILENAME).read_text(encoding="utf-8"))
     context = json.loads((branch / "outputs" / "round-001-alpha-context.json").read_text(encoding="utf-8"))

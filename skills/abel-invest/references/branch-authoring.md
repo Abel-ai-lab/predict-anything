@@ -221,12 +221,15 @@ metadata, inputs, graph attribution, and exploration-path facts.
 
 1. State the audit-relevant candidate metadata in `branch.yaml`.
 2. Run `<command_prefix> prepare-branch --branch ...`.
-3. Inspect `inputs/context_guide.md`, `inputs/probe_samples.json`, and
-   `inputs/data_manifest.json`.
+3. Run `<command_prefix> artifact-digest --branch <branch> --compact` to inspect
+   compact prepared-input facts before opening `inputs/context_guide.md`,
+   `inputs/probe_samples.json`, or `inputs/data_manifest.json`.
 4. Implement or revise `compute_decisions(self, ctx)`.
 5. Run `<command_prefix> debug-branch --branch ...`.
 6. Read the semantic verdict and traces.
 7. Run `<command_prefix> run-branch --branch ...` when runtime facts are ready.
-8. Read `evidence_ledger.json`, `frontier.md`, and the Edge result.
+8. Run `<command_prefix> artifact-digest --branch <branch> --compact` before
+   reading `evidence_ledger.json`, `frontier.md`, or the Edge result directly.
+   Use full `--json` digest only for audit, recovery, or debugging.
 9. Keep `exploration_path.md` covered with ledger ref, chosen path, compact
    reason, Edge feedback, and artifact refs.
