@@ -167,11 +167,7 @@ def init_session_dir(
     discover: bool = False,
     discover_limit: int = 10,
     backtest_start: str = DEFAULT_BACKTEST_START,
-    mode: str | None = None,
 ) -> Path:
-    requested_mode = None
-    if mode is not None and str(mode).strip():
-        requested_mode = "grandma" if str(mode).strip().lower() == "grandma" else "standard"
     session = root / ticker.lower() / exp_id
     session.mkdir(parents=True, exist_ok=True)
     ensure_exploration_path(session)
@@ -199,16 +195,9 @@ def init_session_dir(
     with SessionLock(session):
         write_tsv_header(session / "events.tsv", EVENTS_HEADER)
         session_state = load_session_state(session) if session_state_path(session).exists() else {}
-        effective_mode = requested_mode or (
-            "grandma"
-            if str(session_state.get("mode") or "").strip().lower() == "grandma"
-            else "standard"
-        )
+        effective_mode = "standard"
         session_state["mode"] = effective_mode
-        if effective_mode == "grandma":
-            session_state["validation_profile"] = "grandma_daily"
-        else:
-            session_state.pop("validation_profile", None)
+        session_state.pop("validation_profile", None)
         write_session_state(session, session_state)
         graph_frontier.write_graph_frontier(session, frontier_data)
         if readiness_report is not None:
@@ -370,8 +359,6 @@ def init_branch_dir(session: Path, branch_id: str) -> Path:
                     discovery=discovery,
                     readiness=readiness,
                     graph_frontier=frontier,
-                    session_mode=str(session_state.get("mode") or "standard"),
-                    validation_profile=str(session_state.get("validation_profile") or ""),
                 ),
             )
         engine = branch / "engine.py"

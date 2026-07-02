@@ -72,11 +72,12 @@ def test_public_cli_session_branch_render_status_check_smoke(
     assert '"message": "No recorded strategy candidate is ready to summarize yet."' in output
 
 
-def test_init_session_grandma_mode_routes_default_branch_to_grandma_profile(
+def test_init_session_ignores_obsolete_experiment_mode(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
     root = tmp_path / "research"
+    monkeypatch.setenv("ABEL_EXPERIMENT_MODE", "legacy-retired-mode")
 
     assert _run_cli(
         monkeypatch,
@@ -85,56 +86,7 @@ def test_init_session_grandma_mode_routes_default_branch_to_grandma_profile(
             "--ticker",
             "TSLA",
             "--exp-id",
-            "grandma-smoke",
-            "--root",
-            str(root),
-            "--allow-outside-workspace",
-            "--no-discover",
-            "--mode",
-            "grandma",
-        ],
-    ) == 0
-    session = root / "tsla" / "grandma-smoke"
-
-    assert _run_cli(
-        monkeypatch,
-        [
-            "init-branch",
-            "--session",
-            str(session),
-            "--branch-id",
-            "simple-return",
-        ],
-    ) == 0
-
-    state = json.loads((session / "session_state.json").read_text(encoding="utf-8"))
-    spec = ni.load_branch_spec(session / "branches" / "simple-return")
-
-    assert state["mode"] == "grandma"
-    assert state["validation_profile"] == "grandma_daily"
-    assert spec["strategy_mode"] == "grandma"
-    assert spec["validation_profile"] == "grandma_daily"
-    assert spec["position_bounds"] == [-1.0, 1.0]
-    assert spec["model_family"] == "rule_signal"
-    assert spec["complexity_class"] == "simple_signal"
-    assert spec["input_claim"] == "target_only"
-
-
-def test_init_session_uses_experiment_env_for_grandma_mode(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    root = tmp_path / "research"
-    monkeypatch.setenv("ABEL_EXPERIMENT_MODE", "grandma")
-
-    assert _run_cli(
-        monkeypatch,
-        [
-            "init-session",
-            "--ticker",
-            "TSLA",
-            "--exp-id",
-            "grandma-env",
+            "obsolete-mode-env",
             "--root",
             str(root),
             "--allow-outside-workspace",
@@ -143,92 +95,10 @@ def test_init_session_uses_experiment_env_for_grandma_mode(
     ) == 0
 
     state = json.loads(
-        (root / "tsla" / "grandma-env" / "session_state.json").read_text(encoding="utf-8")
+        (root / "tsla" / "obsolete-mode-env" / "session_state.json").read_text(encoding="utf-8")
     )
-    assert state["mode"] == "grandma"
-    assert state["validation_profile"] == "grandma_daily"
-
-
-def test_init_session_preserves_existing_grandma_mode_without_explicit_mode(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    root = tmp_path / "research"
-    base_args = [
-        "init-session",
-        "--ticker",
-        "TSLA",
-        "--exp-id",
-        "grandma-rerun",
-        "--root",
-        str(root),
-        "--allow-outside-workspace",
-        "--no-discover",
-    ]
-
-    assert _run_cli(monkeypatch, [*base_args, "--mode", "grandma"]) == 0
-    assert _run_cli(monkeypatch, base_args) == 0
-    session = root / "tsla" / "grandma-rerun"
-
-    assert _run_cli(
-        monkeypatch,
-        [
-            "init-branch",
-            "--session",
-            str(session),
-            "--branch-id",
-            "after-rerun",
-        ],
-    ) == 0
-
-    state = json.loads((session / "session_state.json").read_text(encoding="utf-8"))
-    spec = ni.load_branch_spec(session / "branches" / "after-rerun")
-
-    assert state["mode"] == "grandma"
-    assert state["validation_profile"] == "grandma_daily"
-    assert spec["strategy_mode"] == "grandma"
-    assert spec["validation_profile"] == "grandma_daily"
-
-
-def test_init_session_explicit_standard_downgrades_existing_grandma_mode(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    root = tmp_path / "research"
-    base_args = [
-        "init-session",
-        "--ticker",
-        "TSLA",
-        "--exp-id",
-        "grandma-standard",
-        "--root",
-        str(root),
-        "--allow-outside-workspace",
-        "--no-discover",
-    ]
-
-    assert _run_cli(monkeypatch, [*base_args, "--mode", "grandma"]) == 0
-    assert _run_cli(monkeypatch, [*base_args, "--mode", "standard"]) == 0
-    session = root / "tsla" / "grandma-standard"
-
-    assert _run_cli(
-        monkeypatch,
-        [
-            "init-branch",
-            "--session",
-            str(session),
-            "--branch-id",
-            "after-standard",
-        ],
-    ) == 0
-
-    state = json.loads((session / "session_state.json").read_text(encoding="utf-8"))
-    spec = ni.load_branch_spec(session / "branches" / "after-standard")
-
     assert state["mode"] == "standard"
     assert "validation_profile" not in state
-    assert "strategy_mode" not in spec
-    assert "validation_profile" not in spec
 
 
 def test_public_cli_version_option(monkeypatch, capsys) -> None:
@@ -397,8 +267,13 @@ def test_public_cli_prepare_branch_smoke(
     assert _run_cli(monkeypatch, ["prepare-branch", "--branch", str(branch)]) == 0
     assert ni.branch_inputs_ready(branch)
     output = capsys.readouterr().out
-    assert "Prepared branch inputs:" in output
-    assert "From here:" in output
+    assert "prepare_checkpoint " in output
+    assert "evidence_recorded=false" in output
+    assert "next_if_ready=debug-branch" in output
+    assert "next_if_failed=fix_cache_or_auth" in output
+    assert "protocol_state=prepared_ready_for_debug" in output
+    assert "Prepared branch inputs:" not in output
+    assert "From here:" not in output
 
 
 def test_public_cli_debug_branch_blocker_smoke(
@@ -422,8 +297,13 @@ def test_public_cli_debug_branch_blocker_smoke(
     assert _run_cli(monkeypatch, ["debug-branch", "--branch", str(branch)]) == 1
     assert (branch / "outputs" / "debug-alpha-context.json").exists()
     output = capsys.readouterr().out
-    assert "No narrative round was recorded." in output
-    assert "From here:" in output
-    assert "fix the engine or prepared inputs before recording a round" in output
+    assert "debug_checkpoint " in output
+    assert "evidence_recorded=false" in output
+    assert "next_if_ready=run-branch" in output
+    assert "next_if_failed=fix_engine_or_branch_compact" in output
+    assert "primary_error=" in output
+    assert "protocol_state=debug_fix_engine_before_run" in output
+    assert "No narrative round was recorded." not in output
+    assert "From here:" not in output
 
 

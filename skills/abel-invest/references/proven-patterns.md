@@ -1,233 +1,105 @@
-# Proven Patterns — Case Studies, Not Recipes
+# Proven Patterns - Candidate Shapes, Not Recipes
 
-These are patterns that worked on specific assets at specific times.
-They are evidence of what's possible, not instructions for what to do.
-Read them as candidate generators and feature-library ideas during EXPLORE mode.
-Do NOT copy-paste or treat the listed metrics as targets. Understand the
-candidate shape, adapt it to the current alpha universe, and let new evidence
-decide whether it deserves more search width.
+Use this reference as a compact pattern catalog during EXPLORE mode. These
+patterns are evidence of what has worked on some assets, not instructions for
+the current target.
 
-These notes are not the primary legality contract.
+Local data decides whether a pattern, parameter range, model family, graph-node
+subset, lag, sign, transform, filter, or sizing rule deserves recorded
+validation. If a pattern inspires a scan, record the effective search width for
+the submitted candidate.
 
-- Author new branch code against `DecisionContext`.
-- Use `debug-branch` semantic preflight before trusting a recorded round.
-- Use patterns as candidate generators and feature-library ideas. Local data
-  should decide whether a pattern, parameter range, model family, or graph-node
-  subset is useful for the current target.
-- When a pattern inspires a search over parameters, lags, models, or node
-  combinations, record the effective search width for the submitted candidate.
-- Treat the temporal caveats below as pattern-specific implementation notes, not
-  as a universal authoring checklist.
-- Do not treat pattern-specific lags, weights, or causal pairs below as
-  currently disclosed CAP fields. Current CAP graph roles disclose structural
-  orientation where specific enough, while exact lag, edge weight, signed
-  effect, and tradable direction remain hidden.
+Runtime legality lives in `constraints.md`; loop sequencing and final-report
+boundaries live in `experiment-loop.md`. Do not treat pattern-specific lags,
+weights, metrics, or causal pairs as currently disclosed CAP fields.
 
----
+## How To Use
 
-## 1. Dual-Lag Xcorr
+- Start from the candidate shape, then adapt it to the current target and graph
+  universe.
+- Treat prior metrics as historical examples only.
+- Keep all live features shifted before decision time.
+- Use `debug-branch` before trusting any recorded round.
+- Watch the validation triangle: high Sharpe without IC, DSR, or stability can
+  be concentration or search-width gaming.
 
-**What**: Average cross-correlation at two causal lags instead of one.
+## Pattern Catalog
 
-**Why it works**: Single-lag xcorr is fragile — it's sensitive to the exact lag choice
-and picks up one causal harmonic. Averaging lag-14 and lag-21 captures both primary
-and secondary harmonics and averages out noise. Equal weighting (0.5/0.5) outperformed
-biased weighting (0.7/0.3) in that constructed signal.
+### Dual-Lag Xcorr
 
-**When**: SSTK→ETH causal pair. Dual-lag xcorr is a core component of Dual Resonance
-(ETH Sharpe 4.27, Lo 2.48). Systematic lag sweep confirmed: lag-7 added noise and
-degraded signal; lags without causal mechanism (17, 20) caused validation failure.
+Average two shifted rolling cross-correlations instead of betting on one exact
+lag. Useful when graph or scout evidence suggests a parent signal has multiple
+temporal harmonics.
 
-**Failure modes**: More lags is not better. Only average lags with a verified causal
-mechanism in the Abel graph. Distant lags (too far apart) capture different phenomena
-and add noise rather than signal.
+Trap: rolling correlation at index `i` can include target return `i`; shift the
+finished correlation before using it. Thresholds such as expanding medians also
+need to be shifted.
 
-**Look-ahead traps**:
-- `parent_ret.shift(lag).rolling(60).corr(target_ret)` — the `.corr()` result at index
-  `i` includes `target_ret[i]` and the unshifted `parent_ret[i]`. Must add `.shift(1)`
-  after the rolling corr.
-- The expanding median used to threshold this xcorr also needs `.shift(1)` (see Pattern 2).
+### Binary Threshold
 
----
+Convert a continuous signal into a clear above/below-threshold exposure
+multiplier. This can differentiate signal regimes more strongly than a smooth
+z-score map.
 
-## 2. Binary Threshold vs Z-Score
+Trap: the best raw Sharpe threshold can collapse IC or stability. Cap final
+positions and validate the triangle, not only Sharpe.
 
-**What**: Convert continuous xcorr into a position multiplier using binary above/below
-the expanding median, not a continuous z-score mapping.
+### Simple Trend Filter
 
-**Why it works**: Sharp differentiation commits fully to the causal signal. A z-score
-mapping gives scale ≈ 1.0 near the median — no differentiation. Binary 1.75/0.25 gives
-maximum information extraction. The transition point matters: at 2.0/0.0 Sharpe and Lo
-still rose but IC collapsed 29% — the metric triangle caught concentration gaming
-(zeroing positions on low-correlation days inflates apparent per-trade quality).
+Use prior close versus prior SMA as a long/flat risk filter. The value is often
+regularization: a simple fixed window can beat adaptive filters that add search
+width and overfit.
 
-**When**: SSTK→ETH xcorr multiplier in Dual Resonance. Validated through full scaling
-sweep (1.25→2.0 step 0.25). Best in that run: UP=1.75, DOWN=0.25.
+Trap: compare `close.shift(1)` to `sma.shift(1)`, not today's close to today's
+rolling mean.
 
-Apply this as an internal multiplier, then cap the final strategy output so `abs(position) <= 1`.
+### Position Persistence Penalty
 
-| Scale Up/Down | Lo   | IC    | Verdict              |
-|---------------|------|-------|----------------------|
-| 1.50 / 0.50   | 2.35 | 0.549 | Strong               |
-| **1.75 / 0.25** | **2.37** | **0.569** | **best in that run**  |
-| 2.00 / 0.00   | 2.38 | 0.403 | IC crash — gaming    |
+Reduce exposure as a holding streak ages, using only yesterday's held position
+to compute the streak. This can reduce serial PnL autocorrelation and improve
+Lo-adjusted behavior.
 
-**Failure modes**: Choosing the highest Sharpe/Lo point without watching IC. The triangle
-is the only way to detect the gaming transition — single-metric optimization misses it.
+Trap: using today's position to compute today's holding count is circular.
 
-**Look-ahead traps**:
-- `pd.Series(xcorr).expanding().median()` at index `i` includes `xcorr[i]` itself.
-  Must be `.expanding().median().shift(1)`. Handle the NaN at position 0 with
-  `np.isnan(xcorr_med) | (xcorr > xcorr_med)` → UP.
+### RSI Contrarian Overlay
 
----
+Use shifted RSI as a sizing overlay: reduce exposure after overbought streaks
+and increase exposure after oversold conditions. It works best as an overlay,
+not as a generic model feature.
 
-## 3. SMA(50) Trend Filter
+Trap: RSI at index `i` includes close `i`; shift it before sizing.
 
-**What**: Long/Flat mode — set position to 0 when `close[T-1] < SMA(50)[T-1]`.
+### Multi-Horizon Model Ensemble
 
-**Why it works**: Forces flat during bear markets. Occam's razor: this is a single
-fixed parameter. All adaptive alternatives (KAMA, Kalman, Vol-Adaptive, regime-switch)
-add parameters → overfit. On 5 years of crypto data: SMA(50) OOS/IS = 1.07 vs
-Vol-Adaptive best = 0.88. Simplicity is regularization. Window sweep (10–200) shows
-all windows with Sharpe > 1.0 — the filter is robust, not sensitive to exact window.
+Train separate models for several forward-return horizons and combine them.
+Each horizon can capture a different causal timescale.
 
-**When**: All ETH strategies. SMA window tested exhaustively; 50 is not magic, just
-confirmed robust. The filter is the single most consistent improvement across all ETH
-backtest variants.
+Trap: targets may use `returns.shift(-H)` inside training, but all features
+must be lagged by at least one bar. Re-search horizon weights per target; do
+not copy another asset's weights.
 
-**Failure modes**: Any adaptive or regime-switching trend filter tested inferior in
-walk-forward validation. Adding complexity hurt generalization in every case tested.
+### Cross-Asset Spread
 
-**Look-ahead traps**:
-- Must use `close[T-1]` vs `SMA[T-1]`, not `close[T]` vs `SMA[T]`. The rolling mean
-  includes the current bar — `np.roll(close, 1) > np.roll(sma, 1)` or equivalently
-  `pd.Series(close).shift(1) > pd.Series(sma).shift(1)`.
+Use relative momentum, spread, ratio, or sector/peer contrast when the graph,
+market structure, or scout evidence suggests cross-asset information matters.
+Treat it as a supplement unless graph realization and validation support a
+stronger claim.
 
----
+Trap: rolling peer returns include today's return unless shifted.
 
-## 4. Position Persistence Penalty
+### Vote-Squared Sizing
 
-**What**: Decay position size from day 2 of holding: -0.10/day, floor 0.30.
+For an ensemble, size by squared vote fraction so near-unanimous agreement gets
+meaningfully more exposure and split votes stay small.
 
-**Why it works**: Lo-adjusted Sharpe = Sharpe × √(1/cf) where cf depends on PnL
-autocorrelation. Persistent long streaks create serial correlation. Decaying position
-size breaks the serial correlation mechanically — the more consecutive days held,
-the smaller the position, the more varied the daily PnL magnitude.
+Trap: every component vote must be based on shifted features. One leaky member
+can contaminate the amplified aggregate vote.
 
-**When**: Dual Resonance (ETH). Parameter sweep: start-day 1→5, decay 0.05→0.12.
-Best in that run: start day 2, decay 0.10/day. Too aggressive (day 1, 0.12) → Sharpe drops.
-Too gentle (day 5, 0.05) → no measurable effect on Lo.
+## Common Failure Modes
 
-**Failure modes**: Any signal that makes positions MORE persistent over time hurts Lo
-(ETH momentum, volatility-ratio sizing, drawdown-aware sizing all tested and confirmed
-harmful to Lo). The persistence penalty is anti-momentum by design.
-
-**Look-ahead traps**:
-- Counter must use `positions[i-1]` (yesterday's position), not `positions[i]`.
-  Using today's position to compute today's count is a circular reference.
-
----
-
-## 5. RSI Contrarian Overlay
-
-**What**: RSI(20) — overbought (>70) → multiply position by 0.60, oversold (<30) → 1.40×.
-
-**Why it works**: Anti-serial-correlation by construction. When the asset has been
-trending up for many days, RSI is elevated and the overlay scales down exposure,
-reducing the autocorrelation footprint of momentum streaks. Complements the persistence
-penalty: the penalty handles run-length, RSI handles price-level extremes.
-
-**When**: Dual Resonance (ETH Sharpe 4.27, Lo 2.48). RSI(20) > RSI(14) > RSI(10):
-longer period triggers only at genuine extremes, not noise. Scaling sweep 0.85/1.15
-through 0.50/1.50 — Sharpe-Lo tradeoff. In that run, 0.60/1.40 maximized Lo without
-collapsing Sharpe below threshold.
-
-**Failure modes**: RSI as an ML feature is noise. RSI as a position overlay is signal.
-This distinction was confirmed in a BNB run: adding RSI as a feature degraded Sharpe
-by 8%; using it as an overlay improved Lo. Do not conflate the two uses. After the
-overlay, cap the final position so `abs(position) <= 1`.
-
-**Look-ahead traps**:
-- `compute_rsi(close, period=20).shift(1)` — RSI at index `i` already incorporates
-  `close[i]`. Must shift before using in position sizing decisions.
-
----
-
-## 6. Multi-Horizon GBDT Ensemble
-
-**What**: Train separate GBDTs for H=1, H=3, H=5 day forward returns; combine
-predictions with per-asset tuned weights.
-
-**Why it works**: Each horizon captures a different causal timescale. H=1 captures
-fast mean-reversion; H=3/5 capture multi-day momentum. Ensemble weights are tuned
-per asset because each asset has a different dominant timescale. Walk-forward retrain
-prevents look-ahead: the target for H=k is `return.shift(-k)` applied only during
-training, not inference.
-
-**When**: META (Sharpe 2.52), AAPL (Sharpe 1.69), BNB (Sharpe 2.82). Best-run weights
-differ per asset:
-- META: H=1/3/5 weights 70/20/10 — fast-moving large-cap, short horizon dominates
-- AAPL: H=1/3/5 weights 50/30/20 — more balanced, sector peers add medium-horizon signal
-- BNB: H=1/3/5 weights 50/30/20 — crypto volatility benefits from multi-horizon
-
-**Failure modes**: Copying META weights to AAPL degraded performance — each asset
-must run independent search to find its optimal horizon weights.
-
-**Look-ahead traps**:
-- Training targets: `y = returns.shift(-H)` — correct, this is the future return.
-  But features must all use `shift(+lag)` where lag >= 1. The shift directions are
-  opposite for features (backward) and targets (forward) — this asymmetry is a common
-  source of leakage. Verify feature/target shift directions in every new implementation.
-
----
-
-## 7. Cross-Asset Spread Signal
-
-**What**: Compute rolling momentum spread between target and peer assets
-(e.g., BNB 5-day return minus ETH/SOL/XRP 5-day returns).
-
-**Why it works**: Captures relative crypto momentum. When BNB is outperforming peers,
-it's experiencing idiosyncratic flow, not just beta lift. The spread signal is
-mean-reverting over medium horizons and provides information orthogonal to
-single-asset momentum. Abel shows ETH→BNB causal weight = 0, so this is a
-correlation-derived supplement rather than a causal core signal. It was still
-tradeable, but only as an empirically validated add-on.
-
-**When**: BNB Phase 1 search. Adding 8 crypto peers (ADA, ETH, SOL, XRP, etc.)
-was the single biggest breakthrough: IC +34%, top-18 parent list includes ADA and ETH.
-Direct Abel parents only gave 2 of the top-18 — 2-hop + crypto sector peers dominated.
-
-**Failure modes**: Spreading against equities (GOLD, SPX) did not work for BNB — the
-mechanism is crypto-specific relative momentum, not broad risk-off/risk-on. Abel probe
-confirmed ETHUSD xcorr threshold 1.50/0.50 outperformed GOLD xcorr for BNB.
-
-**Look-ahead traps**:
-- `peer_ret.rolling(5).mean()` includes today's return. Must add `.shift(1)` before
-  using as a feature or signal component.
-
----
-
-## 8. Vote² Sizing
-
-**What**: For multi-component ensemble: `position = vote_fraction²`. If 6 of 8
-components vote long, `position = (6/8)² = 0.5625`.
-
-**Why it works**: Nonlinear sizing rewards high conviction (near-unanimous agreement)
-and punishes split votes. At 4/8 (50% agreement), position = 0.25 — near-flat despite
-a slight majority. At 8/8 (100%), position = 1.0. Squared response amplifies the
-signal-to-noise ratio of the vote count.
-
-**When**: TON multi-component strategy (8 causal pairs, Sharpe 1.78). The quadratic
-response function was chosen over linear (vote_fraction) or cubic (vote_fraction³)
-based on backtest sweep — cubic was too aggressive, linear too timid.
-
-**Failure modes**: Vote² is only meaningful if each component uses a shifted signal.
-If any component leaks the current day's return, the vote is contaminated and the
-squared amplification makes the leak worse, not better.
-
-**Look-ahead traps**:
-- Each component's vote must be computed from features that are fully shifted:
-  `signal[i]` must use only information from `[0..i-1]`. With 8 components, one
-  leaky component out of 8 can still materially inflate the aggregate position
-  because squared sizing amplifies agreement.
+- Copying historical parameters instead of re-searching for the current target.
+- Treating a graph read as proof that graph-derived search happened.
+- Adding filters, model families, or ensemble members without accounting for
+  the search width they introduced.
+- Optimizing the scout's local metric while ignoring Edge execution semantics.
+- Claiming that one failed expression disproves a graph node or pattern family.

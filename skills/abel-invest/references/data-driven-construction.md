@@ -1,6 +1,6 @@
 # Data-Driven Construction
 
-Use this reference for ordinary non-grandma alpha search, especially when the
+Use this reference for ordinary alpha search, especially when the
 next idea is drifting toward another hand-written rule.
 
 This is the default construction stance, not a separate workflow. This file
@@ -47,15 +47,11 @@ research. Prefer `research/<ticker>/<session_id>/scratch/` for files. Scratch
 outputs are not validation evidence; they help choose what is worth formal,
 audited validation.
 
-Use scratch to compare construction axes, not to create paperwork. A compact
-first-look scout should usually take roughly 5 minutes while scoring plausible
-target, graph, and construction shapes closely enough to choose what deserves
-formal validation. If the scout script is still making progress, let it finish
-naturally before deciding what to validate. Prefer a ranked table over a
-prose-only memo: target baselines, graph single-feature shapes, feature
-factories, model-family variants, ensembles, filters, or sizing variants should
-be compared with objective metrics such as Sharpe, total return, drawdown, and
-turnover when feasible.
+Use scratch to compare construction axes, not to create paperwork. Prefer a
+ranked table over a prose-only memo: target baselines, graph single-feature
+shapes, feature factories, model-family variants, ensembles, filters, or sizing
+variants should be compared with objective metrics such as Sharpe, total
+return, drawdown, and turnover when feasible.
 
 Diagnostic tables are raw material. IC, correlation, or feature-importance
 screens can rank inputs, but they do not by themselves show whether a tradable
@@ -72,8 +68,7 @@ Useful construction surfaces include:
   models, and lightweight ensembles when the feature set justifies them
 
 These are examples, not a fixed route or minimum count. For prepared-data
-ordering, prepare-only scout branches, and promotion into recorded rounds,
-follow `experiment-loop.md`.
+ordering and promotion into recorded rounds, follow `experiment-loop.md`.
 
 ## What Simple Rules Are For
 

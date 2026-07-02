@@ -55,21 +55,9 @@ Treat these files as runtime facts supplied by the system:
 The strategy should inspect them, then write against the world they describe.
 Do not rediscover or override them in `engine.py`.
 
-## Feedback Loop
-
-```bash
-<command_prefix> prepare-branch --branch ...
-<command_prefix> debug-branch --branch ...
-```
-
-After `prepare-branch`, inspect:
-
-- `inputs/context_guide.md`
-- `inputs/data_manifest.json`
-- `inputs/probe_samples.json`
-
-After `debug-branch`, read the semantic verdict, warnings, and sampled traces.
-Only then decide whether `run-branch` is warranted.
+For the prepare/debug loop and checkpoint readback policy, follow `SKILL.md`
+and `experiment-loop.md`. This file only defines the legal strategy-authoring
+surface and the meaning of runtime failures.
 
 ## What Not To Do
 

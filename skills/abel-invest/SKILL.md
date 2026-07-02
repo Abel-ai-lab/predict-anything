@@ -60,8 +60,6 @@ Always start by resolving workspace state before strategy work.
   read `references/workspace-bootstrap.md`.
 - New session, normal round loop, or resuming a session:
   read `references/experiment-loop.md`.
-- Grandma mode, simple-return screening, or conservative no-leverage exploration:
-  read `references/grandma-mode.md`.
 - Live graph discovery, graph frontier expansion, or graph-informed alpha context:
   read `references/discovery-protocol.md`.
 - Creating or revising `branch.yaml`, reviewing evidence labels,
@@ -85,7 +83,7 @@ Always start by resolving workspace state before strategy work.
   reportability rules). Core path — not optional — when a performance bar is set.
 - Before writing "exhausted / ceiling / no edge":
   read `references/experiment-loop.md` and check the ledger requirements there.
-- Ordinary non-grandma alpha search, data-driven candidate construction, or the
+- Ordinary alpha search, data-driven candidate construction, or the
   next idea risks becoming another simple hand-written rule:
   read `references/data-driven-construction.md` before the first broad
   candidate. Core path.
@@ -121,6 +119,11 @@ Always:
   readiness, blockers, what evidence exists, and the next action you will take.
 - Treat `agent_context.md` as the compact factual resume surface,
   `exploration_path.md` as the human-facing chosen-path and Edge-feedback log.
+- Treat the terse checkpoint printed by `prepare-branch`, `debug-branch`, and
+  `run-branch` as the normal loop feedback. Use compact `artifact-digest` only
+  for resume, blocker detail, branch backtrack, or insufficient checkpoint
+  state. Treat full digest `--json`, raw artifacts, `--verbose`, and `--audit`
+  as audit/debug surfaces, not the standard loop.
 - On a fresh or unfamiliar ticker, use the compact first-look data scout in
   `experiment-loop.md` before the first serious recorded alpha candidate unless
   the user gave a narrow path or continuation. Expect the scout to take roughly
@@ -210,6 +213,9 @@ Core search invariants:
 - Edge failures are diagnostics, not the next objective. After a failed round,
   keep choosing the next action by objective quality and upside; do not only
   repair gates into conservative branches when return or Sharpe remain weak.
+- Treat conservative preferences such as no leverage, lower drawdown, or simple
+  return as ordinary user constraints inside the alpha-search loop, not as a
+  separate product mode.
 - Record the effective width of any search that materially selected the
   submitted candidate. Search-width accounting should not make the agent timid
   about pursuing a high-ceiling empirical lead.
@@ -227,10 +233,10 @@ Core search invariants:
 
 Completion, reporting, and artifacts:
 
-- After every recorded `run-branch`, follow the printed `Decision checkpoint`.
-  The normal next action is either continue a concrete exploration action or
-  enter final report; do not send a final user report that says exploration is
-  incomplete while also naming the next experiment.
+- After every recorded `run-branch`, follow the printed `loop_checkpoint` and
+  its `next_boundary`. Continue a concrete exploration action or enter final
+  report; do not send a final user report that says exploration is incomplete
+  while also naming the next experiment.
 - `Completed` is the only normal final-answer state, whether the target was
   reached or the ledger supports unable-to-reach. A completed stop report uses
   `<command_prefix> best-strategy --session <session> --json` as the read-only
@@ -267,6 +273,8 @@ Glossary:
   search width and does not replace final validation.
 - Ledger: `evidence_ledger.json`, the evidence record.
 - Frontier: `frontier.md` / `frontier.json`, factual search coverage.
+- Artifact digest: `artifact-digest`, a compact read-only summary of session or
+  branch artifacts for ordinary loop decisions.
 - PASS/FAIL: Edge validation verdicts, not instructions to stop thinking.
 - Narrative scout: Abel Ask/domain-context pass used for candidate generation,
   not validation.

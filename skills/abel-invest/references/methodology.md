@@ -2,7 +2,8 @@
 
 Use this optional reference when the user asks why Abel Invest is data-driven,
 why the causal graph still matters, why search is allowed, or why validation
-gates do not replace strategy search.
+gates do not replace strategy search. It is a principles note, not a loop
+checklist; `SKILL.md` and `experiment-loop.md` own ordinary execution flow.
 
 ## Boundary
 
@@ -27,7 +28,7 @@ organize results after evidence appears; they should not slow the first useful
 empirical test.
 
 **Empirical construction by default.**
-For ordinary non-grandma alpha search, the default posture is empirical
+For ordinary alpha search, the default posture is empirical
 construction over target and graph-derived data. Feature factories, model
 families, denoise, subsets, ensembles, regimes, filters, and sizing are
 degrees of freedom. Simple rules can benchmark, diagnose, ablate, or refine an
@@ -71,24 +72,7 @@ reason, Edge feedback, and ledger/artifact refs. It protects visualization and
 replay completeness. Keep it short and evidence-linked; do not turn it into a
 mechanism essay.
 
-## Search Shape
-
-The natural path is:
-
-```text
-user objective -> bounded candidate universe -> empirical construction/search -> recorded validation -> explanation/reporting
-```
-
-Candidate-universe sources include:
-
-- validated baselines or catalog strategies
-- target history and target-only simple features
-- causal graph nodes and graph-derived feeds
-- sector, cross-asset, liquidity, volume, and regime feeds
-- proven empirical patterns
-- feature factories, learned models, and ensembles
-- user constraints such as drawdown, no leverage, or grandma mode
-
-`experiment-loop.md` owns the runtime path. This file only explains why the
-path keeps strategy judgment with the agent while the framework owns legality,
-evidence facts, search-width accounting, and reportability.
+`experiment-loop.md` owns the runtime path, and
+`data-driven-construction.md` owns the construction catalog. This file only
+explains why strategy judgment stays with the agent while the framework owns
+legality, evidence facts, search-width accounting, and reportability.

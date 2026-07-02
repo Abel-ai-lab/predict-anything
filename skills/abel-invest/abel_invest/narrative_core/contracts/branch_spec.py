@@ -360,15 +360,10 @@ def build_default_branch_spec(
     discovery: dict,
     readiness: dict,
     graph_frontier: dict | None = None,
-    session_mode: str = "standard",
-    validation_profile: str = "",
 ) -> dict:
     frontier = graph_frontier or {}
     suggested_nodes = graph_frontier_candidate_node_ids(frontier, readiness, limit=5)
     selected_nodes = suggested_nodes[: min(3, len(suggested_nodes))]
-    grandma_mode = str(session_mode or "").strip().lower() == "grandma"
-    if grandma_mode:
-        selected_nodes = []
     graph_enriched = bool(selected_nodes)
     spec = {
         "version": 2,
@@ -396,18 +391,6 @@ def build_default_branch_spec(
             "fields": ["close"],
         },
     }
-    if grandma_mode:
-        spec.update(
-            {
-                "strategy_mode": "grandma",
-                "validation_profile": validation_profile or "grandma_daily",
-                "position_bounds": [-1.0, 1.0],
-                "model_family": "rule_signal",
-                "complexity_class": "simple_signal",
-                "mechanism_family": "simple_return",
-                "input_claim": "target_only",
-            }
-        )
     return spec
 
 
