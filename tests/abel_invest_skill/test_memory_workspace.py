@@ -209,6 +209,13 @@ def test_run_branch_round_updates_ledger_and_agent_context(
     assert "blockers " in round_output
     assert "best_so_far " in round_output
     assert "protocol_state=" in round_output
+    assert "next_boundary " in round_output
+    assert "state=reportable" in round_output
+    assert "allowed_next=continue_exploration|final_report" in round_output
+    assert "final_report_source=" in round_output
+    assert "best-strategy --session" in round_output
+    assert "final_report_allowed_when=objective_met_or_ledger_supports_stop" in round_output
+    assert "forbidden_final=incomplete_report_with_next_experiment" in round_output
     assert "exploration_path.md" in round_output
     assert "Decision checkpoint:" not in round_output
     assert "Raw JSON: leaked" not in round_output

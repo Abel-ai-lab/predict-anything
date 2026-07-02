@@ -205,6 +205,20 @@ def protocol_state_for_round(*, result: dict, decision: str) -> str:
     return "recorded_error_review_required"
 
 
+def loop_boundary_state(*, protocol_state: str) -> str:
+    if protocol_state == "recorded_pass_reportable":
+        return "reportable"
+    if protocol_state.startswith("recorded_error"):
+        return "blocked"
+    return "exploring"
+
+
+def loop_allowed_next(*, boundary_state: str) -> str:
+    if boundary_state == "blocked":
+        return "fix_workflow|continue_exploration"
+    return "continue_exploration|final_report"
+
+
 def latest_best_snapshot(session) -> dict[str, str]:
     best: dict[str, str] = {}
     for branch in load_branches(session):
@@ -268,7 +282,9 @@ def print_prepare_checkpoint(
         f"selected_inputs={len(selected_inputs)} feed_count={len(symbols)} "
         f"cache_ok={len(warm_ok)} cache_fail={len(warm_fail)} "
         f"requested_start={requested_start} target_safe={target_safe} "
-        f"dense_overlap={dense_overlap} scaffold={scaffold}"
+        f"dense_overlap={dense_overlap} scaffold={scaffold} "
+        "evidence_recorded=false next_if_ready=debug-branch "
+        "next_if_failed=fix_cache_or_auth"
     )
     if warm_fail:
         failures = ", ".join(
@@ -306,7 +322,8 @@ def print_debug_checkpoint(
         f"branch={branch.name} semantic_ready={str(semantic_ready).lower()} "
         f"runtime_stage=semantic_preflight decisions={semantic.get('decision_count', 0)} "
         f"reads={semantic.get('read_count', 0)} activity={semantic_activity(debug_result)} "
-        f"output_shape={output_label} evidence_recorded=false result_class={frame_key}"
+        f"output_shape={output_label} evidence_recorded=false result_class={frame_key} "
+        "next_if_ready=run-branch next_if_failed=fix_engine_or_branch_compact"
     )
     if primary_error:
         print(f'primary_error="{primary_error[:240]}"')
@@ -373,9 +390,19 @@ def print_loop_checkpoint(
         refs.append(f"frame={frame_path.relative_to(session)}")
     refs.append(f"exploration_path={EXPLORATION_PATH_FILENAME}")
     print("artifacts " + " ".join(refs))
+    protocol_state = protocol_state_for_round(result=result, decision=decision)
+    print("protocol_state=" + protocol_state)
+    boundary_state = loop_boundary_state(protocol_state=protocol_state)
+    final_report_command = (
+        f"{command_prefix_for_path(branch)} best-strategy --session {session} --json"
+    )
     print(
-        "protocol_state="
-        + protocol_state_for_round(result=result, decision=decision)
+        "next_boundary "
+        f"state={boundary_state} "
+        f"allowed_next={loop_allowed_next(boundary_state=boundary_state)} "
+        f'final_report_source="{final_report_command}" '
+        "final_report_allowed_when=objective_met_or_ledger_supports_stop "
+        "forbidden_final=incomplete_report_with_next_experiment"
     )
 
 

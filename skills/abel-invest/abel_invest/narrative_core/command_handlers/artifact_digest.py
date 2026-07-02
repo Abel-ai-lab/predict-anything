@@ -335,6 +335,7 @@ def build_compact_session_digest(payload: dict[str, Any], *, recent_limit: int =
         "scope": "session",
         "ticker": payload.get("ticker", ""),
         "session": payload.get("session", ""),
+        **compact_loop_purpose(payload),
         "status": {
             "branch_count": session_digest.get("branch_count", len(branches)),
             "recorded_round_count": session_digest.get("round_count", 0),
@@ -368,6 +369,7 @@ def build_compact_branch_digest(payload: dict[str, Any]) -> dict[str, Any]:
         "scope": "branch",
         "ticker": payload.get("ticker", ""),
         "session": payload.get("session", ""),
+        **compact_loop_purpose(payload),
         "branch_id": branch.get("branch_id", ""),
         "path": branch.get("path", ""),
         "declaration": {
@@ -381,6 +383,17 @@ def build_compact_branch_digest(payload: dict[str, Any]) -> dict[str, Any]:
             "decision_facts": compact_decision_facts(branch),
             "artifact_paths": latest.get("artifact_paths") or {},
         },
+    }
+
+
+def compact_loop_purpose(payload: dict[str, Any]) -> dict[str, Any]:
+    session = str(payload.get("session") or "<session>")
+    return {
+        "loop_state_only": True,
+        "not_user_report": True,
+        "use_for": ["resume", "checkpoint_recovery", "branch_backtrack"],
+        "do_not_use_for": ["final_ranking", "user_report"],
+        "final_report_source": f"best-strategy --session {session} --json",
     }
 
 

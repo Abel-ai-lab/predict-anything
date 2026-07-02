@@ -127,6 +127,11 @@ def test_artifact_digest_session_compact_surfaces_bounded_loop_state(
     assert payload["schema"] == "abel-invest.artifact-digest/v1"
     assert payload["mode"] == "compact"
     assert payload["scope"] == "session"
+    assert payload["loop_state_only"] is True
+    assert payload["not_user_report"] is True
+    assert payload["use_for"] == ["resume", "checkpoint_recovery", "branch_backtrack"]
+    assert payload["do_not_use_for"] == ["final_ranking", "user_report"]
+    assert payload["final_report_source"].endswith(f"best-strategy --session {session} --json")
     assert payload["status"]["branch_count"] == 2
     assert payload["status"]["recorded_round_count"] == 2
     assert payload["latest_round"]["branch_id"] == failed_branch.name
@@ -152,6 +157,9 @@ def test_artifact_digest_branch_compact_surfaces_failure_facts(
     latest = payload["latest_round"]
     assert payload["mode"] == "compact"
     assert payload["scope"] == "branch"
+    assert payload["loop_state_only"] is True
+    assert payload["not_user_report"] is True
+    assert payload["final_report_source"].endswith(f"best-strategy --session {session} --json")
     assert payload["branch_id"] == "graph-v2"
     assert payload["declaration"]["selected_inputs"] == ["GPC"]
     assert latest["verdict"] == "FAIL"
