@@ -1,6 +1,6 @@
 # Data-Driven Construction
 
-Use this reference for ordinary non-grandma alpha search, especially when the
+Use this reference for ordinary alpha search, especially when the
 next idea is drifting toward another hand-written rule.
 
 This is the default construction stance, not a separate workflow. This file

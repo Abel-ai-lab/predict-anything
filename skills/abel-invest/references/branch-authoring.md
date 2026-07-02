@@ -10,10 +10,6 @@ shim, usually `./.venv/bin/abel-invest` from the workspace root.
 - `graph_frontier.json` is the session graph-derived candidate universe.
 - `readiness.json` is the session coverage/advisory report.
 - `branch.yaml` declares candidate metadata and runtime intent.
-- `prepare-branch` resolves inputs, writes the branch contract, and warms edge
-  cache.
-- `debug-branch` is the semantic preflight step.
-- `run-branch` consumes prepared inputs and records evidence.
 
 The graph frontier gives high-value leads, not answers. Readiness gives
 coverage facts, not a veto. A branch is a candidate strategy expression:
@@ -216,20 +212,3 @@ For first-look scout sequencing, scratch/heredoc use, prepare-only scout
 branches, and the no flat/no-signal materialization rule, follow
 `experiment-loop.md`. This file only owns how the promoted branch declares
 metadata, inputs, graph attribution, and exploration-path facts.
-
-## Minimal Runtime Path
-
-1. State the audit-relevant candidate metadata in `branch.yaml`.
-2. Run `<command_prefix> prepare-branch --branch ...`.
-3. Use `prepare_checkpoint` first; open compact digest or prepared-input files
-   only when needed for the next code change.
-4. Implement or revise `compute_decisions(self, ctx)`.
-5. Run `<command_prefix> debug-branch --branch ...`.
-6. Use `debug_checkpoint`; open traces only for blockers or unclear fixes.
-7. Run `<command_prefix> run-branch --branch ...` when runtime facts are ready.
-8. Use `loop_checkpoint` first. Open compact digest, ledger/frontier files, or
-   Edge artifacts only for resume, blocker detail, claim verification, or
-   precise follow-up authoring; reserve full `--json` digest for
-   audit/recovery/debugging.
-9. Keep `exploration_path.md` covered with ledger ref, chosen path, compact
-   reason, Edge feedback, and artifact refs.

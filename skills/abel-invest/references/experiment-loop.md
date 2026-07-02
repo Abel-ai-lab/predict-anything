@@ -23,7 +23,7 @@ Run:
 Live graph discovery should run by default when available. Its output is the
 default high-value alpha feature universe, not a mandatory first branch and not
 a requirement to run the whole depth-1 frontier as one basket. For ordinary
-non-grandma alpha search, keep the search posture empirical, high-capacity, and
+alpha search, keep the search posture empirical, high-capacity, and
 graph-informed over a scoped target + graph-derived universe, not another
 hand-written single mechanism.
 
@@ -35,11 +35,8 @@ When resuming, read:
 
 - `agent_context.md` for compact factual state
 - `exploration_path.md` for the human-facing path log
-- the latest CLI checkpoint for normal loop state
-- `artifact-digest --session <session> --compact` only when resuming after a
-  gap, after major session changes, or when the checkpoint is insufficient.
-  Use branch compact for branch-specific failure detail. Reserve full `--json`
-  digest output for audit/recovery/debugging.
+- the latest CLI checkpoint for normal loop state; use compact digest only when
+  that checkpoint is insufficient
 
 ## First-Look Data Scout
 
@@ -126,9 +123,8 @@ Each round should push toward the user's objective.
    where `N` is this round's effective search width only. Inline heredocs,
    notebook cells, and query cells count the same as saved scratch files when
    they materially select the submitted candidate.
-10. Read the `loop_checkpoint` as the standard loop feedback. Use compact
-   digest or raw artifacts only when the checkpoint is insufficient for resume,
-   blocker investigation, claim verification, or the next precise change.
+10. Read the `loop_checkpoint` as the standard loop feedback; use compact
+   digest or raw artifacts only when the checkpoint leaves a concrete gap.
 11. Let metric shape and failure mode decide the next move. The framework shows
    facts; it does not prescribe the next driver, proxy, threshold, model
    family, or route.
