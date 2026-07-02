@@ -35,12 +35,11 @@ When resuming, read:
 
 - `agent_context.md` for compact factual state
 - `exploration_path.md` for the human-facing path log
-- the latest CLI checkpoint for normal loop state. `prepare-branch`,
-  `debug-branch`, and `run-branch` default to terse checkpoint output.
-- `artifact-digest --session <session> --compact` when resuming, after major
-  session changes, or when the checkpoint is insufficient. Use branch compact
-  when a specific branch needs failure details; reserve full `--json` digest
-  output for audit/recovery/debugging.
+- the latest CLI checkpoint for normal loop state
+- `artifact-digest --session <session> --compact` only when resuming after a
+  gap, after major session changes, or when the checkpoint is insufficient.
+  Use branch compact for branch-specific failure detail. Reserve full `--json`
+  digest output for audit/recovery/debugging.
 
 ## First-Look Data Scout
 
@@ -127,16 +126,9 @@ Each round should push toward the user's objective.
    where `N` is this round's effective search width only. Inline heredocs,
    notebook cells, and query cells count the same as saved scratch files when
    they materially select the submitted candidate.
-10. Read the terse checkpoint printed by `run-branch` as the standard loop
-   feedback. It reports latest result, blockers, best-so-far, artifact refs,
-   and protocol state without prescribing strategy. Run
-   `artifact-digest --session <session> --compact` only when resuming, after
-   major session changes, or when the checkpoint is insufficient. If the latest
-   or best branch needs failure detail, run
-   `artifact-digest --branch <branch> --compact`. Use full `--json` digest only
-   for audit/recovery/debugging. Read `evidence_ledger.json`, `frontier.md`, or
-   the latest Edge result directly only when investigating a blocker, verifying
-   a specific claim, or authoring the next precise change.
+10. Read the `loop_checkpoint` as the standard loop feedback. Use compact
+   digest or raw artifacts only when the checkpoint is insufficient for resume,
+   blocker investigation, claim verification, or the next precise change.
 11. Let metric shape and failure mode decide the next move. The framework shows
    facts; it does not prescribe the next driver, proxy, threshold, model
    family, or route.
@@ -219,10 +211,9 @@ target. If none holds, stay in `Exploring`, keep searching, and choose the next
 concrete action.
 
 If you can name a concrete next search action, the search is still `Exploring`.
-After every recorded `run-branch`, treat the printed `loop_checkpoint` as the
-immediate control point: either update the path and continue a concrete
-exploration action, or enter final report. The checkpoint is a compact evidence
-surface, not a recommendation engine.
+After every recorded `run-branch`, treat the printed `loop_checkpoint` and
+`next_boundary` as the immediate control point: either update the path and
+continue a concrete exploration action, or enter final report.
 
 Do not stop by round count, a mediocre candidate, a high-Sharpe near-pass, an
 easy-to-validate low-objective branch, `render` / `status` / `check` success,

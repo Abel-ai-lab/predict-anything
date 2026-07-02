@@ -62,16 +62,16 @@ Do not rediscover or override them in `engine.py`.
 <command_prefix> debug-branch --branch ...
 ```
 
-After `prepare-branch`, run
-`artifact-digest --branch <branch> --compact` first. Open raw prepared-input files
-only when the digest is not enough to write or debug the next precise change:
+After `prepare-branch`, use `prepare_checkpoint` first. Run branch compact
+digest or open raw prepared-input files only when that checkpoint is
+insufficient for the next code/debug change:
 
 - `inputs/context_guide.md`
 - `inputs/data_manifest.json`
 - `inputs/probe_samples.json`
 
-After `debug-branch`, read the semantic verdict, warnings, and sampled traces.
-Only then decide whether `run-branch` is warranted.
+After `debug-branch`, use `debug_checkpoint` to decide whether `run-branch` is
+warranted. Open traces only for named blockers or unclear fixes.
 
 ## What Not To Do
 

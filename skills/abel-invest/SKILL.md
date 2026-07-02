@@ -122,15 +122,10 @@ Always:
 - Treat `agent_context.md` as the compact factual resume surface,
   `exploration_path.md` as the human-facing chosen-path and Edge-feedback log.
 - Treat the terse checkpoint printed by `prepare-branch`, `debug-branch`, and
-  `run-branch` as the normal loop feedback. Use `--verbose` when you need the
-  former full human report and `--audit` for audit/recovery detail. Use
-  `<command_prefix> artifact-digest --session <session> --compact` when
-  resuming, after major session changes, or when the checkpoint is insufficient.
-  Use `<command_prefix> artifact-digest --branch <branch> --compact` when a
-  specific branch needs failure details. Treat `artifact-digest --json` as
-  audit/recovery output, not the standard loop surface. Read full artifacts only
-  to investigate blockers, verify a specific claim, or author the next precise
-  change.
+  `run-branch` as the normal loop feedback. Use compact `artifact-digest` only
+  for resume, blocker detail, branch backtrack, or insufficient checkpoint
+  state. Treat full digest `--json`, raw artifacts, `--verbose`, and `--audit`
+  as audit/debug surfaces, not the standard loop.
 - On a fresh or unfamiliar ticker, use the compact first-look data scout in
   `experiment-loop.md` before the first serious recorded alpha candidate unless
   the user gave a narrow path or continuation. Expect the scout to take roughly
@@ -237,11 +232,10 @@ Core search invariants:
 
 Completion, reporting, and artifacts:
 
-- After every recorded `run-branch`, follow the printed `loop_checkpoint`.
-  The checkpoint is a compact evidence surface, not strategy advice.
-  The normal next action is either continue a concrete exploration action or
-  enter final report; do not send a final user report that says exploration is
-  incomplete while also naming the next experiment.
+- After every recorded `run-branch`, follow the printed `loop_checkpoint` and
+  its `next_boundary`. Continue a concrete exploration action or enter final
+  report; do not send a final user report that says exploration is incomplete
+  while also naming the next experiment.
 - `Completed` is the only normal final-answer state, whether the target was
   reached or the ledger supports unable-to-reach. A completed stop report uses
   `<command_prefix> best-strategy --session <session> --json` as the read-only
