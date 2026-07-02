@@ -44,16 +44,10 @@ During screening:
 
 ### 2. Validation Selection
 
-Submit selected candidates through Abel Invest / Edge:
-
-```bash
-<command_prefix> prepare-branch --branch <branch-path>
-<command_prefix> debug-branch --branch <branch-path>
-<command_prefix> run-branch --branch <branch-path> -d "<candidate description>" --selection-trials <N>
-```
-
-`N` is this round's effective search width only: every variant tried to select
-the submitted candidate for this round, not a cumulative campaign total.
+Submit selected candidates through the normal Abel Invest prepare/debug/run
+path. `--selection-trials N` is this round's effective search width only: every
+variant tried to select the submitted candidate for this round, not a
+cumulative campaign total.
 
 Only report or promote a selected strategy as robust after it has enough
 validation evidence. Session visualization may still review the full exploration
@@ -90,10 +84,9 @@ round's `--selection-trials` or include it in the final-K analytic check.
 ## Final-K Revalidation
 
 Before reporting an optimum selected from multiple candidates, ensure the
-selected candidate still passes validation at final campaign K. If stored PASS
+selected candidate still passes validation at final campaign K. If stored
 metrics were computed at smaller mid-campaign K, analytically recompute the
-DSR/gate against stored artifacts rather than issuing another recorded
-`run-branch`.
+DSR/gate against stored artifacts rather than issuing another recorded run.
 
 If the selected candidate fails at final K, check the next strongest candidate.
 Report the null honestly when no candidate passes final-K validation.

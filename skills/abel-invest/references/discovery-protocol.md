@@ -1,22 +1,14 @@
 # Graph-Informed Alpha Context
 
-Use this reference after workspace preflight is complete when live graph
-discovery, graph-derived feeds, or frontier expansion are relevant.
-Commands below use the workspace command prefix printed by the active bootstrap
-shim, usually `./.venv/bin/abel-invest` from the workspace root.
+Use this reference after workspace preflight when live graph discovery,
+graph-derived feeds, or frontier expansion are relevant.
 
-## Purpose
+The graph frontier answers one product question: which causal graph nodes are
+currently known, and how can they enrich the alpha universe? It is a feature
+universe and provenance surface, not a branch recommendation or a requirement
+to trade the whole frontier as one basket.
 
-The graph frontier answers one product question:
-
-Which causal graph nodes are currently known, and how can they enrich the
-alpha universe?
-
-It does not prescribe the first strategy branch. It does not mean the whole
-depth-1 frontier should be traded as one basket. CAP graph nodes are a validated
-source of structure and should normally enter candidate generation early, but
-data decides the tradable expression: subset, lag, sign, transformation, model,
-filter, sizing signal, or ensemble role.
+## Session Opening
 
 Live graph discovery is the normal session opening:
 
@@ -25,83 +17,55 @@ Live graph discovery is the normal session opening:
 ```
 
 Use an explicit no-discovery fallback only when auth, service access, or
-continuity constraints make live graph discovery unavailable:
+continuity constraints make live discovery unavailable:
 
 ```bash
 <command_prefix> init-session --ticker <TICKER> --exp-id <exp-id> --no-discover
 ```
 
-## Session Model
+## Session Artifacts
 
-The session owns:
-
-- `graph_frontier.json`: current graph node universe and expansion provenance
+- `graph_frontier.json`: graph node universe and expansion provenance
 - `readiness.json`: advisory coverage report
-- `exploration_path.md`: human-facing path, reason, and Edge feedback log
-- `frontier.md`: factual search-context coverage
+- `frontier.md`: compact factual search-context coverage
+- `exploration_path.md`: chosen path, reason, and Edge feedback log
 
-The branch selects inputs from this session context in `branch.yaml`. The
-evidence ledger later records declared, prepared, and actual graph node read
-facts.
-
-## Alpha Universe
-
-Use the graph as the default high-value expanded feature universe, and search it
-like an alpha source rather than a checklist:
-
-- target history and validated baselines establish the benchmark
-- graph nodes and graph-derived feeds are the normal next place to look for
-  incremental information when live graph candidates exist
-- available cross-assets, sector peers, volume, liquidity, and regime variables
-  can supplement the graph when the user goal or evidence supports them
-- proven patterns, feature factories, ML models, and ensembles turn the universe
-  into candidate signals
-
-For ordinary alpha search, graph context should feed empirical construction
-early. Feature factories, model comparisons, denoise/compression, node-subset
-search, lag/sign/transformation search, regimes, sizing, filters, and ensembles
-are possible expressions, not a checklist. A hand-written rule that happens to
-read graph nodes is graph-realized evidence, but it is not by itself
-data-driven graph search.
-
-Target-only candidates are baselines, seeds, ablations, and competing strategy
-candidates. Their job is to make graph-derived marginal contribution visible,
-not to replace graph search as the default when graph candidates are live.
+Branches select inputs from this session context in `branch.yaml`. The evidence
+ledger later records declared, prepared, and actual graph node read facts.
 
 ## CAP Role Interpretation
 
 CAP graph nodes are model-supported causal priors, not trading instructions.
-Trust that they carry target-relevant information, but do not infer disclosed
-weight, exact lag, signed effect, or tradable direction from the role alone.
+Trust that they may carry target-relevant information, but do not infer
+disclosed weight, exact lag, signed effect, or tradable direction from the role.
 
-CAP graph roles expose causal-flow orientation when the role is specific enough,
-not signed trading direction:
+CAP graph roles expose causal-flow orientation when specific enough:
 
 - `parent`: upstream of the target, `parent -> target`
 - `child`: downstream of the target, `target -> child`
-- `blanket`: Abel Invest's Markov-blanket discovery bucket/provenance label for
-  nodes returned through MB scope after parent/child handling; it is not
-  synonymous with `spouse` and does not by itself disclose one causal-flow
-  direction
+- `blanket`: Markov-blanket discovery bucket/provenance label; not synonymous
+  with `spouse` and not a single causal-flow direction by itself
 
-If more specific roles are present, use those roles for structural orientation.
-The underlying graph is temporal, so treat graph relevance as lag-mediated
-rather than contemporaneous by default. CAP does not disclose the exact lag; the
-candidate search can test lag and transformation choices.
+The underlying graph is temporal, so treat relevance as lag-mediated rather
+than contemporaneous by default. Candidate search can test lag, sign,
+transformation, model family, filter, sizing, and ensemble roles.
 
 ## Practical Use
 
-Graph context can shape the search prior and feature universe:
+Graph context can shape:
 
-- test graph-enriched feature factories
-- search graph node subsets instead of assuming the whole frontier should move
-  together
-- test lag, sign, ratio, relative-momentum, volatility, and regime
-  transformations
-- compare linear, tree, ensemble, and hybrid model families when useful
-- use graph-derived signals as alpha core, confirmation, filter, sizing signal,
-  or regime context according to what the data supports
-- keep weak standalone graph signals if they add diversity inside an ensemble
+- feature factories over target plus graph feeds
+- graph node subset search
+- lag, sign, ratio, spread, rolling-window, volatility, and regime transforms
+- linear, tree, ensemble, learned, or hybrid model comparisons
+- alpha core, confirmation, filter, sizing, or regime roles
+- diverse weak signals inside an ensemble
+
+Target-only candidates remain useful baselines, seeds, ablations, and
+competitors. They should make graph-derived marginal contribution visible, not
+replace graph search when live candidates exist.
+
+## Frontier Expansion
 
 Do not expand the graph merely to satisfy coverage. Expand when it helps the
 empirical search question:
@@ -112,34 +76,30 @@ empirical search question:
 ```
 
 Use `--mode parents`, `--mode blanket`, or `--mode all` according to the
-candidate-universe question. The result is new or updated nodes in
-`graph_frontier.json`, not a recommendation to run a specific branch.
+candidate-universe question. The result is updated graph context, not a
+recommendation to run a specific branch.
 
-Good expansion reasons are evidence-led: missing motifs, availability or input
-realization limits, user context, or a plausible external driver outside the
-current frontier. Weak reasons include "more graph nodes are always good" or
-"the product expects graph coverage."
+Good expansion reasons:
 
-Before expanding to a more distant frontier, consider whether the current graph
-universe still has useful subset, lag, sign, transformation, model-family,
-regime, or sizing search left. Prefer the path that is most likely to improve
-the user's objective.
+- missing motifs or driver families
+- availability or input-realization limits
+- user context that points to an external driver
+- evidence that the current frontier has been usefully exhausted
+
+Weak reasons:
+
+- more graph nodes are always better
+- the product expects graph coverage
+- a single failed graph expression means the current frontier is empty
+
+Before expanding farther, ask whether current graph nodes still have useful
+subset, lag, sign, transform, model-family, regime, or sizing search left.
 
 ## Narrative Scout
 
-Abel Ask and narrative context can improve search efficiency by generating
-candidate features, supplemental drivers, graph expansion anchors, or
-interpretation. Use them when they help the empirical search.
-
-Narrative scout work can suggest:
-
-- a supplemental driver to test
-- a graph expansion anchor
-- a sign, lag, regime, or transformation question
-- a reason to stop spending search width on a weak candidate family
-
-It is not validation evidence and it does not override CAP facts or Edge
-results. If the narrative result is off-target or weak, record that plainly.
+Narrative context can improve search efficiency by suggesting candidate
+features, supplemental drivers, expansion anchors, or interpretation. It is not
+validation evidence and does not override CAP facts or Edge results.
 
 Efficient pattern:
 
@@ -147,11 +107,8 @@ Efficient pattern:
 ledger/frontier facts -> candidate universe question -> optional narrative scout -> branch/search
 ```
 
-Inefficient pattern:
-
-```text
-weak metric result -> expand graph broadly -> search new nodes only because coverage feels thin
-```
+Avoid expanding broadly after a weak metric result only because coverage feels
+thin.
 
 ## Branch Cut
 
@@ -159,12 +116,12 @@ When moving from graph context into a branch:
 
 - choose inputs that match the candidate search question
 - write selected runtime inputs into `branch.yaml`
-- keep graph attribution lightweight before validation unless the branch needs a
-  specific graph claim
-- use readiness to understand coverage, not to auto-ban ideas
-- run `prepare-branch` before a recorded round
-- after the round, check input realization facts before treating a declared
-  graph-supported branch as graph-derived evidence
+- keep graph attribution lightweight before validation unless making a specific
+  graph claim
+- use readiness as coverage context, not an automatic veto
+- run `prepare-branch` before recorded evidence
+- check input realization before treating declared `graph_supported` evidence
+  as graph-derived evidence
 
 ```yaml
 selected_inputs:
@@ -177,5 +134,5 @@ selected_inputs:
     source_reason: market-liquidity contrast outside the current frontier
 ```
 
-Readiness is advisory. Do not collapse every branch onto the latest common start
-unless the candidate expression truly requires strict overlap.
+Do not collapse every branch onto the latest common start unless the candidate
+expression truly requires strict overlap.
