@@ -69,6 +69,17 @@ lower-tail Sharpe, and the smallest typical drawdown. Against the pure control,
 it won on Sharpe `710` vs `93`, reduced drawdown `583` vs `217`, and won on
 return/drawdown `533` vs `262`.
 
+The capability ladder also explains the difference between the earliest
+strict LLM-only control and the stronger four-arm target-history baseline:
+
+| Ladder step | What changed | Mean Sharpe | Median Sharpe | P10 Sharpe | Median max DD | Median return/DD | Mean candidates |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Original strict LLM-only no skill / no graph | LLM chooses from summary stats only; no empirical candidate grid | `0.2016` | `0.2205` | `-0.3199` | `-0.3184` | `0.4487` | `40.0` |
+| Four-arm no skill / no graph target-history baseline | Scores deterministic target-history candidates while keeping skill and graph disabled | `0.7617` | `0.7530` | `0.4686` | `-0.2616` | `5.7652` | `40.0` |
+| Graph only | Adds causal graph candidate expansion without Abel Invest workflow instructions | `0.9514` | `0.9374` | `0.6461` | `-0.2527` | `9.5752` | `198.2` |
+| Skill only | Adds Abel Invest workflow discipline without causal graph access | `0.8194` | `0.8088` | `0.5126` | `-0.1916` | `5.7444` | `40.0` |
+| Skill + graph | Combines Abel Invest workflow with causal graph candidate expansion | `1.0245` | `1.0099` | `0.7089` | `-0.1666` | `8.1007` | `207.0` |
+
 The information-gain story is visible in the factor isolation:
 
 | Capability contrast | What improved | Readout |
